@@ -108,25 +108,30 @@ Our container does **not** contain a model. It contains **orchestration**. The a
 ## 6. Pre-event checklist
 
 ### Accounts & keys
-- [ ] GitHub repo created, private, Paula + Emre added as collaborators
-- [ ] Vercel account, connected to the repo, auto-deploy from `main` working
+- [x] GitHub repo created, private — **github.com/Macropodux/hacknation-scaffold**
+- [ ] Paula + Emre added as collaborators *(need their GitHub usernames)*
+- [x] Vercel connected, **auto-deploy from `main` verified working (~15s)**
 - [ ] Supabase project created
 - [ ] Anthropic API key in Vercel env vars (using existing credits)
 - [ ] Spend cap + auto-reload set on Anthropic console
 - [ ] ⚠️ **Confirm HALKIN hub registration is separate from main event registration** — hubs have their own Luma signup. Don't discover this at 16:00 Saturday.
 
 ### The scaffold — *deployed and clicked-through, or it doesn't count*
-- [ ] Next.js app live at a Vercel URL
+Live: **https://hacknation-scaffold.vercel.app/** — the status board there reports which
+commit is deployed and lights each row below as it gets wired.
+
+- [x] Next.js app live at a Vercel URL
 - [ ] Supabase auth: can sign up + log in
 - [ ] Postgres: a table, reads and writes working
 - [ ] LLM streaming endpoint working (via Vercel AI SDK)
 - [ ] File upload working
-- [ ] Tailwind + design system in place
-- [ ] `Dockerfile` builds and runs ⚠️ *(one source says submissions must be containerized — verify)*
+- [x] Tailwind in place — design system still to do
+- [x] `Dockerfile` builds and runs — **verified: image builds, container serves 200** ⚠️ *(the containerization requirement itself is still unconfirmed — belt and braces)*
 - [ ] A throwaway demo feature proving every layer end-to-end — **deleted on Saturday**
 
 ### Agent setup
-- [ ] `CLAUDE.md` with stack conventions + the hard rules
+- [x] `AGENTS.md` with stack conventions + hard rules (`CLAUDE.md` imports it via `@AGENTS.md`, so Claude Code / Cursor / Copilot all get the same instructions)
+- [x] Next.js 16 docs bundled at `node_modules/next/dist/docs/` — `AGENTS.md` points agents there instead of stale training data
 - [ ] MCP: Supabase, Vercel
 - [ ] Prompt library for the 02:00 tasks
 
