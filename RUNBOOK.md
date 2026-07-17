@@ -1,6 +1,8 @@
 # Hack-Nation 6th Global AI Hackathon — Team Runbook
 
-**Team:** Josh (product / agents / design / video) · Paula (build + domain) · Emre (ML + data) *[TBC — confirming Thu 17 Jul]*
+**Team (4):** Josh (product / agents / design / video) · Paula `paulatin4mente` (build + domain) · Emre ✅ confirmed (ML + data) · 4th member, AI background *(username TBC)*
+
+> **Four people, one small app, 20 hours.** Three builders in the same codebase is about the ceiling — a fourth pair of hands in the same files costs more in collisions than it adds. Give member 4 a lane that isn't `src/app/`: data/ML, or owning user testing + demo prep. Decide this before Saturday, not at 02:00.
 **Hub:** HALKIN, London
 **Status of this doc:** living. Times confirmed from the official participant deck (p.2). Anything marked ⚠️ is unverified.
 
@@ -114,7 +116,11 @@ Our container does **not** contain a model. It contains **orchestration**. The a
 - [ ] Supabase project created
 - [ ] Anthropic API key in Vercel env vars (using existing credits)
 - [ ] Spend cap + auto-reload set on Anthropic console
-- [ ] ⚠️ **Confirm HALKIN hub registration is separate from main event registration** — hubs have their own Luma signup. Don't discover this at 16:00 Saturday.
+- [x] HALKIN hub — **all registered, in person** ✓
+
+### ⚠️ If you rename the Vercel project on Saturday, do it in the FIRST HOUR
+Renaming changes the `.vercel.app` URL and **the old one stops resolving**. Judges click that
+link for a week (19–25 Jul). Rename before you submit, or don't rename at all.
 
 ### The scaffold — *deployed and clicked-through, or it doesn't count*
 Live: **https://hacknation-scaffold.vercel.app/** — the status board there reports which

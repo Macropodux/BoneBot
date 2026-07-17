@@ -14,13 +14,17 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Team
 
-Three scientists, no professional web engineers. All three direct agents rather than hand-writing code.
+Four scientists, no professional web engineers. All direct agents rather than hand-writing code.
 
 - **Josh** — physicist & licensed physician. Product owner, design, demo video. **Decides scope cuts.**
-- **Paula** — Cambridge molecular neuroscientist. Builds via agents, domain validation.
-- **Emre** — UCL computational neuroscientist. ML/data logic, Python/PyTorch. *(TBC)*
+- **Paula** (`paulatin4mente`) — Cambridge molecular neuroscientist. Builds via agents, domain validation.
+- **Emre** — UCL computational neuroscientist. ML/data logic, Python/PyTorch.
+- **4th member** — AI background. *(username TBC)*
 
 Each runs their own agent on their own clone. **This file is the only thing keeping those agents consistent** — it matters.
+
+⚠️ Four people share this repo. Before creating or heavily editing a file, prefer one that
+nobody else is in. Collisions cost more than they look at 02:00.
 
 ## Stack
 
