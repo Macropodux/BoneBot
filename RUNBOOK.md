@@ -131,7 +131,9 @@ commit is deployed and lights each row below as it gets wired.
 - [x] **LLM streaming verified in production** — real tokens, chunk by chunk, via the AI SDK.
       Model is `ANTHROPIC_MODEL` (default `claude-sonnet-5`); provider swap to OpenAI is one line.
       Out-of-key returns a plain 503 sentence, not a stack trace — verified.
-- [ ] Postgres: one trivial read/write to prove the connection *(~30 min — worth it)*
+- [x] **Postgres round-trip verified** — write from one request, read back from another;
+      rows from different machines land in the same DB (`supabase/scam_checks.sql` = the table).
+      Write path degrades gracefully: a missing/broken DB still returns the verdict.
 - [ ] ~~Supabase auth: sign up + log in~~ — **deliberately skipped.** See the no-login-wall
       rule in `AGENTS.md`. Build it only if a challenge genuinely needs accounts.
 - [ ] File upload — only if needed
