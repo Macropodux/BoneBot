@@ -15,7 +15,6 @@ export default function Chat() {
     <div className="mx-auto flex h-screen max-w-2xl flex-col gap-4 p-6">
       <header className="flex items-baseline justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
         <h1 className="font-semibold">Streaming test</h1>
-        <span className="font-mono text-xs text-zinc-500">claude-opus-4-8</span>
       </header>
 
       <div className="flex flex-1 flex-col gap-4 overflow-y-auto">
