@@ -74,6 +74,19 @@ Full version-matched Next.js docs are at `node_modules/next/dist/docs/`. **Read 
 - ⛔ **No speculative abstraction.** This code has a 21-hour lifespan.
 - If you've failed the same task twice, **stop and say so.** Don't try a third variation — surface the blocker.
 
+### ⛔ No login wall in front of the demo
+Judges have 400+ submissions and a week. They open the URL. **If they hit a signup form, a real
+fraction just leave** — and the product gets scored on its login page.
+
+**The demo must work with zero setup: no account, no wall.** If the product genuinely needs
+accounts, add a "try the demo" button that skips straight in, or pre-seed an account and put the
+credentials on the landing page.
+
+Supabase is wired but **using it is not required**. It earns its place only if the product must
+*remember* something across page loads or users. Plenty of strong 20-hour demos are stateless:
+input → LLM does something clever → output. Wired-and-unused is a fine outcome. Using it *because
+we set it up* is the mistake.
+
 ### Demo-first
 The team writes a 3-minute demo script *before* any product code. **If a thing isn't in the demo script, it doesn't get built.** If asked for something outside the script, ask whether it's actually needed.
 
