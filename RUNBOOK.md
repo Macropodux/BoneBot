@@ -111,11 +111,12 @@ Our container does **not** contain a model. It contains **orchestration**. The a
 
 ### Accounts & keys
 - [x] GitHub repo created, private — **github.com/Macropodux/hacknation-scaffold**
-- [ ] Paula + Emre added as collaborators *(need their GitHub usernames)*
+- [x] Paula (`paulatin4mente`) accepted · Emre (`eyavuz21`) invited · 4th member TBC
 - [x] Vercel connected, **auto-deploy from `main` verified working (~15s)**
-- [ ] Supabase project created
-- [ ] Anthropic API key in Vercel env vars (using existing credits)
-- [ ] Spend cap + auto-reload set on Anthropic console
+- [x] Supabase project created (London region)
+- [x] Anthropic API key in Vercel — **marked Sensitive, Production + Preview**
+      *(Sensitive vars can't target Development; irrelevant — we use `npm run dev` + `.env.local`)*
+- [ ] Spend cap + auto-reload set on Anthropic console ⚠️ **must outlast 25 Jul**
 - [x] HALKIN hub — **all registered, in person** ✓
 
 ### ⚠️ If you rename the Vercel project on Saturday, do it in the FIRST HOUR
@@ -127,10 +128,13 @@ Live: **https://hacknation-scaffold.vercel.app/** — the status board there rep
 commit is deployed and lights each row below as it gets wired.
 
 - [x] Next.js app live at a Vercel URL
-- [ ] Supabase auth: can sign up + log in
-- [ ] Postgres: a table, reads and writes working
-- [ ] LLM streaming endpoint working (via Vercel AI SDK)
-- [ ] File upload working
+- [x] **LLM streaming verified in production** — real tokens, chunk by chunk, via the AI SDK.
+      Model is `ANTHROPIC_MODEL` (default `claude-sonnet-5`); provider swap to OpenAI is one line.
+      Out-of-key returns a plain 503 sentence, not a stack trace — verified.
+- [ ] Postgres: one trivial read/write to prove the connection *(~30 min — worth it)*
+- [ ] ~~Supabase auth: sign up + log in~~ — **deliberately skipped.** See the no-login-wall
+      rule in `AGENTS.md`. Build it only if a challenge genuinely needs accounts.
+- [ ] File upload — only if needed
 - [x] Tailwind in place — design system still to do
 - [x] `Dockerfile` builds and runs — **verified: image builds, container serves 200** ⚠️ *(the containerization requirement itself is still unconfirmed — belt and braces)*
 - [ ] A throwaway demo feature proving every layer end-to-end — **deleted on Saturday**
