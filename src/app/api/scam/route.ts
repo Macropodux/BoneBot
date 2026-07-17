@@ -1,6 +1,7 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { VerdictSchema } from "@/lib/scam-schema";
+import { supabase } from "@/lib/supabase";
 
 export const maxDuration = 30;
 
@@ -67,5 +68,40 @@ export async function POST(req: Request) {
     prompt: message,
   });
 
+  // Remember this check. Two deliberate choices:
+  //
+  // 1. Wrapped so a DB failure NEVER breaks the product. If Supabase is down,
+  //    or the table doesn't exist yet, the user still gets their verdict.
+  //    Logging is a side feature; it must not be able to kill the core.
+  // 2. We store a short preview, not the full message. People paste private
+  //    things into a scam checker. Store the minimum — the verdict metadata and
+  //    enough text to recognise it. (This matters more for a clinical tool.)
+  try {
+    const { error } = await supabase.from("scam_checks").insert({
+      verdict: object.verdict,
+      confidence: object.confidence,
+      summary: object.summary,
+      message_preview: message.trim().slice(0, 80),
+    });
+    if (error) console.error("scam_checks insert failed:", error.message);
+  } catch (e) {
+    console.error("scam_checks insert threw:", e);
+  }
+
   return Response.json(object);
+}
+
+// The "memory" read: the last few checks, newest first. This is what makes the
+// database visible in the UI — proof the app remembers across reloads and users.
+export async function GET() {
+  const { data, error } = await supabase
+    .from("scam_checks")
+    .select("verdict, confidence, message_preview, created_at")
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  // Table missing / RLS blocking → return empty rather than 500. The page just
+  // shows no history; the checker still works.
+  if (error) return Response.json({ checks: [] });
+  return Response.json({ checks: data });
 }

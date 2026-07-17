@@ -8,8 +8,15 @@
 //
 // Worked example only. Delete on Saturday.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Verdict } from "@/lib/scam-schema";
+
+type RecentCheck = {
+  verdict: Verdict["verdict"];
+  confidence: number;
+  message_preview: string;
+  created_at: string;
+};
 
 const STYLES = {
   scam: { dot: "bg-red-500", label: "Likely scam" },
@@ -51,6 +58,22 @@ export default function ScamCheck() {
   const [result, setResult] = useState<Verdict | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recent, setRecent] = useState<RecentCheck[]>([]);
+
+  // Read the memory: GET /api/scam returns the last few checks from Supabase.
+  async function loadRecent() {
+    try {
+      const res = await fetch("/api/scam");
+      const { checks } = await res.json();
+      setRecent(checks ?? []);
+    } catch {
+      // No history is not an error worth showing — the checker still works.
+    }
+  }
+
+  useEffect(() => {
+    loadRecent();
+  }, []);
 
   async function check() {
     setBusy(true);
@@ -64,6 +87,7 @@ export default function ScamCheck() {
       });
       if (!res.ok) throw new Error(await res.text());
       setResult(await res.json());
+      loadRecent(); // the check we just ran is now in the memory — show it
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -149,6 +173,29 @@ export default function ScamCheck() {
               </ul>
             </>
           )}
+        </section>
+      )}
+
+      {recent.length > 0 && (
+        <section className="flex flex-col gap-3 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+          <h2 className="font-mono text-xs uppercase tracking-widest text-zinc-500">
+            Recently checked
+          </h2>
+          <ul className="flex flex-col gap-2">
+            {recent.map((r, i) => (
+              <li key={i} className="flex items-center gap-3 text-sm">
+                <span
+                  className={`h-2 w-2 flex-shrink-0 rounded-full ${STYLES[r.verdict].dot}`}
+                />
+                <span className="flex-1 truncate text-zinc-600 dark:text-zinc-400">
+                  {r.message_preview}
+                </span>
+                <span className="font-mono text-xs text-zinc-400">
+                  {r.confidence}%
+                </span>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
     </div>
