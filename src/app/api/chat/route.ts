@@ -19,7 +19,7 @@ export const maxDuration = 30;
 //
 // Judges click the live URL for a week (19–25 Jul) on our credits, so this
 // also decides how long the money lasts.
-const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5";
+const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5";
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -33,6 +33,12 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model: anthropic(MODEL),
+    providerOptions: {
+      anthropic: {
+        thinking: { type: "adaptive", display: "summarized" },
+        effort: "high",   // low | medium | high | xhigh | max
+      },
+    },
     messages: await convertToModelMessages(messages),
   });
 
