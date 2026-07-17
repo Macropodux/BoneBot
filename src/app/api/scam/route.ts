@@ -61,12 +61,24 @@ export async function POST(req: Request) {
   // generateObject (not streamText): we want one validated object, not a
   // token stream. The SDK sends the schema to the model, validates the reply
   // against it, and retries on mismatch — so `object` is guaranteed to fit.
-  const { object } = await generateObject({
-    model: anthropic(MODEL),
-    schema: VerdictSchema,
-    system: SYSTEM,
-    prompt: message,
-  });
+  let object;
+  try {
+    ({ object } = await generateObject({
+      model: anthropic(MODEL),
+      schema: VerdictSchema,
+      system: SYSTEM,
+      prompt: message,
+    }));
+  } catch (e) {
+    // The model call itself failed — bad/expired key, exhausted credits, or a
+    // provider outage. This is the "credits run out mid-week" case from
+    // AGENTS.md. A judge must see a sentence, not a blank 500.
+    console.error("scam model call failed:", e);
+    return new Response(
+      "The checker is temporarily unavailable. Please try again shortly.",
+      { status: 503 },
+    );
+  }
 
   // Remember this check. Two deliberate choices:
   //
