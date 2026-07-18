@@ -10,8 +10,6 @@
 import { useState } from "react";
 import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model";
 
-type Mode = "consumer" | "clinician";
-
 const BAND = {
   elevated: { dot: "bg-red-500", label: "Osteoporosis range is plausible" },
   uncertain: { dot: "bg-amber-500", label: "Uncertain — a scan is the way to be sure" },
@@ -30,7 +28,6 @@ const EXAMPLE: BoneFeatures = {
 };
 
 export default function BoneBot() {
-  const [mode, setMode] = useState<Mode>("consumer");
   const [f, setF] = useState<BoneFeatures>(EXAMPLE);
   const [result, setResult] = useState<ModelOutput | null>(null);
   const [say, setSay] = useState("");
@@ -72,7 +69,7 @@ export default function BoneBot() {
       const r = await fetch("/api/assistant", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mode, result: model, features: f, question: q }),
+        body: JSON.stringify({ mode: "consumer", result: model, features: f, question: q }),
       });
       const text = r.ok ? (await r.json()).text : "BoneBot is unavailable right now — check the result above.";
       setSay(text);
@@ -114,20 +111,6 @@ export default function BoneBot() {
           An estimated bone-density score from data you already have — spoken back to you. Not a diagnosis.
         </p>
       </header>
-
-      <div className="flex gap-2">
-        {(["consumer", "clinician"] as Mode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={`rounded-full px-4 py-1.5 text-sm capitalize ${
-              mode === m ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900" : "border border-zinc-300 dark:border-zinc-700"
-            }`}
-          >
-            {m === "consumer" ? "For me" : "For my GP"}
-          </button>
-        ))}
-      </div>
 
       <section className="grid grid-cols-2 gap-4 rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
         <label className="flex flex-col gap-1 text-sm">
