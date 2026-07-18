@@ -37,10 +37,9 @@ scanned, then estimate it for a woman who **was not**.
 
 ## Front-gate: 4 screening questions (before anything else)
 
-Four simple yes/no questions gate entry. They confirm the tool is valid for her
-(women 50+, postmenopausal — the population the model is trained on) and fast-track
-high risk. Only women who pass Q1–Q3 proceed to the full estimate. Ask Q1–Q2 first
-so ineligible users exit early.
+Four quick questions gate entry — they confirm the tool is valid for her (women
+50+, postmenopausal) and route the special cases. Ask Q1–Q2 first so ineligible
+users exit early.
 
 1. **"Were you assigned female at birth?"**
    → *No* = **exit** (not validated for you); show general bone-health info.
@@ -48,14 +47,24 @@ so ineligible users exit early.
    → *No* = **park** (outside the postmenopausal group the model is built for).
 3. **"Have you already been diagnosed with osteoporosis, had a bone scan, or take
    bone medication?"**
-   → *Yes* = **redirect to GP** (already in care — screening isn't for you).
-4. **"Since age 50, have you broken a bone from a minor fall or knock?"**
-   → *Yes* = **proceed, fast-tracked as high-risk** (strong "see your GP" flag).
+   → *Yes* = she's already been scanned, so **ask for her most recent T-score**
+   instead of estimating one:
+     - *knows it* → skip the estimate; **interpret her real T-score** + give
+       management / lifestyle guidance (a real score beats our estimate).
+     - *doesn't know it* → suggest she get it from her GP.
+   → *No* = continue.
+4. **"How old are you?"** (number)
+   → captures **age** — confirms the 50+ population and feeds the model as the
+   first real data point.
 
-**Flow:** pass Q1 + Q2 and *no* to Q3 → continue to photos + follow-ups + estimate.
-Q4 doesn't gate — it **stratifies**. Every exit stays helpful (general guidance /
-see your GP), never a dead end. Being honest that we only screen who the model is
-valid for is good practice — and it reads well to a clinical judge.
+**To proceed to the rest of the questionnaire:** *Yes* to Q1, *Yes* to Q2, *No* to
+Q3. Q4 isn't a gate — it starts the data capture (age). Every exit stays helpful
+(general guidance / see your GP or get your score), never a dead end. The prior-
+fragility-fracture question — the strongest risk flag — is captured in the main
+questionnaire (it's the `priorFragilityFracture` model feature).
+
+Gating to the population the model is valid for — and using a **real** T-score when
+one already exists — is good practice and reads well to a clinical judge.
 
 ---
 
