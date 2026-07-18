@@ -30,7 +30,7 @@ The conversation begins with four short questions. A low-cost LLM may parse free
 4. **“Have you already been diagnosed with osteoporosis, had a bone scan, or taken bone medication?”**
    `Yes` -> do not produce a new estimate. Ask for the most recent DXA T-score. If known, explain the **reported** result and give cautious, non-treatment guidance; if unknown, direct the person to their GP/scan provider.
 
-The lightweight model uses age and menopause status to estimate P(osteoporosis): a validated result at or below 1% may safely stop the full questionnaire with prevention advice, while a result above 1% proceeds to the full assessment. Until Emre supplies that validated model, threshold, and calibration evidence, the first four questions are routing only; they must not claim “99% chance you do not have osteoporosis.”
+The lightweight model uses age and menopause status to estimate P(osteoporosis): a result at or below the current 5% routing threshold stops the full questionnaire with prevention advice, while a result above 5% proceeds to the full assessment. Until Emre supplies a trained and calibrated model, this percentage remains visibly illustrative and must not claim certainty or diagnosis.
 
 ### 2. Deep multimodal intake
 

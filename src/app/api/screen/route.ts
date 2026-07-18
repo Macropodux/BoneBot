@@ -1,4 +1,4 @@
-import { anthropic } from "@ai-sdk/anthropic";
+import { openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { ReportSchema } from "@/lib/bone-schema";
 import { scoreBone, type BoneFeatures } from "@/lib/bone-model";
@@ -6,7 +6,7 @@ import { evidencePrompt, selectEvidence, usesOnlySelectedEvidence } from "@/lib/
 
 export const maxDuration = 30;
 
-const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5";
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-5-nano";
 
 const SYSTEM = `You explain a bone-health SCREENING model's output to a postmenopausal woman, in plain, warm, non-alarming language.
 
@@ -35,10 +35,10 @@ export async function POST(req: Request) {
   //    credits, outage) we still return the model result; the UI shows a plain
   //    fallback. A judge must never see a blank 500.
   let report = null;
-  if (process.env.ANTHROPIC_API_KEY) {
+  if (process.env.OPENAI_API_KEY) {
     try {
       const { object } = await generateObject({
-        model: anthropic(MODEL),
+        model: openai(MODEL),
         schema: ReportSchema,
         system: SYSTEM,
         prompt: JSON.stringify({

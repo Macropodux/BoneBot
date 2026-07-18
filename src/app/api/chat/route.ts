@@ -1,4 +1,4 @@
-import { anthropic } from "@ai-sdk/anthropic";
+import { openai } from "@ai-sdk/openai";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 
 // The LLM is NOT in this app. This route calls a remote model API with a
@@ -19,10 +19,10 @@ export const maxDuration = 30;
 //
 // Judges click the live URL for a week (19–25 Jul) on our credits, so this
 // also decides how long the money lasts.
-const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5";
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-5-nano";
 
 export async function POST(req: Request) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.OPENAI_API_KEY) {
     // A judge clicking a dead demo should see a sentence, not a stack trace.
     return new Response("Demo unavailable: no API key configured.", {
       status: 503,
@@ -32,13 +32,7 @@ export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
   const result = streamText({
-    model: anthropic(MODEL),
-    providerOptions: {
-      anthropic: {
-        thinking: { type: "adaptive", display: "summarized" },
-        effort: "high",   // low | medium | high | xhigh | max
-      },
-    },
+    model: openai(MODEL),
     messages: await convertToModelMessages(messages),
   });
 

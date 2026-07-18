@@ -58,9 +58,9 @@ the actual T-score.
 - Q1 *No* → general info, stop.
 - Q4 *Yes* → real-T-score path.
 - Else → the lightweight model takes **age (Q2) + menopause (Q3)** → **P(osteoporosis)**:
-  - **≤ 1%** (e.g. a 23-year-old, premenopausal) → "your risk is very low right now"
+  - **≤ 5%** (e.g. a younger, premenopausal woman) → "your initial screening estimate is very low"
     + prevention tips; no full assessment.
-  - **> 1%** → proceed to the **full questionnaire + heavyweight T-score estimate**.
+  - **> 5%** → proceed to the **full questionnaire + heavyweight T-score estimate**.
 
 **Two models, two jobs:**
 - **Lightweight (triage):** logistic regression on a *broad* female age range →
