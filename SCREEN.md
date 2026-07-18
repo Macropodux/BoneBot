@@ -202,6 +202,33 @@ to see, and it's the regulator-conscious framing the challenge rewards.
 
 ---
 
+## BoneBot — the voice format (`/assistant`)
+
+The chat/voice version of the product, built additively so the plain `/screen`
+form still works as the safe fallback demo.
+
+- **Input:** type, or **speak** (browser Web Speech API — no dependency, no key).
+- **The number:** `scoreBone()` runs **client-side** — deterministic, the model.
+  BoneBot never sets the T-score.
+- **Voice out:** `/api/tts` calls **ElevenLabs** (REST, no SDK dep); falls back to
+  the browser voice if `ELEVENLABS_API_KEY` is absent.
+- **Two modes** (toggle): *For me* (consumer — what to do: lifestyle / see a GP)
+  and *For my GP* (clinician — whether to act: decision support). Same model, two
+  system prompts in `/api/assistant`.
+- **Graceful:** both routes return a plain 503 sentence without keys — no stack
+  trace in front of a judge.
+- 🔑 **Needs in Vercel:** `ANTHROPIC_API_KEY` (already set) + `ELEVENLABS_API_KEY`.
+
+### Stretch (optional, NOT the MVP): BoneBeats 🎵
+
+ElevenLabs can generate music, so the consumer's lifestyle tips could become a
+short upbeat encouragement song. Fun, shareable, sponsor-aligned — but a gimmick
+next to the clinical moat, and it cuts against "simpler = punchier." Park it:
+build only if everything else is done and Josh green-lights it, and keep it firmly
+in consumer mode, never clinician.
+
+---
+
 ## The "not yet validated" banner (temporary state)
 
 While `MODEL_IS_VALIDATED = false` in `bone-model.ts`, a visible strip reads:
