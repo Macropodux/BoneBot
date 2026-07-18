@@ -11,6 +11,7 @@
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 import type { BoneFeatures, ModelOutput } from "@/lib/bone-model";
+import { evidencePrompt, selectEvidence } from "@/lib/bone-evidence";
 
 export const maxDuration = 30;
 
@@ -32,8 +33,9 @@ Rules:
 - Explain her estimate in simple terms, then tell her what to do, based on the band:
   • elevated: encourage her to see her GP about a DXA scan and a fracture-risk review — AND give bone-protective lifestyle steps (weight-bearing + resistance exercise, calcium & vitamin D, stop smoking, limit alcohol).
   • uncertain: suggest she mention it to her GP at her next visit, and start the lifestyle steps now.
-  • lower: reassure her, no scan needed now, give lifestyle steps to keep bones strong.
-- Only use the factors you are given. Never invent a number or a factor. No drug or treatment advice. Warm and encouraging, never alarming.`;
+  • lower: explain that this estimate is reassuring but cannot decide on its own whether a scan is appropriate; suggest discussing screening at a routine GP visit if age or other risk factors make that relevant.
+- Only use the factors you are given. Never invent a number or a factor. No drug or treatment advice. Warm and encouraging, never alarming.
+- Use clinical wording only from the approved evidence cards in the prompt, and respect each card's limits.`;
 
 const CLINICIAN_SYSTEM = `You are BoneBot clinical decision-support, addressing a GP or clinician. Be concise and clinical.
 
@@ -44,7 +46,10 @@ Rules:
 - State the estimated T-score, its range, and the band (normal / osteopenia / osteoporosis).
 - Give a clear suggested action for them to weigh, tied to the estimate and range. E.g. "estimate in osteoporosis range, interval crosses -2.5 → consider DXA referral / FRAX assessment"; or "normal estimate → no imaging indicated, reassess if risk factors change".
 - Separate KNOWN clinical risk factors from anything only statistically associated.
-- Note it is an estimate from cross-sectional data, to be confirmed by DXA. Never present it as measured. Only use the factors provided.`;
+- Note it is an estimate from cross-sectional data, to be confirmed by DXA. Never present it as measured. Only use the factors provided.
+- Use clinical wording only from the approved evidence cards in the prompt, and respect each card's limits.`;
+// The request prompt adds only local evidence cards selected from bone-evidence.ts.
+// The LLM must treat their approved wording and limits as a closed evidence set.
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -60,12 +65,12 @@ export async function POST(req: Request) {
     band: body.result.category,
     validated: body.result.validated,
     factors: body.result.contributions.map((c) => ({ factor: c.factor, direction: c.direction })),
-    profile: body.features,
   };
+  const evidence = selectEvidence(body.result.contributions.map((contribution) => contribution.factor));
 
   const prompt = body.question
-    ? `Context (the model's result and her profile):\n${JSON.stringify(context)}\n\nHer question: "${body.question}"\nAnswer it, grounded only in this context.`
-    : `Context (the model's result and her profile):\n${JSON.stringify(context)}\n\nGive the ${body.mode} response now.`;
+    ? `Model context:\n${JSON.stringify(context)}\n\nApproved evidence cards:\n${evidencePrompt(evidence.cards)}\n\nHer question: "${body.question}"\nAnswer only from the model context and approved cards. If they do not answer the question, say so and suggest discussing it with a clinician.`
+    : `Model context:\n${JSON.stringify(context)}\n\nApproved evidence cards:\n${evidencePrompt(evidence.cards)}\n\nGive the ${body.mode} response now. Use only the model context and approved cards.`;
 
   try {
     const { text } = await generateText({ model: anthropic(MODEL), system, prompt });

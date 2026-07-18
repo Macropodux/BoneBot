@@ -16,6 +16,7 @@ When this file exceeds ~300 lines or the wiki passes ~150 pages, shard into `wik
 - [[runbook-md-schedule]] — RUNBOOK.md: Technical architecture guidelines, setup checklists, git workflows, and EWOR Venture Lab E2E evaluation details.
 - [[screen-md-spec]] — SCREEN.md: Front-end layouts, input OCR specs, target variables, output reporting, and ElevenLabs speech synthesis constraints.
 - [[challenge-05-brief]] — Challenge 05 PDF: Official Hack-Nation guidelines, criteria (Impact, Tech, Foundation), recommended datasets, and deliverables.
+- [[clinical-evidence-library]] — Local, versioned evidence cards and source register that constrain BoneBot's clinical explanations.
 
 ## Entities
 

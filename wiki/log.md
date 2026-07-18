@@ -37,3 +37,15 @@ Created `wiki/sources/screen-md-spec.md`. Raw source cited in place at `SCREEN.m
 ## [2026-07-18] ingest | Challenge 05 PDF — Official Guidelines
 
 Created `wiki/sources/challenge-05-brief.md`. Raw source PDF read from `challange/` subdirectory. Source-only ingest.
+
+## [2026-07-18] schema | Added the `evidence` tag
+
+Added the `evidence` tag for vetted clinical and scientific material that
+constrains BoneWise explanations.
+
+## [2026-07-18] ingest | BoneWise Clinical Evidence Library
+
+Created `wiki/sources/clinical-evidence-library.md`. Raw source cited in place at
+`docs/EVIDENCE.md`; the runtime catalogue remains in `src/lib/bone-evidence.ts`.
+This source records the evidence boundaries used to constrain LLM explanations,
+including the evidence-only status of ALP and full-blood-count measures.

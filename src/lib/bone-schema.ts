@@ -16,6 +16,7 @@ export const ReportSchema = z.object({
       z.object({
         factor: z.string().describe("Must be one of the factors provided — do not invent."),
         plain: z.string().describe("One sentence: how this factor affects bone health, in plain language."),
+        evidenceIds: z.array(z.string()).min(1).describe("Must use only evidence-card IDs supplied in the prompt."),
       }),
     )
     .describe("Explain the top factors the model used, grounded ONLY in the contributions provided."),
@@ -24,11 +25,13 @@ export const ReportSchema = z.object({
     .describe(
       "The one or two things she can actually change — chiefly weight-bearing activity — framed constructively. Only mention factors present in the input.",
     ),
+  modifiableEvidenceIds: z.array(z.string()).min(1).describe("Must use only evidence-card IDs supplied in the prompt."),
   recommendation: z
     .string()
     .describe(
       "The next step, e.g. discussing a DXA bone-density scan with her clinician. This is a screening flag, NEVER a diagnosis or a treatment. Make that explicit.",
     ),
+  recommendationEvidenceIds: z.array(z.string()).min(1).describe("Must use only evidence-card IDs supplied in the prompt."),
 });
 
 export type Report = z.infer<typeof ReportSchema>;

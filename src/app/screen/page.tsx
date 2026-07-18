@@ -6,8 +6,9 @@
 import { useState } from "react";
 import type { ModelOutput } from "@/lib/bone-model";
 import type { Report } from "@/lib/bone-schema";
+import type { EvidenceSource } from "@/lib/bone-evidence";
 
-type Result = { model: ModelOutput; report: Report | null };
+type Result = { model: ModelOutput; report: Report | null; evidence: EvidenceSource[] };
 
 const CATEGORY = {
   elevated: { dot: "bg-red-500", label: "Elevated screening risk" },
@@ -166,6 +167,21 @@ export default function Screen() {
             <p className="text-sm text-zinc-500">
               Screening result shown above. (The plain-language explanation is temporarily unavailable.)
             </p>
+          )}
+
+          {result.evidence.length > 0 && (
+            <details className="border-t border-zinc-200 pt-3 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+              <summary className="cursor-pointer font-medium">Evidence used for this explanation</summary>
+              <ul className="mt-2 flex flex-col gap-1">
+                {result.evidence.map((source) => (
+                  <li key={source.id}>
+                    <a href={source.url} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                      {source.publisher}: {source.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
 
           <p className="border-t border-zinc-200 pt-3 text-xs text-zinc-400 dark:border-zinc-800">

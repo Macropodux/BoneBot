@@ -31,6 +31,7 @@ Add additional types here as the wiki evolves.
 - `bonewise` — content specific to the BoneWise product build.
 - `hackathon` — content about the Hack-Nation event/team, not the product itself.
 - `challenge-brief` — the original challenge brief material.
+- `evidence` — vetted clinical and scientific evidence used to constrain BoneWise explanations.
 
 ## Page sizing
 
