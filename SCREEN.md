@@ -35,29 +35,41 @@ scanned, then estimate it for a woman who **was not**.
 
 ---
 
-## Front-gate: 4 screening questions (before anything else)
+## Front-gate: 4 questions → soft triage (before the full assessment)
 
-Four quick questions gate entry — they confirm the tool is valid for her (women
-50+, postmenopausal) and route the special cases. Each is evidence-based (why,
-below). Ask Q1–Q2 first so ineligible users exit early.
+Four opening questions feed a **lightweight triage model** that estimates the
+*probability* osteoporosis is even plausible — a **graded screen, not a hard
+cutoff**. It answers "should we even look?" before the heavyweight model estimates
+the actual T-score.
 
-1. **"Were you assigned female at birth?"**
-   → *No* = **exit** (not validated for you); show general bone-health info.
-2. **"Have your periods stopped for good, or are you 50 or older?"**
-   → *No* = **park** (outside the postmenopausal group the model is built for).
-3. **"Have you already been diagnosed with osteoporosis, had a bone scan, or take
-   bone medication?"**
-   → *Yes* = she's already been scanned, so **ask for her most recent T-score**
-   instead of estimating one (knows it → interpret the real score + guidance;
-   doesn't → point her to her GP).
-   → *No* = continue.
-4. **"Since age 50, have you broken a bone from a minor fall or knock?"**
-   → *Yes* = proceed, **fast-tracked as high risk** (strong "see your GP" flag).
+1. **"Were you assigned female at birth?"** *(yes/no)*
+   → eligibility — the model is trained on women. *No* → general bone-health info, stop.
+2. **"How old are you?"** *(number)*
+   → the **main driver of the triage probability**. Replaces a hard "50+" cutoff —
+   the model grades age continuously.
+3. **"Have your periods stopped for good (menopause)?"** *(yes / no / not sure)*
+   → feeds the triage alongside age; being postmenopausal sharply raises the probability.
+4. **"Have you already been diagnosed with osteoporosis, had a bone scan, or take
+   bone medication?"** *(yes/no)*
+   → routing. *Yes* → ask for her **real T-score** and interpret it (skip the
+   estimate; unknown → point her to her GP). *No* → run the assessment.
 
-**To proceed to the rest of the questionnaire:** *Yes* to Q1, *Yes* to Q2, *No* to
-Q3. Q4 doesn't gate — it **stratifies**. (Exact age is captured as the first field
-of the main questionnaire — the `age` model feature.) Every exit stays helpful,
-never a dead end.
+**Flow:**
+- Q1 *No* → general info, stop.
+- Q4 *Yes* → real-T-score path.
+- Else → the lightweight model takes **age (Q2) + menopause (Q3)** → **P(osteoporosis)**:
+  - **≤ 1%** (e.g. a 23-year-old, premenopausal) → "your risk is very low right now"
+    + prevention tips; no full assessment.
+  - **> 1%** → proceed to the **full questionnaire + heavyweight T-score estimate**.
+
+**Two models, two jobs:**
+- **Lightweight (triage):** logistic regression on a *broad* female age range →
+  P(osteoporosis). Answers "should we even look?"
+- **Heavyweight (estimate):** the regression on eligible women → the estimated
+  T-score. Answers "how are your bones?"
+
+The **prior-fragility-fracture** question moves into the **main questionnaire** — it
+sharpens the T-score (a heavyweight feature) but doesn't drive the triage.
 
 ### Why each is evidence-based
 
@@ -65,22 +77,19 @@ never a dead end.
   **1 in 3 women vs 1 in 5 men over 50** (International Osteoporosis Foundation) —
   because oestrogen is central to bone maintenance. The model is also trained on
   women only, so it's valid only for them.
-- **Q2 (menopause / 50+):** oestrogen loss at menopause is the primary driver of
-  accelerated bone loss; mean age of natural menopause ≈ **51**. **50 (not 45)
-  because it matches our NHANES training population (women 50+)** — a model is only
-  valid for the group it was trained on — and it aligns with mean menopause age.
-  (USPSTF screens women ≥65 and younger postmenopausal women at risk; FRAX is
-  validated 40–90.) *Honest edge case: a woman postmenopausal before 50 passes on
-  the "periods stopped" clause but sits just outside the training age range — a mild
-  extrapolation we'd note.*
-- **Q3 (already diagnosed):** screening tools are for the **undiagnosed**; a woman
+- **Q2 (age):** osteoporosis risk **rises steeply with age** — the triage model
+  learns this gradient from a broad age range, so a 23-year-old comes out ~0% and an
+  older woman clearly higher. A *number* (not a cutoff) lets it grade risk smoothly.
+- **Q3 (menopause):** oestrogen loss at menopause is the primary driver of
+  accelerated bone loss; mean age of natural menopause ≈ **51**. Postmenopausal
+  status sharply raises risk on top of age.
+- **Q4 (already diagnosed):** screening tools are for the **undiagnosed**; a woman
   already diagnosed or treated follows her care pathway — and we capture her **real**
   T-score rather than estimate one. Standard screening-design practice.
-- **Q4 (fragility fracture since 50):** a prior **low-trauma (fragility) fracture**
-  is among the strongest predictors of future fracture — roughly **doubling risk,
-  independent of BMD** — and is a core **FRAX** variable. "Minor fall or knock"
-  captures the clinically meaningful low-trauma distinction (vs a high-trauma injury
-  like a car crash).
+
+*(The prior-fragility-fracture question — a core FRAX predictor that roughly doubles
+fracture risk independent of BMD — is asked in the main questionnaire, where it
+sharpens the T-score estimate.)*
 
 ---
 
