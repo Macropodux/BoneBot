@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// BoneWise brand type (design_handoff_bonewise): Space Grotesk for headings/
+// BoneBot brand type: Space Grotesk for headings/
 // wordmark/buttons/stats, IBM Plex Sans for everything else. Self-hosted via
 // next/font — no runtime Google Fonts request, unlike the design prototype's
 // CDN <link>.
@@ -29,7 +29,7 @@ const body = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "BoneWise",
+  title: "BoneBot",
   description: "Hormone-aware bone-health screening for postmenopausal women — Hack-Nation Challenge 05.",
 };
 

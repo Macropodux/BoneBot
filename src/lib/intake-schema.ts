@@ -5,19 +5,20 @@ import {
   type MenopauseStatus,
   type TriageOutput,
 } from "@/lib/triage-model";
+import { tScoreModel } from "../../model/model-parameters";
 
 // The server owns this state machine. An LLM may explain an outcome, but it
 // must never choose the next question, triage route, or screening result.
 export const IntakeAnswersSchema = z.object({
   assignedFemaleAtBirth: z.boolean().optional(),
-  age: z.number().int().min(18).max(120).optional(),
+  age: z.number().int().min(18).max(110).optional(),
   menopauseStatus: z.enum(["yes", "no", "not-sure"]).optional(),
   hasExistingBoneCare: z.boolean().optional(),
   knowsDxaTScore: z.boolean().optional(),
-  dxaTScore: z.number().min(-6).max(4).optional(),
+  dxaTScore: z.number().min(-5).max(3).optional(),
   dxaYear: z.number().int().min(1900).max(2100).optional(),
   dxaYearKnown: z.boolean().optional(),
-  yearsSinceMenopause: z.number().min(0).max(80).optional(),
+  yearsSinceMenopause: z.number().min(0).max(60).optional(),
   onHormoneTherapy: z.boolean().optional(),
   priorFragilityFracture: z.boolean().optional(),
   heightCm: z.number().min(100).max(230).optional(),
@@ -282,11 +283,11 @@ function toBoneFeatures(answers: IntakeAnswers): BoneFeatures {
     weightBearingActivity: activityFromSteps(answers.averageDailySteps!),
     currentSmoker: answers.currentSmoker!,
     parentalHipFracture: answers.parentalHipFracture!,
-    glucocorticoids: false,
-    rheumatoidArthritis: false,
-    highAlcohol: false,
-    vitaminD: 50,
-    calcium: 2.4,
+    glucocorticoids: Boolean(tScoreModel.imputationDefaults.glucocorticoids),
+    rheumatoidArthritis: Boolean(tScoreModel.imputationDefaults.rheumatoidArthritis),
+    highAlcohol: Boolean(tScoreModel.imputationDefaults.highAlcohol),
+    vitaminD: tScoreModel.imputationDefaults.vitaminD,
+    calcium: tScoreModel.imputationDefaults.calcium,
   };
 }
 

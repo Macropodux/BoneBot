@@ -1,7 +1,7 @@
 "use client";
 
-// BoneWise — landing -> chip-based chat screening -> results, in one page.
-// Recreated from design_handoff_bonewise/BoneWise.dc.html (a Claude design
+// BoneBot — landing -> chip-based chat screening -> results, in one page.
+// Recreated from the design handoff (a Claude design
 // prototype, not production code) per its README: translate inline styles to
 // Tailwind, wire the chat to the real model (bone-model.ts) + Vercel AI SDK
 // instead of the prototype's mocked scoring/answers.
@@ -17,17 +17,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model";
+import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
+import { tScoreModel } from "../../model/model-parameters";
 
 const ACCENT = "#0E7C6E";
 const ACCENT_HOVER = "#0A5A50";
 const ACCENT_TINT = "#E4F0ED";
 
-type StepKey = "age" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "weight";
+type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "weight";
 
 type Step = { key: StepKey; q: string; options: string[] };
 
 const STEPS: Step[] = [
+  { key: "assignedFemale", q: "Were you assigned female at birth?", options: ["Yes", "No"] },
   { key: "age", q: "Let's start simple — how old are you?", options: ["Under 55", "55–64", "65–74", "75 or older"] },
+  { key: "menopauseStatus", q: "Have your periods stopped for good?", options: ["Yes", "No", "Not sure"] },
+  { key: "existingCare", q: "Have you already been diagnosed with osteoporosis, had a bone scan, or taken bone medication?", options: ["Yes", "No"] },
   { key: "menopause", q: "At what age did you reach menopause?", options: ["Before 40", "40–45", "After 45", "Not sure"] },
   { key: "fracture", q: "Have you broken a bone since age 50 — even from a minor fall or bump?", options: ["Yes", "No"] },
   { key: "parent", q: "Did either of your parents ever fracture a hip?", options: ["Yes", "No", "Not sure"] },
@@ -37,7 +42,10 @@ const STEPS: Step[] = [
 ];
 
 const EXAMPLE_ANSWERS: Record<StepKey, string> = {
+  assignedFemale: "Yes",
   age: "65–74",
+  menopauseStatus: "Yes",
+  existingCare: "No",
   menopause: "40–45",
   fracture: "No",
   parent: "Yes",
@@ -51,16 +59,17 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
 // rheumatoid arthritis / alcohol aren't part of this flow. Same illustrative
 // defaults used before. Not measurements.
 const FIELD_DEFAULTS = {
-  onHormoneTherapy: false,
-  weightBearingActivity: 0.2,
-  rheumatoidArthritis: false,
-  highAlcohol: false,
-  vitaminD: 45,
-  calcium: 2.4,
+  onHormoneTherapy: Boolean(tScoreModel.imputationDefaults.onHormoneTherapy),
+  weightBearingActivity: tScoreModel.imputationDefaults.activityLevel,
+  rheumatoidArthritis: Boolean(tScoreModel.imputationDefaults.rheumatoidArthritis),
+  highAlcohol: Boolean(tScoreModel.imputationDefaults.highAlcohol),
+  vitaminD: tScoreModel.imputationDefaults.vitaminD,
+  calcium: tScoreModel.imputationDefaults.calcium,
 } as const;
 
 const AGE_MIDPOINT: Record<string, number> = { "Under 55": 50, "55–64": 60, "65–74": 70, "75 or older": 80 };
 const MENOPAUSE_AGE_MIDPOINT: Record<string, number> = { "Before 40": 35, "40–45": 42, "After 45": 48, "Not sure": 48 };
+const MENOPAUSE_STATUS = { Yes: "yes", No: "no", "Not sure": "not-sure" } as const;
 
 function mapAnswersToFeatures(answers: Record<StepKey, string>): BoneFeatures {
   const age = AGE_MIDPOINT[answers.age] ?? 65;
@@ -183,6 +192,8 @@ export default function Home() {
 
   const [features, setFeatures] = useState<BoneFeatures | null>(null);
   const [result, setResult] = useState<ModelOutput | null>(null);
+  const [triageResult, setTriageResult] = useState<TriageOutput | null>(null);
+  const [routeMessage, setRouteMessage] = useState("");
 
   const [qaMessages, setQaMessages] = useState<ChatMessage[]>([]);
   const [qaTyping, setQaTyping] = useState(false);
@@ -212,7 +223,7 @@ export default function Home() {
     setMessages([]);
     setAnswers({});
     botSay(
-      "Hi, I'm BoneWise. I'll ask you 7 quick questions, then a model trained on NHANES data estimates your bone-health risk. I only explain the result — I never decide it."
+      "Hi, I'm BoneBot. I'll ask you 7 quick questions, then a model trained on NHANES data estimates your bone-health risk. I only explain the result — I never decide it."
     );
     window.setTimeout(() => botSay(STEPS[0].q), 1400);
   }
@@ -238,12 +249,58 @@ export default function Home() {
     setScreen("results");
   }
 
+  async function finishAtGate(message: string, triageResultValue?: TriageOutput) {
+    setRouteMessage(message);
+    setTriageResult(triageResultValue ?? null);
+    setResult(null);
+    let explanation = message;
+    if (triageResultValue) {
+      try {
+        const response = await fetch("/api/assistant", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ mode: "consumer", triage: triageResultValue }),
+        });
+        if (response.ok) explanation = (await response.json()).text;
+      } catch {
+        /* The deterministic result remains visible if the explanation is unavailable. */
+      }
+    }
+    setQaMessages([{ role: "bot", text: explanation }]);
+    setScreen("results");
+  }
+
   function answer(opt: string) {
     if (typing) return;
     const step = STEPS[stepIdx];
     const nextAnswers = { ...answers, [step.key]: opt };
     setMessages((m) => [...m, { role: "user", text: opt }]);
     setAnswers(nextAnswers);
+
+    if (stepIdx === 3) {
+      if (nextAnswers.assignedFemale !== "Yes") {
+        void finishAtGate("BoneBot is currently calibrated for people assigned female at birth. A clinician can help you find the right bone-health assessment.");
+        return;
+      }
+      if (nextAnswers.existingCare === "Yes") {
+        void finishAtGate("Because you may already have a scan result, diagnosis, or treatment plan, BoneBot will not replace it with an estimate. Please ask your GP or scan provider for your most recent DXA report and recommended follow-up.");
+        return;
+      }
+      const triage = scoreTriage({
+        age: AGE_MIDPOINT[nextAnswers.age ?? ""] ?? 65,
+        menopauseStatus:
+          nextAnswers.menopauseStatus === "Yes"
+            ? MENOPAUSE_STATUS.Yes
+            : nextAnswers.menopauseStatus === "No"
+              ? MENOPAUSE_STATUS.No
+              : MENOPAUSE_STATUS["Not sure"],
+      });
+      if (!triage.proceedToFullAssessment) {
+        void finishAtGate(`Your initial screening estimate is ${triage.probabilityPercent}%, below BoneBot’s ${triage.thresholdPercent}% threshold for the full assessment.`, triage);
+        return;
+      }
+      botSay("Your initial screening estimate is above our threshold, so I’ll ask a few more questions to create your full bone-health screening result.");
+    }
 
     const nextIdx = stepIdx + 1;
     setStepIdx(nextIdx);
@@ -267,6 +324,8 @@ export default function Home() {
     setStepIdx(0);
     setResult(null);
     setFeatures(null);
+    setTriageResult(null);
+    setRouteMessage("");
   }
 
   async function qaAsk(q: string) {
@@ -309,7 +368,7 @@ export default function Home() {
         <div className="flex flex-1 flex-col">
           <header className="flex items-center justify-between px-6 py-5 sm:px-12">
             <div className="font-[family-name:var(--font-heading)] text-[22px] font-bold tracking-[-0.02em]">
-              Bone<span style={{ color: ACCENT }}>Wise</span>
+              Bone<span style={{ color: ACCENT }}>Bot</span>
             </div>
             <div className="rounded-full border border-[#D5DCDA] px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#5A6462]">
               Hack-Nation · Challenge 05
@@ -347,7 +406,7 @@ export default function Home() {
               {[
                 { stat: "1 in 2", body: "women over 50 will fracture a bone due to osteoporosis." },
                 { stat: "NHANES", body: "The prediction comes from a model trained on national health survey data — not from a chatbot." },
-                { stat: "7 questions", body: "No account, no forms, no wall. Answer in chat, get a screening flag." },
+                { stat: "Adaptive chat", body: "Four quick screening questions, then more detail only when needed. No account or forms." },
               ].map((c) => (
                 <div key={c.stat} className="rounded-[14px] border border-[#E3E9E7] bg-white px-6 py-[22px] text-left">
                   <div className="font-[family-name:var(--font-heading)] text-[28px] font-bold" style={{ color: ACCENT }}>
@@ -365,7 +424,7 @@ export default function Home() {
         <div className="flex min-h-0 flex-1 flex-col">
           <header className="flex items-center gap-6 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
             <div className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em]">
-              Bone<span style={{ color: ACCENT }}>Wise</span>
+              Bone<span style={{ color: ACCENT }}>Bot</span>
             </div>
             <div className="hidden h-1.5 max-w-[320px] flex-1 overflow-hidden rounded-full bg-[#E3E9E7] sm:block">
               <div
@@ -410,11 +469,24 @@ export default function Home() {
         </div>
       )}
 
+      {screen === "results" && !result && (
+        <div className="flex flex-1 items-center justify-center px-6 py-12">
+          <section className="w-full max-w-2xl rounded-2xl border border-[#E3E9E7] bg-white p-8">
+            <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">Initial screening result</p>
+            {triageResult && <p className="mt-4 font-[family-name:var(--font-heading)] text-6xl font-bold" style={{ color: ACCENT }}>{triageResult.probabilityPercent}%</p>}
+            {triageResult && <p className="mt-2 text-sm text-[#5A6462]">Below the {triageResult.thresholdPercent}% threshold for the full assessment.</p>}
+            <p className="mt-6 text-base leading-[1.6] text-[#4A5452]">{routeMessage}</p>
+            <div className="mt-6 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">{qaMessages[0]?.text}</div>
+            <button onClick={restart} className="mt-7 rounded-[10px] px-5 py-3 font-[family-name:var(--font-heading)] font-bold text-white" style={{ backgroundColor: ACCENT }}>Start over</button>
+          </section>
+        </div>
+      )}
+
       {screen === "results" && result && (
         <div className="flex min-h-0 flex-1 flex-col">
           <header className="flex items-center gap-6 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
             <div className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em]">
-              Bone<span style={{ color: ACCENT }}>Wise</span>
+              Bone<span style={{ color: ACCENT }}>Bot</span>
             </div>
             <div className="text-[13px] font-medium text-[#5A6462]">Screening complete</div>
             <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
@@ -609,7 +681,7 @@ export default function Home() {
 
       <footer className="flex flex-col items-start justify-between gap-3 border-t border-[#E3E9E7] bg-white px-6 py-3.5 sm:flex-row sm:items-center sm:px-12">
         <div className="text-[12.5px] text-[#5A6462]">
-          BoneWise is a screening flag, not a diagnosis. It does not provide medical advice — discuss results with
+          BoneBot is a screening flag, not a diagnosis. It does not provide medical advice — discuss results with
           your clinician.
         </div>
         <div className="whitespace-nowrap text-[12.5px] text-[#9AA5A2]">Hack-Nation 6th Global AI Hackathon · 2026</div>
