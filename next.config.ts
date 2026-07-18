@@ -6,12 +6,11 @@ const nextConfig: NextConfig = {
   output: "standalone",
   async redirects() {
     return [
-      // BoneBot (/assistant) is the product now — send visitors straight
-      // there instead of the old scaffold status board. Temporary (307) so
-      // this is easy to change once a real landing page exists.
+      // The BoneWise landing/chat/results flow now lives at "/" directly
+      // (design_handoff_bonewise). Keep old /assistant links working.
       {
-        source: "/",
-        destination: "/assistant",
+        source: "/assistant",
+        destination: "/",
         permanent: false,
       },
     ];
