@@ -29,10 +29,14 @@ wearable already collects.
 
 A postmenopausal woman enters her profile (age, years since menopause, hormone
 therapy, prior fracture, BMI, a couple of risk factors) and her recent activity
-(from a wearable). She gets back: a screening result — **elevated / uncertain /
-lower** — with a calibrated confidence, the factors driving it, the one or two
-things she can change (chiefly activity), and a clear "this is a flag, not a
-diagnosis — a DXA scan confirms." Nothing else. No login.
+(from a wearable). She gets back: an **estimated T-score with an uncertainty
+range** (on the clinical scale a DXA uses), the band it falls in, the factors
+driving it, the one or two things she can change (chiefly activity), and a clear
+"this is an estimate, not a diagnosis — a DXA scan gives the real T-score."
+
+**Two audiences, one toggle:** **Consumer mode** (warm — encourages lifestyle
+change and, when warranted, a GP visit) and **GP mode** (concise clinical decision
+support). Same model, two presentations. See `SCREEN.md`.
 
 ## 3-minute demo script (the thing we build to)
 
@@ -42,31 +46,32 @@ diagnosis — a DXA scan confirms." Nothing else. No login.
 - **0:20–0:40 — Gap.** Current risk tools are static questionnaires; none use
   the movement data a wearable already collects.
 - **0:40–1:40 — Demo.** Meet [persona], 58, six years postmenopausal, a prior
-  wrist fracture, low activity. She enters it → **Elevated, 78% confidence.** Top
-  factors: years since menopause, prior fracture, low weight-bearing activity.
-  "This is a screening flag, not a diagnosis — a DXA scan confirms. The good
+  wrist fracture, low activity. She enters it → **estimated T-score −2.1, likely
+  −2.8 to −1.4 — the osteoporosis range is plausible.** Top factors: years since
+  menopause, prior fracture, low weight-bearing activity.
+  "This is an estimate, not a diagnosis — a DXA scan confirms. The good
   news: weight-bearing activity is one of the few things you can change." Show
   the explanation, the modifiable-factor nudge, the disclaimer.
 - **1:40–2:20 — Science.** "Trained and validated on NHANES bone-density (DXA)
-  data — [N] postmenopausal women — with a held-out split and honest calibration.
-  It returns *uncertain* rather than guessing. And we publish the model +
-  benchmark openly." (Foundation value.)
+  data — [N] postmenopausal women — with a held-out split; we report error (MAE)
+  and how often the true score falls inside our range. It says *uncertain* rather
+  than faking precision. And we publish the model + benchmark openly." (Foundation value.)
 - **2:20–3:00 — Impact.** "Data women already have → an earlier, personalized
   prompt to get screened, before the first fracture. A foundation others extend."
   Josh (physician) closes on credibility.
 
 ## Architecture — the honest design
 
-**The model predicts. The LLM only explains.** The prediction is a calibrated
-logistic-regression model trained on NHANES DXA data; scoring runs in TS from
-exported coefficients (a dot product + sigmoid — no separate Python service).
-The LLM receives the model's output and turns it into plain, warm, honest
-language — it never sets the risk. This keeps every number traceable to
+**The model predicts. The LLM only explains.** The prediction is a **regression**
+trained on NHANES DXA data that outputs an **estimated T-score + uncertainty
+range**; scoring runs in TS from exported coefficients (a linear dot product — no
+separate Python service). The LLM receives the model's output and turns it into
+plain, warm, honest language — it never sets the number. This keeps every number traceable to
 validated data, which is exactly what the challenge rewards and what a physician
 can stand behind.
 
 ```
-profile + activity → scoreBone() [deterministic, NHANES-trained] → {category, confidence, factors}
+profile + activity → scoreBone() [deterministic, NHANES-trained] → {estimatedTScore, range, category, factors}
                                                                         ↓
                                               LLM explains the model's output (grounded, no invention)
                                                                         ↓
@@ -85,10 +90,11 @@ Files already drafted:
   hormonal history, labs, and wrist-accelerometer activity (2011–2014 cycles) —
   the "wearable" feature, with a clean measured label, all in one open dataset.
 - **First 30 min = data spike.** Get NHANES DXA + reproductive + accelerometer
-  into one dataframe keyed by respondent. Confirm the low-BMD label and the
+  into one dataframe keyed by respondent. Confirm the T-score label and the
   activity feature line up before modeling.
-- **Reusable asset:** publish the trained model + a benchmark (features → low
-  BMD, per-subject / grouped split, calibration report). Success criterion #3.
+- **Reusable asset:** publish the trained model + a benchmark (features →
+  estimated T-score, per-subject / grouped split, error + interval-coverage
+  report). Success criterion #3.
 
 ## Honesty rules (non-negotiable — the challenge kills unsupported claims)
 
@@ -102,8 +108,8 @@ Files already drafted:
 
 ## Roles / agent tasks (pick one, own its files)
 
-- **Emre — the model.** Data spike → train logistic regression on NHANES DXA →
-  calibration (Brier, reliability curve) → export coefficients into
+- **Emre — the model.** Data spike → train a regression on NHANES DXA to predict
+  the T-score → report error (MAE) + interval coverage → export coefficients into
   `bone-model.ts` → flip `MODEL_IS_VALIDATED`. This is the science; it's the moat.
 - **Josh — clinical + demo.** Own the system prompt in `api/screen/route.ts`
   (the medical framing), the "does this survive a physician" gate on every claim,
