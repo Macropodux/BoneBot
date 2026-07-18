@@ -1,0 +1,307 @@
+# Why This Matters: Research Backing & Project Rationale
+
+*Motivation, evidence base, and design rationale for the Osteoporosis Screening Benchmark (HackNation Challenge 05).*
+
+**Aim:** an accessible risk-assessment tool to help prevent osteoporotic bone
+fractures in peri- and post-menopausal women — flagging who should be referred
+for a DXA scan **before** a first fracture, using routinely available data plus an
+objective wearable-activity signal, delivered through a friendly conversational
+interface. Screening triage, **not** diagnosis.
+
+---
+
+## 1. The problem: women are diagnosed too late
+
+Osteoporosis is a silent disease — it is subclinical until a fracture occurs, and
+patients consistently underestimate their own fracture risk. Because there are no
+symptoms, the first "diagnosis" for a large share of women is the fracture itself.
+The downstream numbers are stark:
+
+- **Roughly one in two women over 50** will suffer an osteoporotic fracture in her
+  remaining lifetime.
+- Even *after* a fragility fracture — the clearest possible warning sign — the GLOW
+  study of 60,000+ older women across 10 countries found **more than 80% did not
+  receive osteoporosis treatment**. In an international hip-fracture cohort, only
+  ~27% were started on fracture-prevention medication afterward.
+- Across European primary care, about **75% of elderly women at high fracture risk
+  receive no osteoporosis treatment**, with under-diagnosis a key driver.
+
+So the gap is not only *treatment* — it is *identification*. Women who never get
+screened never enter the pathway. A tool that widens the top of the funnel (who
+gets flagged for a DXA) targets the rate-limiting step.
+
+---
+
+## 2. Where current risk-assessment tools fail women
+
+**What exists.** The USPSTF endorses a set of clinical triage tools to decide who
+should get a DXA: OST, ORAI, SCORE, OSIRIS, and FRAX. They are useful but blunt.
+
+**What they rely on.** Mostly a handful of static clinical inputs. The table below
+breaks down each tool's inputs, its high-risk cut-off, its reported accuracy, and
+why it is limiting.
+
+| Tool | Inputs it uses | High-risk cut-off | Reported sensitivity / specificity* | Key limitation |
+|---|---|---|---|---|
+| **OST** (Osteoporosis Self-assessment Tool) | Age, weight only (score = 0.2 x [weight_kg - age]) | score < 2 | ~89% / ~41% (pooled, cut-off <1) | Reduces bone risk to two variables; ignores fracture history, menopause detail, activity, and everything behavioural. |
+| **ORAI** (Osteoporosis Risk Assessment Instrument) | Age, weight, current estrogen use | score >= 9 | ~90-94% / ~30-41% | Adds only estrogen use to age+weight; high sensitivity but low specificity, so it sends many low-risk women for unnecessary DXA. |
+| **SCORE** (Simple Calculated Osteoporosis Risk Estimation) | Age, weight, race/ethnicity, rheumatoid arthritis, prior non-traumatic fracture after 45, estrogen use | score >= 6 | ~90%+ / ~30-40% (AUC < 0.75) | More inputs, but all static and self-reported; includes a race-based term; still no behavioural, activity, or longitudinal signal. |
+| **OSIRIS** (Osteoporosis Index of Risk) | Age, weight, current HRT use, prior low-impact fracture | score <= 1 | higher-specificity group: lower sensitivity, higher specificity than ORAI/SCORE | Same static risk-factor family; the fracture input only helps *after* a fracture has already happened. |
+| **FRAX** (Fracture Risk Assessment Tool) | Age, sex, height, weight (BMI), prior fracture, parental hip fracture, current smoking, glucocorticoid use, rheumatoid arthritis, secondary osteoporosis, alcohol >= 3 units/day (optionally femoral-neck BMD) | 10-yr major-fracture probability >= 9.3% (varies by guideline) | ~33% / high (women 50-64) | Richest inputs, but needs facts a patient may not know (parental hip fracture); no physical-activity or falls term; poor sensitivity (~33% for T <= -2.5) in women 50-64. |
+
+\* Approximate figures for detecting DXA-defined osteoporosis (T <= -2.5) in
+post-menopausal women, drawn from systematic reviews and meta-analyses. Sensitivity
+and specificity vary substantially with the chosen cut-off, skeletal site, and
+population — the network meta-analysis groups SCORE/ORAI/OST as *higher-sensitivity*
+and FRAX/OSIRIS as *higher-specificity*. Note the recurring pattern: the tools are
+tuned to catch cases (high sensitivity) at the cost of many false positives (low
+specificity, ~30-45%), i.e. lots of unnecessary DXA referrals — except FRAX, which
+flips to high specificity but then misses roughly two-thirds of osteoporotic women
+aged 50-64.
+
+**Why they are limiting as a group.** They share four structural weaknesses:
+they capture a single point in time rather than an ongoing signal; they lean on
+static, self-reported clinical facts (and none use any *objective* measure of how
+much a woman actually moves); the simpler ones (OST, ORAI, OSIRIS) effectively
+collapse to age + weight, trading specificity away to keep sensitivity; and every
+one of them depends on a clinician sitting down to administer it. That is exactly
+the space our tool targets — an objective wearable-activity signal and a
+self-serve conversational front-end.
+
+**How accurate they are.** They trade sensitivity against specificity, and the
+sensitivity can be poor in exactly the group we care about: a FRAX threshold of
+>=9.3% had only ~**33% sensitivity** for detecting a T-score <= -2.5 in women aged
+50-64. Two-thirds of osteoporotic women in that age band would be missed.
+
+**How accessible they are.** The confirmatory test (DXA) needs specialised
+equipment, a referral, and travel/cost that many women never reach — which is why
+the clinical tools exist as a filter in the first place. But the filter is only as
+good as its inputs, and it depends on a clinician remembering to run it.
+
+**What the state of the art still misses.** The most recent NHANES machine-learning
+model (Karaismailoglu & Karaismailoglu, *Balkan Med J* 2025) is instructive. It
+trained on 12,108 adults >=50 — **6,292 men and 5,816 women** — to predict low bone
+density. Three things stand out for us:
+
+1. **The disease is concentrated in women, but women are the minority of the data.**
+   Low bone density affected **58.7% of the women vs 31.5% of the men** in that
+   cohort, yet women were only 48% of the training set. A pooled model spends much
+   of its capacity separating men from women (sex was its single strongest
+   predictor) rather than resolving risk *within* women.
+2. **For women, it effectively collapses to age + BMI.** Their sex-stratified
+   analysis shows that once you look only at women, the top predictors are age and
+   BMI — i.e. essentially the OST tool again, plus some biochemistry.
+3. **They discarded the two most relevant modalities.** Their own limitations state
+   that **menopausal status and physical activity were excluded due to missing
+   data.** For a women's bone-health model, estrogen/menopause status and objective
+   activity are central — and they are exactly what we build on.
+
+**Our positioning:** same open data source, but a women-specific model that recovers
+the menopause and physical-activity signal the field drops, targets the
+osteoporosis-defining threshold (T <= -2.5), and ships as a reusable open benchmark
+(their data was "available on request", with no public splits or code).
+
+---
+
+## 3. Our tool: what makes it different
+
+### 3a. Why a wearable-activity signal should help
+
+Mechanical loading builds and preserves bone, so *how much and how intensely a woman
+actually moves* is biologically tied to bone density — and it is information the
+clinical tools ignore. The evidence, much of it in our exact NHANES cycle:
+
+- In **NHANES 2005-2006**, objectively measured (accelerometer) activity was
+  associated with higher bone density and trabecular bone score in older adults;
+  higher moderate-to-vigorous activity tracked with better femoral-neck and hip
+  measures.
+- In post-menopausal women (NHANES 2007-2018), performing **>=38 MET-hours/week** was
+  linked to lower osteoporosis risk.
+- In **UK Biobank**, even brief bouts of higher-intensity activity predicted bone
+  health in pre- and post-menopausal women — suggesting intensity/impact features,
+  not just step counts, carry signal.
+
+The scientific question our benchmark answers is precisely: **does this objective
+activity signal add predictive value over the age/weight/lab factors the existing
+tools already use?** No prior open NHANES benchmark answers it, because they dropped
+the modality.
+
+### 3b. Why a friendly conversational interface helps
+
+The clinical tools fail partly because they depend on a clinician sitting down to
+compute them. A conversational front-end lets a woman self-serve:
+
+- **Natural-language intake.** Instead of a clinical form, she can describe her
+  routines and habits in her own words ("I walk the dog twice a day, I did HRT for
+  a couple of years, my mum broke her hip") and the system maps that to model
+  inputs. This lowers the literacy and effort barrier that formal questionnaires
+  impose.
+- **Nutritional context.** Calcium and vitamin D status are established contributors
+  to bone health (and vitamin D/calcium are among the few things already widely
+  prescribed for bone). A chat interface can capture dietary and supplement habits
+  that a five-field risk calculator never asks about, and NHANES carries dietary and
+  serum vitamin-D data to train on.
+- **Comprehension.** The result is only useful if she understands it and acts on it.
+  A conversational layer can explain the "why" and the next step ("this suggests
+  asking your GP about a DXA scan") without medical jargon.
+
+Guardrail: the interface must never drift into diagnosis or treatment advice. Its
+job is to explain a screening result and route to a clinician and a DXA scan.
+
+---
+
+## 4. Datasets: what we use and how we stay honest
+
+### 4a. What's available
+
+- **NHANES 2005-2006 (primary).** The one cycle that co-locates objective
+  accelerometry (PAXRAW) **and** femur DXA **and** labs **and** reproductive
+  history — the multimodal intersection our ablation needs. Research-grade,
+  hip-worn ActiGraph over 7 days, on a nationally representative sample.
+- **NHANES 2007-2018 (extension).** Much larger n for clinical-only models, but the
+  accelerometer protocol changed after 2011 (raw wrist triaxial, not comparable
+  counts) — do **not** naively pool it with 2005-2006.
+- **mcPHASES (PhysioNet)** and consumer-wearable sets: useful as a *future* bridge
+  to hormone/wearable modelling, but not training data here (young, premenopausal,
+  no bone measures).
+
+### 4b. How we leverage them
+
+- **Splits.** Stratified on the osteoporosis label, grouped by participant (SEQN),
+  fixed seed; ~70/15/15 train/validation/test. Validation is used only for
+  probability calibration; the test set is touched once, for final numbers.
+- **Label.** DXA-defined femoral-neck **T-score <= -2.5**, using the NHANES III
+  young-adult reference (Looker et al.). The scan is the label only and is never a
+  feature (enforced by an automated anti-leakage check).
+
+### 4c. How we avoid bias (a design priority, not an afterthought)
+
+The intuition that "Strava users are fitter than non-users" is exactly right, and
+the literature confirms it generalises: wearable-derived datasets primarily
+represent **younger, more active, and more affluent** people, and fitness-tracker
+ownership is confounded with race, socioeconomic status, and health literacy —
+enough that some researchers warn wearable access is becoming a *social determinant
+of health*. A model trained on volunteered consumer-app data would learn the habits
+of the women **least** likely to be under-screened, and would generalise poorly to
+the women who most need flagging.
+
+Our mitigations:
+
+1. **Use research-grade, provisioned-device data.** NHANES issued the same
+   accelerometer to a probability sample of the US population, so activity data
+   isn't conditioned on someone choosing to buy and wear a tracker. This structurally
+   avoids the ownership-selection bias.
+2. **Report subgroup performance.** We evaluate by race/ethnicity and age band, not
+   just in aggregate, so any performance gap is visible rather than hidden.
+3. **Be explicit about the reference population.** The T-score reference was derived
+   on non-Hispanic white women; we document this and flag it as a fairness caveat
+   rather than assuming it transfers.
+4. **Honest n.** After the multimodal intersection the sample is smaller than the
+   pooled-cycle studies; we report it plainly and use stratified CV rather than
+   over-engineering.
+
+### 4d. How we evaluate
+
+Because the osteoporosis-positive class is a minority, accuracy alone is misleading.
+We report **PR-AUC** (primary, given imbalance), balanced accuracy, recall per class,
+ROC-AUC, and **Brier score / calibration**. The headline result is the
+**with-vs-without-wearable ablation** (delta PR-AUC). We also add a **no-call band**:
+when the calibrated probability sits in an uncertain range, the tool abstains and
+says "confirm with a DXA scan" rather than guessing.
+
+---
+
+## 5. Architecture: separate the prediction from the message
+
+Two distinct components, deliberately decoupled:
+
+1. **Risk model (quantitative).** The calibrated classifier described above takes the
+   structured inputs and returns a probability + confidence + no-call flag, with
+   SHAP contributions for transparency. This is the part that is benchmarked and
+   validated.
+2. **Message-delivery layer (LLM).** A language model turns that numeric output into
+   a clear, non-alarming explanation for the user — comprehensive and informative,
+   assuming **no prior medical or biological knowledge**, and always ending in a
+   concrete next step (e.g. "worth asking your GP about a DXA scan"). It also drives
+   the natural-language intake in section 3b.
+
+Keeping these separate matters: the LLM never invents the risk number, and the risk
+number never reaches the user as a bare, frightening figure. The model is
+auditable; the message is humane. The LLM must not add diagnoses or treatment
+recommendations beyond the validated model's scope.
+
+---
+
+## 6. Marketability (future work — not for the hackathon build)
+
+Not a challenge deliverable, but worth noting as a sustainability path: the tool
+could act as a **connector**, linking women flagged as higher-risk to appropriate
+services — gyms, personal trainers, nutritionists, run clubs, and health
+professionals — and earn referral or booking fees. Because weight-bearing exercise
+and nutrition are front-line, non-pharmacological levers for bone health, this is a
+plausibly *aligned* incentive.
+
+Ethical guardrails if this is ever pursued: referral incentives must never distort
+the clinical message or push paid services over a needed medical referral;
+recommendations should be transparent about any commercial relationship; and the
+primary call-to-action for a higher-risk result must remain "see a clinician / get a
+DXA", not "book this PT".
+
+---
+
+## 7. Extras: fall-risk stratification from gait
+
+Osteoporosis raises the *consequence* of a fall (fragile bones fracture); frailty and
+gait decline raise the *probability* of a fall. Combining the two would stratify not
+just "who has weak bones" but "who is likely to have a **fracture-inducing fall**" —
+the outcome we actually want to prevent. (~30% of adults over 65 fall each year.)
+
+The wearable modality supports this directly. Accelerometer-derived gait features
+(cadence, gait speed, stability/variability, sedentary-bout patterns) have been used
+to predict falls, and:
+
+- Wearable-sensor gait models have reported ~**80%+ accuracy** for classifying future
+  fallers in community-dwelling older adults, and can **outperform traditional
+  clinical fall assessments**.
+- **Combining** accelerometric and clinical/non-accelerometric factors consistently
+  beats either alone — the same multimodal thesis as our bone-density model.
+
+A natural extension: a second model that scores fall risk from gait, then combines it
+with the bone-density risk to prioritise the women most likely to fracture. Future
+work, not a core hackathon deliverable.
+
+---
+
+## 8. Responsible use
+
+This is a research benchmark and a screening-triage demonstrator — **not a medical
+device and not a diagnosis**. Every prediction routes back to a clinician and a DXA
+scan. Limitations (cross-sectional single-cycle data, self-reported fields, small n
+after the multimodal intersection, reference-population assumptions, and the wearable
+selection issues discussed above) are documented in limitations.md and reported
+honestly rather than hidden.
+
+---
+
+## References
+
+1. Osteoporosis in 2022: care gaps to screening and personalised medicine (GLOW; >80% untreated after fracture) — PMC7614114. https://pmc.ncbi.nlm.nih.gov/articles/PMC7614114/
+2. The clinician's guide to prevention and treatment of osteoporosis (silent until fracture; at-risk not screened) — Osteoporos Int 2022. https://link.springer.com/article/10.1007/s00198-021-05900-y
+3. Osteoporosis treatment gap in European primary care (~75% of at-risk women untreated) — Osteoporos Int 2020. https://link.springer.com/article/10.1007/s00198-020-05557-z
+4. Fragility fractures and the osteoporosis care gap: an international phenomenon — ScienceDirect. https://www.sciencedirect.com/science/article/abs/pii/S0049017205002143
+5. USPSTF, Osteoporosis to prevent fractures: screening. https://www.uspreventiveservicestaskforce.org/uspstf/recommendation/osteoporosis-screening
+6. Risk assessment tools for screening (FRAX ~33% sensitivity; tool comparison) — Curr Osteoporos Rep 2015. https://link.springer.com/article/10.1007/s11914-015-0282-z
+7. Comparative accuracy of screening tools (network meta-analysis) — Int J Nurs Stud 2025. https://www.sciencedirect.com/science/article/abs/pii/S0020748925000380
+8. OST performance review (age + weight tool) — PMC6068473. https://pmc.ncbi.nlm.nih.gov/articles/PMC6068473/
+8b. Systematic review & meta-analysis of clinical risk-assessment instruments (pooled OST sensitivity 89% / specificity 41%) — Osteoporos Int 2015. https://link.springer.com/article/10.1007/s00198-015-3025-1
+9. Karaismailoglu & Karaismailoglu, Risk prediction of low bone density with ML (NHANES; 6,292 M / 5,816 F; dropped menopause + physical activity) — Balkan Med J 2025. https://pmc.ncbi.nlm.nih.gov/articles/PMC12576511/
+10. Accelerometry, BMD and trabecular bone score, NHANES 2005-2006 — Arch Osteoporos 2019. https://link.springer.com/article/10.1007/s11657-019-0583-4
+11. Physical activity and spine BMD in post-menopausal women, NHANES 2007-2018 (>=38 MET-h/wk) — J Orthop Surg Res 2023. https://link.springer.com/article/10.1186/s13018-023-03976-2
+12. Brief high-intensity activity and bone health, UK Biobank — Int J Epidemiol 2017. https://academic.oup.com/ije/article/46/6/1847/3902973
+13. Demographic/socioeconomic factors in Fitbit ownership (wearable data skews younger/active/affluent) — IJERPH 2025. https://doi.org/10.3390/ijerph23070839
+14. Physical activity surveillance via apps/wearables: representativeness in the UK — JMIR 2019. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6371078/
+15. Access to wearables as a social determinant of health — Healthcare IT News. https://www.healthcareitnews.com/news/access-wearables-could-become-social-determinant-health-researchers-warn
+16. Health literacy and health-IT adoption (digital divide) — PMC5069402. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5069402/
+17. Predicting fall risk in older adults: ML comparison of accelerometric vs non-accelerometric factors — Digit Health 2025. https://pmc.ncbi.nlm.nih.gov/articles/PMC11951886/
+18. Prediction of fall risk in community-dwelling older adults using a wearable system (~81.6% accuracy) — PMC8545936. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8545936/
+19. Looker et al., Updated proximal femur BMD reference data (T-score reference) — Osteoporos Int 1998.
