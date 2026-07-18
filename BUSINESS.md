@@ -39,6 +39,40 @@ triages **who needs a DXA scan**, and drives earlier case-finding — sold **B2B
   but only once validated.
 - **Pharma-sponsored case-finding** — fast revenue, reputational care required.
 
+## Referral revenue line (done right) — the consumer-side stream
+
+Connect the woman to bone-health providers (specialist physios, exercise classes,
+nutritionists) — **free to her, providers pay us.** But **pull, not push**, or it
+becomes a GDPR + trust liability (health data is special-category; broadcasting her
+contact to companies who cold-approach her is the wrong version).
+
+**How we actually get paid — cleanest last:**
+
+| Model | Provider pays… | Note |
+|---|---|---|
+| **Pay-per-lead (CPL)** | flat fee per consented intro (~£5–£50) | simplest; they pay even if it doesn't convert — least clean |
+| **Pay-per-booking (CPA)** | only when she books/attends (~£20–£100 or % of 1st session) | paid on real value; aligns incentives |
+| **Marketplace take-rate** | ~10–20% of a booking made *through* us | most defensible — we provide the booking, not just a contact |
+| **Listing / subscription** | flat fee to be listed | predictable, volume-independent |
+
+**Recommended: CPA or take-rate** — paid for a *completed connection she chose*,
+not for handing over data. That distinction is what keeps it GDPR- and
+clinician-defensible.
+
+**Pull, not push (the consent model):** she opts in and picks the provider; her
+details go **only to the one she chooses**. Opt-in wording:
+
+> *"Want help acting on this? We can connect you with bone-health specialists near
+> you — physios, classes, or nutritionists who focus on bone health. Free to you.
+> Tell us your area and we'll show vetted options — and only share your details with
+> the one **you** choose. (Some are paid partners; we'll always say which.)"*
+
+**Guardrails:** consumer mode only; **after** and **separate from** the estimate
+(never bundled into screening consent); "elevated" routes to her **GP first**;
+disclose paid partners; **the fee never biases the clinical recommendation** —
+"see your GP / do X" is clinical and unpaid, "here are providers" is commercial and
+disclosed.
+
 ## Differentiation — "why not just use FRAX?"
 
 FRAX (Sheffield) is the free, standard fracture-risk tool. BoneBot must clearly beat
