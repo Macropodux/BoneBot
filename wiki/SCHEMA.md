@@ -31,7 +31,7 @@ Add additional types here as the wiki evolves.
 - `bonebot` — content specific to the BoneBot product build.
 - `hackathon` — content about the Hack-Nation event/team, not the product itself.
 - `challenge-brief` — the original challenge brief material.
-- `evidence` — vetted clinical and scientific evidence used to constrain BoneWise explanations.
+- `evidence` — vetted clinical and scientific evidence used to constrain BoneBot explanations.
 
 ## Page sizing
 

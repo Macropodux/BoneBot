@@ -41,9 +41,9 @@ Created `wiki/sources/challenge-05-brief.md`. Raw source PDF read from `challang
 ## [2026-07-18] schema | Added the `evidence` tag
 
 Added the `evidence` tag for vetted clinical and scientific material that
-constrains BoneWise explanations.
+constrains BoneBot explanations.
 
-## [2026-07-18] ingest | BoneWise Clinical Evidence Library
+## [2026-07-18] ingest | BoneBot Clinical Evidence Library
 
 Created `wiki/sources/clinical-evidence-library.md`. Raw source cited in place at
 `docs/EVIDENCE.md`; the runtime catalogue remains in `src/lib/bone-evidence.ts`.

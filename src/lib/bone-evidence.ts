@@ -1,7 +1,7 @@
-// BoneWise's local, clinician-reviewed evidence library.
+// BoneBot's local, clinician-reviewed evidence library.
 //
 // This is intentionally small and static: no database, no retrieval service and
-// no web request happens when a person uses BoneWise. The LLM receives only the
+// no web request happens when a person uses BoneBot. The LLM receives only the
 // selected cards below, plus the deterministic model output. Add a new medical
 // claim only after it has been reviewed and given a source in docs/EVIDENCE.md.
 

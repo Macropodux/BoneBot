@@ -1,16 +1,16 @@
 ---
 type: source
-title: "BoneWise Clinical Evidence Library"
-authors: "BoneWise team"
+title: "BoneBot Clinical Evidence Library"
+authors: "BoneBot team"
 url: ""
 raw: "docs/EVIDENCE.md"
 ingested: 2026-07-18
-tags: [bonewise, evidence, spec]
+tags: [bonebot, evidence, spec]
 created: 2026-07-18
 updated: 2026-07-18
 ---
 
-# BoneWise Clinical Evidence Library
+# BoneBot Clinical Evidence Library
 
 The local evidence library is the bounded clinical context supplied to BoneBot's
 LLM explanation layer. It pairs a compact runtime catalogue in
@@ -19,7 +19,7 @@ LLM explanation layer. It pairs a compact runtime catalogue in
 
 ## Role in the product
 
-BoneWise's deterministic model produces the estimated T-score and contributing
+BoneBot's deterministic model produces the estimated T-score and contributing
 factors. The server selects only the relevant evidence cards and provides them to
 the LLM, which must not introduce a clinical claim beyond the cards' approved
 wording and limits. A generated explanation with an unknown evidence-card ID is
@@ -43,7 +43,7 @@ rule, or lifestyle target.
   it is not a direct osteoporosis or T-score test.
 - A full blood count can be clinically relevant, but research on RBC and other
   blood-cell measures has mixed results. It cannot be used to infer a T-score,
-  fracture probability, anaemia, or osteoporosis status in BoneWise.
+  fracture probability, anaemia, or osteoporosis status in BoneBot.
 
 ## Where this fits
 

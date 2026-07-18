@@ -1,4 +1,4 @@
-# BoneWise evidence library
+# BoneBot evidence library
 
 This directory documents the small, local evidence library used by BoneBot.
 It is deliberately not a database or retrieval-augmented generation system.
@@ -10,7 +10,7 @@ The team wiki indexes this register at
 
 ## Clinical boundaries
 
-- BoneWise estimates a DXA-scale T-score; it does not measure bone density,
+- BoneBot estimates a DXA-scale T-score; it does not measure bone density,
   diagnose osteoporosis, calculate fracture probability, or prescribe treatment.
 - DXA results are interpreted with clinical fracture-risk factors, not in
   isolation. A prior fragility fracture, long-term glucocorticoids, and other
@@ -68,7 +68,7 @@ The team wiki indexes this register at
 ## Source use and limits
 
 SWAN, WHI and SOF establish scientifically valuable longitudinal context, but
-they are not BoneWise's training dataset and do not validate its prediction.
+they are not BoneBot's training dataset and do not validate its prediction.
 NHANES is the intended training/benchmark data source; the exact cycles,
 variables, sample exclusions, model coefficients, performance, and uncertainty
 calibration must be published with the trained model before
@@ -81,7 +81,7 @@ was limited to the osteopenia subgroup, cannot establish causality, and does not
 provide a decision threshold. Total ALP is non-specific, so a bone source cannot
 be assumed from an isolated result. NOGG includes ALP in routine investigation of
 osteoporosis/fragility fracture and flags persistent *low* ALP as a possible sign
-of metabolic bone disease. BoneWise must therefore explain ALP only as a result
+of metabolic bone disease. BoneBot must therefore explain ALP only as a result
 to discuss with the clinician, never as evidence of osteoporosis or a target for
 lifestyle intervention.
 
@@ -92,7 +92,7 @@ full-blood-count measures, not bone-turnover markers and not DXA substitutes.
 The literature includes small cross-sectional associations with BMD, but the
 more informative population-based repeated-assessment cohort did not find that
 differential blood counts consistently predict BMD or bone microarchitecture.
-Accordingly, BoneWise may only explain what the measures are and direct an
+Accordingly, BoneBot may only explain what the measures are and direct an
 abnormal result back to the clinician who ordered the test; it must not attach a
 model weight or use either result to diagnose anaemia, immune disease,
 osteoporosis, or fracture risk.
