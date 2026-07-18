@@ -61,6 +61,28 @@ Stay in your own files. Say out loud what you're editing (AGENTS.md).
 
 ---
 
+## Judging priorities — close the Foundation-Value gap (do these first)
+
+The brief scores three things: Women's Health Impact, Technical Excellence, and
+**Foundation Value** (a *reusable scientific asset*, not just an app). We're strong on
+impact + honesty; the risk is Foundation Value — **a polished app with placeholder
+coefficients is exactly the brief's weak-submission trap.** Close it, in order:
+
+1. **Train the model on NHANES for real** → replace placeholder coefficients → flip
+   `MODEL_IS_VALIDATED`. Unlocks Technical Excellence *and* Foundation Value. Top priority.
+2. **Publish the benchmark as the reusable asset:** features → estimated-T-score task,
+   a grouped/held-out split, error (MAE) + interval coverage, the evaluation script,
+   and a short dataset card.
+3. **Add an open LICENSE** — MIT (code) + CC-BY (benchmark/docs). The brief requires it.
+4. **Demo the one core flow, and end on the open asset** ("model + benchmark published
+   for others to build on") — that sentence scores Foundation Value.
+5. **Extras last** (voice, photo extraction, fall-risk) — upside, not the substance.
+
+⚠️ Keep the **business / referral model out of the challenge demo** — it's for the
+Venture Lab / EWOR track, not this challenge's science score.
+
+---
+
 ## Emre's data lane — the specifics
 
 **Label:** low bone density from NHANES femur DXA (femoral-neck / total-femur BMD →
@@ -68,8 +90,10 @@ T-score ≤ −2.5). NHANES gives BMD, **not** T-scores — compute them vs the 
 young-adult female reference. Cite Looker et al. 2010.
 
 **Features (none is the scan):** age, years since menopause, hormone therapy, prior
-fragility fracture, BMI, weight-bearing activity (from the wrist accelerometer),
-smoking, parental hip fracture — the shape already in `bone-model.ts`.
+fragility fracture, BMI, weight-bearing activity (wrist accelerometer), smoking,
+parental hip fracture, **glucocorticoids, rheumatoid arthritis, high alcohol** (FRAX
+variables), and the objective labs **vitamin D + calcium** — the shape in
+`bone-model.ts`.
 
 **⚠️ First job of the data spike — confirm the cycle.** We want wrist-accelerometer +
 femur-DXA in the *same* respondents. Wrist accelerometry ran 2011–2012 and 2013–2014;
@@ -78,8 +102,8 @@ cycle is 2013–2014 before merging** — merging files that don't share respond
 classic silent failure. (Hip accelerometer + DXA also co-occur in 2005–2006 as a
 fallback if activity intensity matters more than a wrist device.)
 
-**Output:** trained, calibrated logistic-regression coefficients exported into
-`bone-model.ts`; then flip `MODEL_IS_VALIDATED = true`. Until then the UI shows the
+**Output:** trained **regression** coefficients (+ the interval half-width) exported
+into `bone-model.ts`; then flip `MODEL_IS_VALIDATED = true`. Until then the UI shows the
 "not yet validated" banner — never demo placeholder numbers as real.
 
 **Reusable asset (Foundation Value):** publish model + benchmark (features → low BMD,
