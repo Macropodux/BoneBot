@@ -36,9 +36,9 @@ uncertainty range** (on the clinical scale a DXA uses), the band it falls in, th
 factors driving it, the one or two things she can change (chiefly activity), and a clear
 "this is an estimate, not a diagnosis — a DXA scan gives the real T-score."
 
-**Two audiences, one toggle:** **Consumer mode** (warm — encourages lifestyle
-change and, when warranted, a GP visit) and **GP mode** (concise clinical decision
-support). Same model, two presentations. See `SCREEN.md`.
+**Consumer-focused:** the build targets the **woman herself** — warm guidance
+(lifestyle, and a GP visit when warranted). A clinician view is future work, not
+this build. See `SCREEN.md`.
 
 ## 3-minute demo script (the thing we build to)
 

@@ -3,8 +3,8 @@
 **The product is BoneBot** (`/assistant`) — a voice + photo bone-health assistant.
 She gives BoneBot **as much objective data as possible via photos** (a blood test,
 a watch screenshot), BoneBot **asks follow-up questions** for the history no screen
-shows, then returns an **estimated-T-score report** — spoken back, in one of two
-modes (*For me* / *For my GP*). The plain `/screen` form is the zero-dependency
+shows, then returns an **estimated-T-score report** — spoken back, **built for her,
+the consumer** (a clinician view is future work, not this build). The plain `/screen` form is the zero-dependency
 **fallback demo**. No login.
 
 - The narration is the demo script in `PROJECT.md` / `RUNBOOK.md §2`.
@@ -153,13 +153,14 @@ we say so rather than fake precision. A confident wrong number is the worst outc
 
 ---
 
-## Two modes — same model, two audiences (one toggle)
+## The consumer product (GP mode = future work)
 
-The estimate is computed once; **how it's presented depends on who's looking.** This
-is our credibility edge — a licensed physician on the team means the GP view is
-real, not cosplay.
+**Decision: the hackathon build is consumer-only.** One audience, done well. The
+clinician view is kept below as future work, not this weekend's build — and the
+physician-on-the-team credibility still carries, through the clinical honesty of the
+estimate and guidance, not a separate screen.
 
-### 👤 Consumer mode (*For me*) — warm, motivating, plain language
+### 👤 Consumer (*the woman*) — warm, motivating, plain language
 
 Her output has **two strands**, and which leads depends on the band:
 
@@ -175,7 +176,7 @@ Her output has **two strands**, and which leads depends on the band:
 | Uncertain | **Both** — *mention it to your GP*, plus lifestyle now. |
 | Lower | **Lifestyle only** — reassure + maintain. |
 
-### 🩺 GP mode (*For my GP*) — concise, clinical, decision-support
+### 🩺 GP mode — FUTURE WORK (post-hackathon, not this build)
 
 - Estimated T-score + range + band (normal / osteopenia / osteoporosis).
 - Factors, **separating known clinical risk factors from anything only
@@ -186,9 +187,9 @@ Her output has **two strands**, and which leads depends on the band:
 - Provenance: trained on NHANES, error (MAE) + interval coverage, "not a diagnostic
   device."
 
-> **Scope note:** two modes = two LLM prompts, one model. Josh approves it into the
-> demo before it's built. Consumer mode ships first; GP mode is the clinical-
-> credibility stretch.
+> **Decision:** consumer-only for the hackathon. GP mode stays documented as a
+> strong post-hackathon expansion; the physician credibility carries the pitch
+> regardless of whether the GP UI ships.
 
 ---
 
@@ -201,7 +202,8 @@ Built additively so the plain `/screen` form remains the safe fallback demo.
 - **The number:** `scoreBone()` runs **client-side** — deterministic, the model.
 - **Voice out:** `/api/tts` → **ElevenLabs** (REST, no SDK dep); falls back to the
   browser voice if `ELEVENLABS_API_KEY` is absent.
-- **Two modes** via `/api/assistant` (two system prompts, same model).
+- **Consumer** is the demo path via `/api/assistant`. (A clinician system prompt
+  exists in code as future-work scaffolding — not the demo.)
 - **Graceful:** every route returns a plain 503 sentence without keys — no stack
   trace in front of a judge.
 - 🔑 **Needs in Vercel:** `ANTHROPIC_API_KEY` (set) + `ELEVENLABS_API_KEY` (for voice).
