@@ -35,6 +35,30 @@ scanned, then estimate it for a woman who **was not**.
 
 ---
 
+## Front-gate: 4 screening questions (before anything else)
+
+Four simple yes/no questions gate entry. They confirm the tool is valid for her
+(women 50+, postmenopausal — the population the model is trained on) and fast-track
+high risk. Only women who pass Q1–Q3 proceed to the full estimate. Ask Q1–Q2 first
+so ineligible users exit early.
+
+1. **"Were you assigned female at birth?"**
+   → *No* = **exit** (not validated for you); show general bone-health info.
+2. **"Have your periods stopped for good, or are you 45 or older?"**
+   → *No* = **park** (outside the postmenopausal group the model is built for).
+3. **"Have you already been diagnosed with osteoporosis, had a bone scan, or take
+   bone medication?"**
+   → *Yes* = **redirect to GP** (already in care — screening isn't for you).
+4. **"Since age 50, have you broken a bone from a minor fall or knock?"**
+   → *Yes* = **proceed, fast-tracked as high-risk** (strong "see your GP" flag).
+
+**Flow:** pass Q1 + Q2 and *no* to Q3 → continue to photos + follow-ups + estimate.
+Q4 doesn't gate — it **stratifies**. Every exit stays helpful (general guidance /
+see your GP), never a dead end. Being honest that we only screen who the model is
+valid for is good practice — and it reads well to a clinical judge.
+
+---
+
 ## INPUT — how BoneBot gathers the data
 
 Principle: **as much objective data as possible via photos, then ask for the rest.**
