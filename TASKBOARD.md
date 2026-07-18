@@ -26,7 +26,7 @@ never appear in the feature set. Whoever trains the model verifies this.
 | Member | Lane | Owns |
 |---|---|---|
 | **Josh** — physician, product | Demo + scope | 3-min demo script, system prompt / clinical framing in `api/screen/route.ts`, the "survives a physician" gate on every claim, video. **Decides scope cuts, alone.** |
-| **Emre** (`eyavuz21`) — comp. neuroscientist | **The model** | NHANES data spike → train logistic regression → calibrate (Brier, reliability curve) → export coefficients into `bone-model.ts` → flip `MODEL_IS_VALIDATED`. Publish the benchmark. |
+| **Emre** (`eyavuz21`) — comp. neuroscientist | **The model** | NHANES data spike → train a regression (estimated T-score) → report error (MAE) + interval coverage → export coefficients into `bone-model.ts` → flip `MODEL_IS_VALIDATED`. Publish the benchmark. |
 | **Paula** (`paulatin4mente`) — mol. neuroscientist | Validation + biology | Grouped/per-subject split, sanity-check feature directions, benchmark methodology doc. |
 | **4th member** — AI background | App + polish | Design pass on `screen/page.tsx`, wearable-input UX, user-test the flow, promote `/screen` to home + delete scam/chat examples. |
 
@@ -43,7 +43,7 @@ Stay in your own files. Say out loud what you're editing (AGENTS.md).
 | 19:00–19:30 | Rebrand + redeploy scaffold | — | — | — | lead |
 | 19:30–02:00 | **Build core (~6.5h)** | system prompt + framing | **data spike → model v1** | split + feature checks | wire `/screen` to real model, delete examples |
 | 02:00–07:00 | Sleep (staggered, one reachable) | | | | |
-| 07:00–10:00 | Finish + fix | polish narration | calibrate + export coeffs, flip validated flag | benchmark doc | UI polish + honest-uncertainty display |
+| 07:00–10:00 | Finish + fix | polish narration | evaluate + export coeffs, flip validated flag | benchmark doc | UI polish + honest-uncertainty display |
 | **10:00** | 🧊 **FEATURE FREEZE** | | | | |
 | 10:00–12:30 | Record + edit video | **lead** | metrics on camera | biology credibility beat | run app on camera |
 | 12:30–13:00 | Submit | | repo/benchmark links | | live URL check (incognito + phone) |

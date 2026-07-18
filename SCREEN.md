@@ -83,7 +83,7 @@ Mapped 1:1 to `BoneFeatures` in `bone-model.ts`:
 | Long-term steroids? | `glucocorticoids` | **top drug cause** of bone loss — steroids suppress bone formation (FRAX variable) |
 | Rheumatoid arthritis? | `rheumatoidArthritis` | chronic inflammation lowers BMD independently of steroids (FRAX variable) |
 | Alcohol ≥ 3 units/day? | `highAlcohol` | impairs bone formation and raises fall risk (FRAX threshold) |
-| Vitamin D (25-OH-D) | `vitaminD` | enables calcium absorption + bone mineralisation; deficiency is common and drives low BMD (objective, photo-extracted) |
+| Vitamin D (25-OH-D) | `vitaminD` | enables calcium absorption + mineralisation; deficiency (common in postmenopausal / housebound women) → secondary hyperparathyroidism + bone loss, and is linked to falls. **Modifiable** (supplementation), objective/photo-extracted — but a *modest* independent BMD predictor: a lever more than a strong signal |
 | Serum calcium | `calcium` | mainly flags **secondary causes** (e.g. hyperparathyroidism) — it's tightly regulated, so a weak *direct* BMD predictor (objective, photo-extracted) |
 
 **Why these:** `glucocorticoids`, `rheumatoidArthritis`, `highAlcohol` are established
