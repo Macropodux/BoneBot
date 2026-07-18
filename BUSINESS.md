@@ -78,8 +78,10 @@ disclosed.
 FRAX (Sheffield) is the free, standard fracture-risk tool. BoneBot must clearly beat
 it: FRAX uses **no objective wearable/lab data** and has **zero engagement layer**.
 BoneBot uses the numbers already on her watch/phone, finds cases earlier, and
-motivates behaviour change. Real differentiation — but it must be *proven* to move
-outcomes, not just asserted.
+motivates behaviour change. It also stratifies **fall risk** — which FRAX handles
+poorly, yet most fractures come from a fall (see the fall-risk add-on in
+`SCREEN.md`). Real differentiation — but it must be *proven* to move outcomes, not
+just asserted.
 
 ## The moat is NOT the algorithm
 

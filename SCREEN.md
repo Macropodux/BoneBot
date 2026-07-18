@@ -153,6 +153,38 @@ we say so rather than fake precision. A confident wrong number is the worst outc
 
 ---
 
+## Add-on (optional): fall-risk stratification
+
+Fracture risk = **fragile bone × the chance of falling.** BoneBot estimates the bone
+side (T-score); this add-on stratifies the **fall side** and combines them.
+
+**Why it's worth it:**
+- Most fragility fractures happen *from a fall* — weak bone alone rarely breaks.
+- Fall risk is **highly modifiable** (balance/strength training, home safety,
+  medication review, vision, vitamin D) → more lifestyle levers, more engagement,
+  more referral opportunities (balance-focused PTs).
+- **Fills a FRAX gap** — FRAX handles falls poorly, so this is a concrete "why not
+  just use FRAX?" answer.
+
+**Fall-risk factors** (evidence-based; a simple stratifier for the hackathon, *not*
+a novel trained model): prior falls (strongest predictor), age, gait/balance
+problems, muscle weakness / low activity, sedating & blood-pressure meds +
+polypharmacy, vision, postural dizziness, fear of falling, low vitamin D.
+Wearable tie-in: gait speed & step regularity from the accelerometer — still "data
+she already has."
+
+**Combined view** (stratify low/moderate/high — don't over-precise):
+
+|  | Low fall risk | High fall risk |
+|---|---|---|
+| **Strong bone** | Low fracture risk | Moderate — focus falls prevention |
+| **Fragile bone** | Moderate — bone + scan | **High — scan + falls prevention, urgently** |
+
+Honesty: a screening stratifier from evidence-based factors, not a validated
+probability. **Add-on, not core** — Josh's scope call; keep the T-score story clean.
+
+---
+
 ## The consumer product (GP mode = future work)
 
 **Decision: the hackathon build is consumer-only.** One audience, done well. The
