@@ -9,7 +9,7 @@ export const triage = {
     postmenopausal: -0.158907,
   },
   bmiMedian: 28.0000,
-  threshold: 0.05,
+  threshold: 0.025,
   auc: 0.8666,
 } as const;
 

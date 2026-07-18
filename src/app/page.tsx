@@ -71,6 +71,12 @@ const AGE_MIDPOINT: Record<string, number> = { "Under 55": 50, "55–64": 60, "6
 const MENOPAUSE_AGE_MIDPOINT: Record<string, number> = { "Before 40": 35, "40–45": 42, "After 45": 48, "Not sure": 48 };
 const MENOPAUSE_STATUS = { Yes: "yes", No: "no", "Not sure": "not-sure" } as const;
 
+const LOW_RISK_GUIDANCE = [
+  "Keep active with weight-bearing and muscle-strengthening activity that feels safe and suitable for you.",
+  "Avoid smoking. If you smoke, getting support to stop benefits your overall health as well as your bones.",
+  "Keep high alcohol intake low. If your health changes or you have a fracture after a minor fall, speak with a clinician.",
+] as const;
+
 function mapAnswersToFeatures(answers: Record<StepKey, string>): BoneFeatures {
   const age = AGE_MIDPOINT[answers.age] ?? 65;
   const menopauseAge = MENOPAUSE_AGE_MIDPOINT[answers.menopause] ?? 48;
@@ -250,22 +256,19 @@ export default function Home() {
   }
 
   async function finishAtGate(message: string, triageResultValue?: TriageOutput) {
-    setRouteMessage(message);
+    setRouteMessage(
+      triageResultValue
+        ? "This is a very low initial screening estimate. You do not need the longer questionnaire today."
+        : message,
+    );
     setTriageResult(triageResultValue ?? null);
     setResult(null);
-    let explanation = message;
     if (triageResultValue) {
-      try {
-        const response = await fetch("/api/assistant", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ mode: "consumer", triage: triageResultValue }),
-        });
-        if (response.ok) explanation = (await response.json()).text;
-      } catch {
-        /* The deterministic result remains visible if the explanation is unavailable. */
-      }
+      setQaMessages([]);
+      setScreen("results");
+      return;
     }
+    const explanation = message;
     setQaMessages([{ role: "bot", text: explanation }]);
     setScreen("results");
   }
@@ -473,10 +476,19 @@ export default function Home() {
         <div className="flex flex-1 items-center justify-center px-6 py-12">
           <section className="w-full max-w-2xl rounded-2xl border border-[#E3E9E7] bg-white p-8">
             <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">Initial screening result</p>
+            {triageResult && <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#15181A]">Very low initial risk</h1>}
             {triageResult && <p className="mt-4 font-[family-name:var(--font-heading)] text-6xl font-bold" style={{ color: ACCENT }}>{triageResult.probabilityPercent}%</p>}
             {triageResult && <p className="mt-2 text-sm text-[#5A6462]">Below the {triageResult.thresholdPercent}% threshold for the full assessment.</p>}
             <p className="mt-6 text-base leading-[1.6] text-[#4A5452]">{routeMessage}</p>
-            <div className="mt-6 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">{qaMessages[0]?.text}</div>
+            {triageResult && (
+              <div className="mt-6 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">
+                <h2 className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">Keep it that way</h2>
+                <ul className="mt-3 list-disc space-y-2 pl-5">
+                  {LOW_RISK_GUIDANCE.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+                <p className="mt-4">This is a screening estimate, not a diagnosis or a bone-density measurement.</p>
+              </div>
+            )}
             <button onClick={restart} className="mt-7 rounded-[10px] px-5 py-3 font-[family-name:var(--font-heading)] font-bold text-white" style={{ backgroundColor: ACCENT }}>Start over</button>
           </section>
         </div>
