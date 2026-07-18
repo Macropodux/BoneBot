@@ -28,7 +28,7 @@ Add additional types here as the wiki evolves.
 - `rules` — governance and process rules for the hackathon team.
 - `spec` — product/technical specification content.
 - `schedule` — timeline, milestones, deadlines.
-- `bonewise` — content specific to the BoneWise product build.
+- `bonebot` — content specific to the BoneBot product build.
 - `hackathon` — content about the Hack-Nation event/team, not the product itself.
 - `challenge-brief` — the original challenge brief material.
 

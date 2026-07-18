@@ -1,8 +1,6 @@
 # PROJECT — Hormone-aware bone-health screening for postmenopausal women
 
-**Hack-Nation Challenge 05 — Women's Hormonal Health.** Working name: **BoneWise**
-(rename freely — but if you rename the Vercel project, do it in the first hour;
-it changes the URL judges click for a week).
+**Hack-Nation Challenge 05 — Women's Hormonal Health.** Product name: **BoneBot**.
 
 > **Read this before spawning an agent.** It is the shared brain. `AGENTS.md` =
 > the rules; this = the plan; `PLAYBOOK.md` = how to build fast; `RUNBOOK.md` =

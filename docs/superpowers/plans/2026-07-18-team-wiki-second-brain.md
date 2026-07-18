@@ -31,7 +31,7 @@
 - Modify: `wiki/SCHEMA.md` — "Tag taxonomy" and "Workflow customizations" sections
 
 **Interfaces:**
-- Produces: the tag taxonomy (`rules`, `spec`, `schedule`, `bonewise`, `hackathon`, `challenge-brief`) and the two SCHEMA.md customizations that Tasks 2–7 depend on (raw-in-place citation rule; source-only-pass rule).
+- Produces: the tag taxonomy (`rules`, `spec`, `schedule`, `bonebot`, `hackathon`, `challenge-brief`) and the two SCHEMA.md customizations that Tasks 2–7 depend on (raw-in-place citation rule; source-only-pass rule).
 
 - [ ] **Step 1: Run the wiki bootstrap**
 
@@ -61,7 +61,7 @@ In the `## Tag taxonomy` section, replace the placeholder example list with:
 - `rules` — governance and process rules for the hackathon team.
 - `spec` — product/technical specification content.
 - `schedule` — timeline, milestones, deadlines.
-- `bonewise` — content specific to the BoneWise product build.
+- `bonebot` — content specific to the BoneBot product build.
 - `hackathon` — content about the Hack-Nation event/team, not the product itself.
 - `challenge-brief` — the original challenge brief material.
 ```
@@ -166,10 +166,10 @@ Same handling as Task 2, Step 1 (cite in place, brief takeaway summary, skip ent
 Frontmatter:
 ```yaml
 type: source
-title: "PROJECT.md — BoneWise Product Spec"
+title: "PROJECT.md — BoneBot Product Spec"
 raw: "PROJECT.md"
 ingested: 2026-07-18
-tags: [spec, bonewise]
+tags: [spec, bonebot]
 created: 2026-07-18
 updated: 2026-07-18
 ```
@@ -220,7 +220,7 @@ type: source
 title: "TASKBOARD.md — 24-Hour Execution Plan"
 raw: "TASKBOARD.md"
 ingested: 2026-07-18
-tags: [schedule, bonewise]
+tags: [schedule, bonebot]
 created: 2026-07-18
 updated: 2026-07-18
 ```
@@ -322,7 +322,7 @@ type: source
 title: "SCREEN.md — Product Input/Output Spec"
 raw: "SCREEN.md"
 ingested: 2026-07-18
-tags: [spec, bonewise]
+tags: [spec, bonebot]
 created: 2026-07-18
 updated: 2026-07-18
 ```

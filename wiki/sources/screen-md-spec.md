@@ -3,7 +3,7 @@ type: source
 title: "SCREEN.md — Product and Interface Spec"
 raw: "SCREEN.md"
 ingested: 2026-07-18
-tags: [spec, bonewise]
+tags: [spec, bonebot]
 created: 2026-07-18
 updated: 2026-07-18
 ---

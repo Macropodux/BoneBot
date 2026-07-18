@@ -10,7 +10,7 @@ updated: 2026-07-18
 
 # AGENTS.md — Hack-Nation Team Rules
 
-`AGENTS.md` is the operating-rules document for the team building BoneWise, a
+`AGENTS.md` is the operating-rules document for the team building BoneBot, a
 hormone-aware bone-health screening tool, at the 6th Global AI Hackathon
 (Hack-Nation). It is the coordination mechanism for four scientists — none
 professional web engineers — who each direct their own coding agent against a
@@ -28,7 +28,7 @@ TBC). Because up to four people edit the repo concurrently, the file warns
 against creating or heavily editing files others are likely working in —
 "collisions cost more than they look at 02:00."
 
-The chosen product is BoneWise (Challenge 05, Women's Hormonal Health); full
+The chosen product is BoneBot (Challenge 05, Women's Hormonal Health); full
 spec detail lives in `PROJECT.md`, not this file. The core architectural rule
 stated here: an NHANES-trained model in `bone-model.ts` produces the risk
 prediction, and the LLM's role is limited to explaining that prediction —
@@ -111,6 +111,6 @@ timeline, checklists, and strategy.
 
 First-pass, source-only ingest — no entity or concept pages exist yet in
 this wiki, so this page has no outbound wikilinks. A later ingest pass
-is expected to extract entities (e.g. team members, BoneWise) and concepts
+is expected to extract entities (e.g. team members, BoneBot) and concepts
 (e.g. the demo-first principle, the no-login-wall rule) and link back to this
 page as their source.

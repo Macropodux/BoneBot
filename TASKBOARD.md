@@ -1,4 +1,4 @@
-# TASKBOARD — 24-Hour Execution Plan (BoneWise)
+# TASKBOARD — 24-Hour Execution Plan (BoneBot)
 
 **One-page "who does what, when."** The authoritative clock is `RUNBOOK.md §3`;
 the spec is `PROJECT.md`; the rules are `AGENTS.md`. This board maps the team's

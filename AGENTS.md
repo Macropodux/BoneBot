@@ -8,7 +8,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Project: Hack-Nation 6th Global AI Hackathon
 
-🎯 **CHALLENGE CHOSEN — read `PROJECT.md` first.** We are building **BoneWise**:
+🎯 **CHALLENGE CHOSEN — read `PROJECT.md` first.** We are building **BoneBot**:
 hormone-aware bone-health screening for postmenopausal women (Challenge 05,
 Women's Hormonal Health). `PROJECT.md` has the spec, the 3-minute demo script,
 the architecture, the data plan, and per-person task assignments. Read it before
