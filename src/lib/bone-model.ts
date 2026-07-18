@@ -1,4 +1,4 @@
-// THE MODEL — deterministic bone-health risk scoring.
+// THE MODEL — deterministic estimated-T-score regression.
 //
 // This is the science, and it is the part a physician stands behind. It MUST be
 // trained on real NHANES DXA (bone-density) data. Right now the coefficients are
@@ -6,18 +6,24 @@
 // invented.
 //
 // 🔴 DO NOT present these numbers as validated. Emre: replace COEFFICIENTS with
-//    the NHANES-trained logistic-regression coefficients, then flip
-//    MODEL_IS_VALIDATED to true. Until then the UI shows a "not yet validated"
-//    banner so nobody demos placeholder numbers as real.
+//    the NHANES-trained regression coefficients (and RANGE_HALF_WIDTH with the
+//    model's residual spread / prediction interval), then flip MODEL_IS_VALIDATED
+//    to true. Until then the UI shows a "not yet validated" banner.
 //
-// Why logistic regression: the challenge and good sense both favor a model that
-// is calibrated and explainable over a big opaque one. Scoring is a dot product
-// plus a sigmoid — trivial to run here in TS from exported coefficients, so the
-// whole app stays in the deployed scaffold with no separate Python service.
+// What it predicts: an ESTIMATED T-SCORE — a bone-density value on the same
+// clinical scale a DXA scan uses (normal ≥ -1.0, osteopenia -2.5..-1.0,
+// osteoporosis ≤ -2.5). We learn profile → T-score from NHANES women who WERE
+// scanned, then estimate it for a woman who was NOT. It is an estimate WITH
+// UNCERTAINTY, never a measurement — so we always return a range, and the screen
+// says "a DXA scan gives the real T-score".
 //
-// Architecture rule (see api/screen/route.ts): the MODEL predicts; the LLM only
-// EXPLAINS the model's output. The LLM never sets the risk. That keeps every
-// number traceable to validated data.
+// Why linear regression: the challenge and good sense both favor a model that is
+// interpretable and honest about uncertainty over a big opaque one. Scoring is a
+// dot product — trivial to run here in TS from exported coefficients, so the whole
+// app stays in the deployed scaffold with no separate Python service.
+//
+// Architecture rule (see api/screen/route.ts): the MODEL predicts the number; the
+// LLM only EXPLAINS it. The LLM never sets the T-score.
 
 export type BoneFeatures = {
   age: number; // years
@@ -30,38 +36,42 @@ export type BoneFeatures = {
   parentalHipFracture: boolean;
 };
 
-// Log-odds coefficients. DIRECTIONS are textbook (safe to show); MAGNITUDES are
-// placeholders pending NHANES training.
+// Regression coefficients in T-SCORE units. DIRECTIONS are textbook (safe to
+// show); MAGNITUDES are placeholders pending NHANES training.
 const COEFFICIENTS = {
-  intercept: -1.5,
-  age: 0.04, // older → higher risk
-  yearsSinceMenopause: 0.06, // longer since estrogen loss → higher risk
-  onHormoneTherapy: -0.5, // protective
-  priorFragilityFracture: 1.1, // strong known risk factor
-  bmi: -0.06, // higher BMI is protective for bone density (to a point)
-  weightBearingActivity: -0.8, // activity protects bone — the wearable lever
-  currentSmoker: 0.4,
-  parentalHipFracture: 0.5,
+  intercept: -0.1,
+  age: -0.03, // older → lower T-score
+  yearsSinceMenopause: -0.06, // longer since estrogen loss → lower
+  onHormoneTherapy: 0.3, // protective
+  priorFragilityFracture: -0.7, // strong known risk factor
+  bmi: 0.04, // higher BMI protects bone density (to a point)
+  weightBearingActivity: 1.0, // activity protects bone — the wearable lever
+  currentSmoker: -0.3,
+  parentalHipFracture: -0.4,
 };
 
-// Flip to true ONLY when COEFFICIENTS come from NHANES-trained, validated model.
-export const MODEL_IS_VALIDATED = false;
+// The ± half-width of the uncertainty range around the estimate. Placeholder:
+// the real value is the model's residual SD / prediction-interval half-width.
+const RANGE_HALF_WIDTH = 0.6;
 
-const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
+// Flip to true ONLY when COEFFICIENTS come from an NHANES-trained, validated model.
+export const MODEL_IS_VALIDATED = false;
 
 export type FactorContribution = {
   factor: string;
-  contribution: number; // signed log-odds contribution for this person
+  contribution: number; // signed push on the estimated T-score, in T-score units
   direction: "raises" | "lowers";
 };
 
 export type ModelOutput = {
-  probability: number; // 0-1, predicted risk of low bone density
+  estimatedTScore: number; // point estimate on the clinical scale
+  tScoreRange: [number, number]; // [low, high] uncertainty interval
   category: "elevated" | "uncertain" | "lower";
-  confidence: number; // 0-100
   contributions: FactorContribution[]; // sorted by magnitude — the explanation
   validated: boolean;
 };
+
+const round1 = (x: number) => Math.round(x * 10) / 10;
 
 export function scoreBone(f: BoneFeatures): ModelOutput {
   const terms: [string, number][] = [
@@ -75,19 +85,20 @@ export function scoreBone(f: BoneFeatures): ModelOutput {
     ["Parental hip fracture", COEFFICIENTS.parentalHipFracture * (f.parentalHipFracture ? 1 : 0)],
   ];
 
-  const logit = COEFFICIENTS.intercept + terms.reduce((s, [, v]) => s + v, 0);
-  const probability = sigmoid(logit);
+  const estimate = COEFFICIENTS.intercept + terms.reduce((s, [, v]) => s + v, 0);
+  const low = estimate - RANGE_HALF_WIDTH;
+  const high = estimate + RANGE_HALF_WIDTH;
 
-  // The no-call band: honesty over false confidence. A confident wrong screen
-  // is worse than "uncertain — get a scan to be sure". Tune with the real model.
+  // The band, from where the estimate AND its range sit on the clinical scale.
+  // Honesty over false precision: if the range doesn't clearly reach the
+  // osteoporosis line, we say "uncertain" rather than guess.
+  // - elevated:  osteoporosis is plausible (estimate ≤ -2.5, or the range dips to it)
+  // - lower:     comfortably normal (estimate ≥ -1.0)
+  // - uncertain: the osteopenia zone in between
   let category: ModelOutput["category"];
-  if (probability >= 0.6) category = "elevated";
-  else if (probability <= 0.35) category = "lower";
+  if (estimate <= -2.5 || low <= -2.5) category = "elevated";
+  else if (estimate >= -1.0) category = "lower";
   else category = "uncertain";
-
-  // Placeholder confidence: distance from the coin-flip line. The real version
-  // uses the calibrated model's reliability (Brier / reliability curve).
-  const confidence = Math.round(Math.min(1, Math.abs(probability - 0.5) * 2) * 100);
 
   const contributions = terms
     .filter(([, v]) => Math.abs(v) > 1e-3)
@@ -98,5 +109,11 @@ export function scoreBone(f: BoneFeatures): ModelOutput {
     }))
     .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
 
-  return { probability, category, confidence, contributions, validated: MODEL_IS_VALIDATED };
+  return {
+    estimatedTScore: round1(estimate),
+    tScoreRange: [round1(low), round1(high)],
+    category,
+    contributions,
+    validated: MODEL_IS_VALIDATED,
+  };
 }

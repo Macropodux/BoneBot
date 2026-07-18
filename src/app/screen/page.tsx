@@ -102,7 +102,7 @@ export default function Screen() {
         disabled={busy}
         className="self-start rounded-lg bg-zinc-900 px-5 py-2.5 font-medium text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
       >
-        {busy ? "Assessing…" : "Assess my risk"}
+        {busy ? "Estimating…" : "Estimate my bone-density score"}
       </button>
 
       {result && cat && (
@@ -118,7 +118,9 @@ export default function Screen() {
               <span className={`h-2.5 w-2.5 rounded-full ${cat.dot}`} />
               <span className="text-lg font-semibold">{cat.label}</span>
             </div>
-            <span className="font-mono text-sm text-zinc-500">{result.model.confidence}% confidence</span>
+            <span className="font-mono text-sm text-zinc-500">
+              est. T-score {result.model.estimatedTScore} ({result.model.tScoreRange[0]} … {result.model.tScoreRange[1]})
+            </span>
           </div>
 
           {result.report ? (

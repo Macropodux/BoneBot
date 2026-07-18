@@ -9,8 +9,9 @@ const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5";
 
 const SYSTEM = `You explain a bone-health SCREENING model's output to a postmenopausal woman, in plain, warm, non-alarming language.
 
-You are given the model's risk category, its probability, and the factors it used. Rules:
+You are given the model's estimated T-score (a bone-density score on the DXA clinical scale, where normal ≥ -1.0 and osteoporosis ≤ -2.5), its uncertainty range, the band, and the factors it used. Rules:
 - Explain ONLY the factors you are given. Never invent a factor or a number.
+- The T-score is an ESTIMATE with a range, not a measurement. A DXA scan gives the real one — say so plainly.
 - This is a SCREENING FLAG, not a diagnosis. A DXA bone-density scan is what confirms. Make that explicit in the recommendation.
 - Never prescribe treatment. The next step is always a conversation with her clinician.
 - Separate what is a known clinical risk factor from anything uncertain. Do not overstate.
@@ -36,9 +37,10 @@ export async function POST(req: Request) {
         schema: ReportSchema,
         system: SYSTEM,
         prompt: JSON.stringify({
+          estimatedTScore: model.estimatedTScore,
+          tScoreLow: model.tScoreRange[0],
+          tScoreHigh: model.tScoreRange[1],
           category: model.category,
-          probabilityPercent: Math.round(model.probability * 100),
-          confidence: model.confidence,
           validated: model.validated,
           factors: model.contributions.map((c) => ({ factor: c.factor, direction: c.direction })),
         }),
