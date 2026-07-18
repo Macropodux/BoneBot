@@ -27,11 +27,13 @@ wearable already collects.
 
 ## The one flow (build backward from this)
 
-A postmenopausal woman enters her profile (age, years since menopause, hormone
-therapy, prior fracture, BMI, a couple of risk factors) and her recent activity
-(from a wearable). She gets back: an **estimated T-score with an uncertainty
-range** (on the clinical scale a DXA uses), the band it falls in, the factors
-driving it, the one or two things she can change (chiefly activity), and a clear
+A postmenopausal woman talks to **BoneBot**. She gives it as much objective data
+as possible via **photos** — a blood test (→ vitamin D, calcium) and a watch
+screenshot (→ steps, active-minutes) — and BoneBot **asks follow-up questions** for
+the history no screen shows (years since menopause, prior fracture, hormone
+therapy, smoking, family history). She gets back: an **estimated T-score with an
+uncertainty range** (on the clinical scale a DXA uses), the band it falls in, the
+factors driving it, the one or two things she can change (chiefly activity), and a clear
 "this is an estimate, not a diagnosis — a DXA scan gives the real T-score."
 
 **Two audiences, one toggle:** **Consumer mode** (warm — encourages lifestyle
