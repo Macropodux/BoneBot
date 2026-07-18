@@ -38,33 +38,49 @@ scanned, then estimate it for a woman who **was not**.
 ## Front-gate: 4 screening questions (before anything else)
 
 Four quick questions gate entry — they confirm the tool is valid for her (women
-50+, postmenopausal) and route the special cases. Ask Q1–Q2 first so ineligible
-users exit early.
+50+, postmenopausal) and route the special cases. Each is evidence-based (why,
+below). Ask Q1–Q2 first so ineligible users exit early.
 
 1. **"Were you assigned female at birth?"**
    → *No* = **exit** (not validated for you); show general bone-health info.
-2. **"Have your periods stopped for good, or are you 45 or older?"**
+2. **"Have your periods stopped for good, or are you 50 or older?"**
    → *No* = **park** (outside the postmenopausal group the model is built for).
 3. **"Have you already been diagnosed with osteoporosis, had a bone scan, or take
    bone medication?"**
    → *Yes* = she's already been scanned, so **ask for her most recent T-score**
-   instead of estimating one:
-     - *knows it* → skip the estimate; **interpret her real T-score** + give
-       management / lifestyle guidance (a real score beats our estimate).
-     - *doesn't know it* → suggest she get it from her GP.
+   instead of estimating one (knows it → interpret the real score + guidance;
+   doesn't → point her to her GP).
    → *No* = continue.
-4. **"How old are you?"** (number)
-   → captures **age** — confirms the 50+ population and feeds the model as the
-   first real data point.
+4. **"Since age 50, have you broken a bone from a minor fall or knock?"**
+   → *Yes* = proceed, **fast-tracked as high risk** (strong "see your GP" flag).
 
 **To proceed to the rest of the questionnaire:** *Yes* to Q1, *Yes* to Q2, *No* to
-Q3. Q4 isn't a gate — it starts the data capture (age). Every exit stays helpful
-(general guidance / see your GP or get your score), never a dead end. The prior-
-fragility-fracture question — the strongest risk flag — is captured in the main
-questionnaire (it's the `priorFragilityFracture` model feature).
+Q3. Q4 doesn't gate — it **stratifies**. (Exact age is captured as the first field
+of the main questionnaire — the `age` model feature.) Every exit stays helpful,
+never a dead end.
 
-Gating to the population the model is valid for — and using a **real** T-score when
-one already exists — is good practice and reads well to a clinical judge.
+### Why each is evidence-based
+
+- **Q1 (female):** women carry ~2–3× the osteoporotic-fracture risk of men — about
+  **1 in 3 women vs 1 in 5 men over 50** (International Osteoporosis Foundation) —
+  because oestrogen is central to bone maintenance. The model is also trained on
+  women only, so it's valid only for them.
+- **Q2 (menopause / 50+):** oestrogen loss at menopause is the primary driver of
+  accelerated bone loss; mean age of natural menopause ≈ **51**. **50 (not 45)
+  because it matches our NHANES training population (women 50+)** — a model is only
+  valid for the group it was trained on — and it aligns with mean menopause age.
+  (USPSTF screens women ≥65 and younger postmenopausal women at risk; FRAX is
+  validated 40–90.) *Honest edge case: a woman postmenopausal before 50 passes on
+  the "periods stopped" clause but sits just outside the training age range — a mild
+  extrapolation we'd note.*
+- **Q3 (already diagnosed):** screening tools are for the **undiagnosed**; a woman
+  already diagnosed or treated follows her care pathway — and we capture her **real**
+  T-score rather than estimate one. Standard screening-design practice.
+- **Q4 (fragility fracture since 50):** a prior **low-trauma (fragility) fracture**
+  is among the strongest predictors of future fracture — roughly **doubling risk,
+  independent of BMD** — and is a core **FRAX** variable. "Minor fall or knock"
+  captures the clinically meaningful low-trauma distinction (vs a high-trauma injury
+  like a car crash).
 
 ---
 
