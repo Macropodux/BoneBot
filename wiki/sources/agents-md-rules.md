@@ -110,7 +110,7 @@ timeline, checklists, and strategy.
 ## Where this fits
 
 First-pass, source-only ingest — no entity or concept pages exist yet in
-this wiki, so this page has no outbound `[[wikilinks]]`. A later ingest pass
+this wiki, so this page has no outbound wikilinks. A later ingest pass
 is expected to extract entities (e.g. team members, BoneWise) and concepts
 (e.g. the demo-first principle, the no-login-wall rule) and link back to this
 page as their source.
