@@ -120,3 +120,11 @@ npm run lint
 ## See also
 
 `RUNBOOK.md` — the human runbook: schedule, timeline, checklists, strategy.
+
+## LLM Wiki
+
+This project has an LLM-curated wiki at `wiki/`, compiled from `AGENTS.md`,
+`PROJECT.md`, `TASKBOARD.md`, `RUNBOOK.md`, `SCREEN.md`, and the Hack-Nation
+Challenge 05 brief. Read `wiki/index.md` before re-reading those raw docs.
+Full conventions in `wiki/SCHEMA.md`. Ingest and query workflows live in the
+`llm-wiki` skill.
