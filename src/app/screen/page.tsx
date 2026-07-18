@@ -25,6 +25,11 @@ const EXAMPLE = {
   weightBearingActivity: 0.2,
   currentSmoker: false,
   parentalHipFracture: true,
+  glucocorticoids: false,
+  rheumatoidArthritis: false,
+  highAlcohol: false,
+  vitaminD: 45,
+  calcium: 2.4,
 };
 
 export default function Screen() {
@@ -94,6 +99,23 @@ export default function Screen() {
         </label>
         <label className="col-span-2 flex items-center gap-2 text-sm">
           <input type="checkbox" checked={f.parentalHipFracture} onChange={bool("parentalHipFracture")} /> Parent had a hip fracture
+        </label>
+        <label className="col-span-2 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={f.glucocorticoids} onChange={bool("glucocorticoids")} /> Long-term steroid (glucocorticoid) use
+        </label>
+        <label className="col-span-2 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={f.rheumatoidArthritis} onChange={bool("rheumatoidArthritis")} /> Rheumatoid arthritis
+        </label>
+        <label className="col-span-2 flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={f.highAlcohol} onChange={bool("highAlcohol")} /> Alcohol ≥ 3 units/day
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Vitamin D (nmol/L)
+          <input type="number" value={f.vitaminD} onChange={num("vitaminD")} className="rounded border border-zinc-300 bg-transparent px-2 py-1 dark:border-zinc-700" />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Calcium (mmol/L)
+          <input type="number" step="0.1" value={f.calcium} onChange={num("calcium")} className="rounded border border-zinc-300 bg-transparent px-2 py-1 dark:border-zinc-700" />
         </label>
       </section>
 

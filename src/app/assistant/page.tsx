@@ -25,6 +25,11 @@ const EXAMPLE: BoneFeatures = {
   weightBearingActivity: 0.2,
   currentSmoker: false,
   parentalHipFracture: true,
+  glucocorticoids: false,
+  rheumatoidArthritis: false,
+  highAlcohol: false,
+  vitaminD: 45,
+  calcium: 2.4,
 };
 
 export default function BoneBot() {

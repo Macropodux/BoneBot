@@ -34,6 +34,11 @@ export type BoneFeatures = {
   weightBearingActivity: number; // 0-1, derived from wearable steps / active minutes
   currentSmoker: boolean;
   parentalHipFracture: boolean;
+  glucocorticoids: boolean; // long-term oral steroid use
+  rheumatoidArthritis: boolean;
+  highAlcohol: boolean; // >= 3 units/day (FRAX threshold)
+  vitaminD: number; // serum 25-OH-D, nmol/L (photo-extracted lab)
+  calcium: number; // serum calcium, mmol/L (photo-extracted lab)
 };
 
 // Regression coefficients in T-SCORE units. DIRECTIONS are textbook (safe to
@@ -48,6 +53,12 @@ const COEFFICIENTS = {
   weightBearingActivity: 1.0, // activity protects bone — the wearable lever
   currentSmoker: -0.3,
   parentalHipFracture: -0.4,
+  glucocorticoids: -0.5, // steroids strongly suppress bone formation — a top drug cause (FRAX)
+  rheumatoidArthritis: -0.3, // chronic inflammation lowers BMD independently (FRAX variable)
+  highAlcohol: -0.3, // impairs bone formation and raises fall risk (FRAX ≥3 units/day)
+  vitaminD: 0.004, // 25-OH-D enables calcium absorption + mineralisation; per nmol/L
+  calcium: 0.02, // serum calcium mainly flags secondary causes (e.g. hyperparathyroidism) —
+  //               weak direct BMD signal (it's tightly regulated); Emre may drop after training
 };
 
 // The ± half-width of the uncertainty range around the estimate. Placeholder:
@@ -83,6 +94,11 @@ export function scoreBone(f: BoneFeatures): ModelOutput {
     ["Weight-bearing activity", COEFFICIENTS.weightBearingActivity * f.weightBearingActivity],
     ["Current smoker", COEFFICIENTS.currentSmoker * (f.currentSmoker ? 1 : 0)],
     ["Parental hip fracture", COEFFICIENTS.parentalHipFracture * (f.parentalHipFracture ? 1 : 0)],
+    ["Glucocorticoid use", COEFFICIENTS.glucocorticoids * (f.glucocorticoids ? 1 : 0)],
+    ["Rheumatoid arthritis", COEFFICIENTS.rheumatoidArthritis * (f.rheumatoidArthritis ? 1 : 0)],
+    ["High alcohol intake", COEFFICIENTS.highAlcohol * (f.highAlcohol ? 1 : 0)],
+    ["Vitamin D", COEFFICIENTS.vitaminD * f.vitaminD],
+    ["Serum calcium", COEFFICIENTS.calcium * f.calcium],
   ];
 
   const estimate = COEFFICIENTS.intercept + terms.reduce((s, [, v]) => s + v, 0);

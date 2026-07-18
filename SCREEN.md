@@ -80,10 +80,17 @@ Mapped 1:1 to `BoneFeatures` in `bone-model.ts`:
 | Parent broke a hip? | `parentalHipFracture` | known risk factor |
 | Current smoker? | `currentSmoker` | risk factor |
 | Weight-bearing activity | `weightBearingActivity` | 0–1, from the watch photo |
+| Long-term steroids? | `glucocorticoids` | **top drug cause** of bone loss — steroids suppress bone formation (FRAX variable) |
+| Rheumatoid arthritis? | `rheumatoidArthritis` | chronic inflammation lowers BMD independently of steroids (FRAX variable) |
+| Alcohol ≥ 3 units/day? | `highAlcohol` | impairs bone formation and raises fall risk (FRAX threshold) |
+| Vitamin D (25-OH-D) | `vitaminD` | enables calcium absorption + bone mineralisation; deficiency is common and drives low BMD (objective, photo-extracted) |
+| Serum calcium | `calcium` | mainly flags **secondary causes** (e.g. hyperparathyroidism) — it's tightly regulated, so a weak *direct* BMD predictor (objective, photo-extracted) |
 
-Plus, **once Emre trains them in:** vitamin D and calcium (NHANES has both — the
-VID / BIOPRO files). Until then the vision layer extracts and *shows* them, but
-they don't yet move the estimate — see guardrail 2.
+**Why these:** `glucocorticoids`, `rheumatoidArthritis`, `highAlcohol` are established
+**FRAX variables** — adding them both improves accuracy and strengthens the "beats
+FRAX" story. `vitaminD` / `calcium` are the objective labs from the blood-test photo
+(NHANES has both — VID / BIOPRO files). Emre confirms each feature's weight when he
+trains on NHANES; serum calcium in particular may be dropped as a direct predictor.
 
 ### Three guardrails (honesty — a clinician judge will probe these)
 
