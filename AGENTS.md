@@ -8,7 +8,24 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # Project: Hack-Nation 6th Global AI Hackathon
 
-**This is a hackathon scaffold.** It exists so that when the challenges are revealed (Sat 18 Jul, 17:05 London) the team starts from a *deployed, working app* instead of an empty folder. Everything here is deliberately generic — the actual product gets built on top.
+🎯 **CHALLENGE CHOSEN — read `PROJECT.md` first.** We are building **BoneWise**:
+hormone-aware bone-health screening for postmenopausal women (Challenge 05,
+Women's Hormonal Health). `PROJECT.md` has the spec, the 3-minute demo script,
+the architecture, the data plan, and per-person task assignments. Read it before
+writing code. Core rule: **the model predicts (NHANES-trained, in `bone-model.ts`),
+the LLM only explains** — never let the LLM set the risk. Screening flag, never a
+diagnosis.
+
+The scam-detector and chat files (`src/app/scam`, `src/app/chat`, and their API
+routes) are the old generic examples — a reference pattern to copy from, then
+delete once the real product stands on its own.
+
+---
+
+**This started as a hackathon scaffold** — a deployed, working app so the team
+began the build from something real instead of an empty folder. The generic
+plumbing (Supabase client, AI SDK route pattern, Docker, auto-deploy) is proven
+and stays; the product is `PROJECT.md`.
 
 🔴 **Hard deadline: Sunday 19 July, 14:00 London.** No extension. A working ugly demo beats a beautiful broken one, every time.
 
