@@ -109,12 +109,12 @@ osteoporosis-defining threshold (T <= -2.5), and ships as a reusable open benchm
 
 Mechanical loading builds and preserves bone, so *how much and how intensely a woman
 actually moves* is biologically tied to bone density — and it is information the
-clinical tools ignore. The evidence, much of it in our exact NHANES cycle:
+clinical tools ignore. The evidence supports including this modality in the
+NHANES 2011–2014 wrist-accelerometry training data described in `PROJECT.md`:
 
-- In **NHANES 2005-2006**, objectively measured (accelerometer) activity was
-  associated with higher bone density and trabecular bone score in older adults;
-  higher moderate-to-vigorous activity tracked with better femoral-neck and hip
-  measures.
+- In older adults, objectively measured accelerometer activity has been associated
+  with higher bone density and trabecular bone score; higher moderate-to-vigorous
+  activity tracked with better femoral-neck and hip measures.
 - In post-menopausal women (NHANES 2007-2018), performing **>=38 MET-hours/week** was
   linked to lower osteoporosis risk.
 - In **UK Biobank**, even brief bouts of higher-intensity activity predicted bone
@@ -154,13 +154,10 @@ job is to explain a screening result and route to a clinician and a DXA scan.
 
 ### 4a. What's available
 
-- **NHANES 2005-2006 (primary).** The one cycle that co-locates objective
-  accelerometry (PAXRAW) **and** femur DXA **and** labs **and** reproductive
-  history — the multimodal intersection our ablation needs. Research-grade,
-  hip-worn ActiGraph over 7 days, on a nationally representative sample.
-- **NHANES 2007-2018 (extension).** Much larger n for clinical-only models, but the
-  accelerometer protocol changed after 2011 (raw wrist triaxial, not comparable
-  counts) — do **not** naively pool it with 2005-2006.
+- **NHANES 2011–2014 (primary).** DXA bone density, reproductive/hormonal history,
+  laboratory measures, and objective wrist-accelerometer activity are combined by
+  respondent (SEQN). This is the multimodal dataset used to train and validate the
+  model; the wrist-accelerometer measure is the project's wearable feature.
 - **mcPHASES (PhysioNet)** and consumer-wearable sets: useful as a *future* bridge
   to hormone/wearable modelling, but not training data here (young, premenopausal,
   no bone measures).
