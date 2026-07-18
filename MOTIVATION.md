@@ -231,12 +231,71 @@ recommendations beyond the validated model's scope.
 
 ## 6. Marketability (future work — not for the hackathon build)
 
-Not a challenge deliverable, but worth noting as a sustainability path: the tool
-could act as a **connector**, linking women flagged as higher-risk to appropriate
-services — gyms, personal trainers, nutritionists, run clubs, and health
-professionals — and earn referral or booking fees. Because weight-bearing exercise
-and nutrition are front-line, non-pharmacological levers for bone health, this is a
-plausibly *aligned* incentive.
+Not a challenge deliverable, but worth noting as a sustainability path.
+
+### 6a. From one-off screen to continuous, wearable-linked score
+
+The hackathon build is a single-timepoint screen. The natural product evolution is
+a companion app that links to a woman's existing fitness tracker (Apple Health,
+Fitbit, Garmin, Oura) so the same wrist-accelerometer signal that drives the NHANES
+model (section 3a) keeps flowing in after the first assessment, rather than being
+captured once and going stale. That turns a single risk flag into a **living score**
+that updates as her activity actually changes — and gives the product a reason for
+her to open it again, which a one-shot screening tool otherwise lacks.
+
+### 6b. Compliance is the actual bottleneck — and the actual market
+
+Identifying risk is only half the problem; the bigger, and more monetisable, gap is
+that women who are told to change their habits mostly don't sustain it, and women
+prescribed medication mostly don't stay on it:
+
+- **Medication adherence.** In real-world practice, adherence to osteoporosis
+  medication is only around **60%**, and this **drops further with treatment
+  duration** — pooled good-adherence estimates fall from ~53% at 1-6 months to ~43%
+  at 13-24 months. As many as **70% of patients discontinue within the first year**,
+  and about half stop within one to two years.
+- **The perception gap.** Physicians believe **~69%** of their patients are
+  adherent; claims data shows the true figure is **under 49%**. Clinicians
+  structurally cannot see non-adherence happening — which is exactly the gap a
+  connected app, not a clinic visit, is positioned to close.
+- **Exercise adherence is worse, and worst in exactly our target group.** General
+  exercise-program dropout runs to roughly **50% within the first 3-6 months**.
+  Among sedentary women aged 70+ in a walking program — our demographic — only
+  **17%** reached the recommended 150 minutes/week. Even fitness-app users fare
+  poorly: only **18.1% of beginner users of a mobile resistance-training app
+  remained adherent at 6 months**, with a median drop-off at 14 weeks.
+- **What actually keeps people compliant.** Supervised sessions get 70-90%
+  attendance, versus ~50% unsupervised — the presence of accountability, not the
+  exercise itself, is the lever. That is precisely what a habit-tracking,
+  wearable-linked companion app can supply outside a clinical setting: reminders,
+  visible streaks, and a running connection back to *her own* risk score moving up
+  or down.
+
+This reframes the product: the screening flag is the hook, but **habit-formation
+and adherence support around a woman's own moving risk score is the retention and
+revenue engine** — closer to a chronic-condition management app than a one-time
+calculator.
+
+### 6c. Why this is worth paying for: the cost side
+
+Osteoporotic fractures cost the US healthcare system directly on the order of
+**$57 billion/year in 2018**, projected to exceed **$95 billion/year by 2040** as
+fracture counts rise from **1.9 million to 3.2 million/year** over the same period.
+A single fracture drives roughly **$30,000** in all-cause healthcare costs in the
+following year. Under-screening (section 1) and non-adherence (6b) are both
+upstream, addressable causes of that spend — which is the commercial case for a
+payer, employer-wellness plan, or insurer to subsidise a tool that measurably
+improves either.
+
+### 6d. Connector model and guardrails
+
+The tool could also act as a **connector**, linking women flagged as higher-risk to
+appropriate services — gyms, personal trainers, nutritionists, run clubs, and
+health professionals — and earn referral or booking fees. Because weight-bearing
+exercise and nutrition are front-line, non-pharmacological levers for bone health,
+this is a plausibly *aligned* incentive, and pairs naturally with 6b: the connector
+supplies the service, the habit-tracking layer supplies the accountability to
+actually use it.
 
 Ethical guardrails if this is ever pursued: referral incentives must never distort
 the clinical message or push paid services over a needed medical referral;
@@ -302,3 +361,9 @@ honestly rather than hidden.
 17. Predicting fall risk in older adults: ML comparison of accelerometric vs non-accelerometric factors — Digit Health 2025. https://pmc.ncbi.nlm.nih.gov/articles/PMC11951886/
 18. Prediction of fall risk in community-dwelling older adults using a wearable system (~81.6% accuracy) — PMC8545936. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8545936/
 19. Looker et al., Updated proximal femur BMD reference data (T-score reference) — Osteoporos Int 1998.
+20. A New Look at Osteoporosis Outcomes: The Influence of Treatment, Compliance, Persistence, and Adherence (~60% real-world adherence; 70% discontinue within 1 year; physician-perceived 69% vs actual <49% adherent) — Mayo Clin Proc. https://www.mayoclinicproceedings.org/article/S0025-6196(11)61200-7/fulltext
+21. The Economics of Improving Medication Adherence in Osteoporosis — PMC3167669. https://pmc.ncbi.nlm.nih.gov/articles/PMC3167669/
+22. Predictors of Long-term Exercise Adherence in a Community-Based Sample of Older Women (sedentary women 70+; only 17% reached recommended activity) — PMC2828261. https://pmc.ncbi.nlm.nih.gov/articles/PMC2828261/
+23. Predictors of long-term resistance exercise adherence among beginners: evidence from a large cohort of mobile app users (18.1% adherent at 6 months) — SportRxiv. https://sportrxiv.org/index.php/server/preprint/view/709
+24. Healthcare Policy Changes in Osteoporosis Can Improve Outcomes and Reduce Costs in the United States ($57B in 2018 rising to >$95B by 2040; 1.9M to 3.2M fractures/year) — JBMR Plus / PMC6808223. https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6808223/
+25. Long-term direct and indirect economic burden associated with osteoporotic fracture in US postmenopausal women (~$30,000 in all-cause costs in year following fracture) — Osteoporos Int 2020. https://link.springer.com/article/10.1007/s00198-020-05769-3
