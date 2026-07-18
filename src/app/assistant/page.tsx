@@ -1,11 +1,19 @@
 "use client";
 
 // BoneBot — voice bone-health assistant.
-// Flow: profile in (type or speak) -> scoreBone() runs HERE (deterministic, the
-// model) -> BoneBot explains it in the chosen mode -> ElevenLabs speaks it.
-// The number is never the LLM's; the LLM only explains. Voice input uses the
-// browser's Web Speech API (no dependency); voice output uses /api/tts
-// (ElevenLabs), falling back to the browser voice if the key is absent.
+// Flow: click "Talk to BoneBot" -> BoneBot asks its 7 history questions ONE AT
+// A TIME (scripted, not open-ended — SCREEN.md: "each question is targeted,
+// it doesn't wander into open chat") -> scoreBone() runs HERE (deterministic,
+// the model) -> BoneBot explains it -> ElevenLabs speaks it -> she can keep
+// asking follow-ups in the same chat. The number is never the LLM's; the LLM
+// only explains. Voice input uses the browser's Web Speech API (no
+// dependency); voice output uses /api/tts (ElevenLabs), falling back to the
+// browser voice if the key is absent.
+//
+// The 6 fields SCREEN.md marks "photo-extracted" (vitaminD, calcium,
+// weightBearingActivity, glucocorticoids, rheumatoidArthritis, highAlcohol)
+// aren't asked conversationally yet — photo upload (/api/vision) isn't built.
+// They use DEFAULTS below until that lands.
 
 import { useState } from "react";
 import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model";
@@ -16,34 +24,103 @@ const BAND = {
   lower: { dot: "bg-emerald-500", label: "Reassuring for now" },
 } as const;
 
-const EXAMPLE: BoneFeatures = {
-  age: 58,
-  yearsSinceMenopause: 6,
-  onHormoneTherapy: false,
-  priorFragilityFracture: true,
-  bmi: 22,
+// Fields not yet gathered conversationally — SCREEN.md's "photo-extracted"
+// column. Sensible illustrative defaults until /api/vision exists.
+const DEFAULTS = {
   weightBearingActivity: 0.2,
-  currentSmoker: false,
-  parentalHipFracture: true,
   glucocorticoids: false,
   rheumatoidArthritis: false,
   highAlcohol: false,
   vitaminD: 45,
   calcium: 2.4,
+} as const;
+
+type AskedKey =
+  | "age"
+  | "yearsSinceMenopause"
+  | "bmi"
+  | "priorFragilityFracture"
+  | "onHormoneTherapy"
+  | "currentSmoker"
+  | "parentalHipFracture";
+
+type Question = {
+  key: AskedKey;
+  prompt: string;
+  type: "number" | "boolean";
+  clarify: string;
 };
 
+const QUESTIONS: Question[] = [
+  {
+    key: "age",
+    prompt: "Hi, I'm BoneBot. First — how old are you?",
+    type: "number",
+    clarify: "Sorry, I didn't catch a number there — how old are you?",
+  },
+  {
+    key: "yearsSinceMenopause",
+    prompt: "How many years has it been since your periods stopped for good, if you know?",
+    type: "number",
+    clarify: "I need a number of years — roughly how long since menopause?",
+  },
+  {
+    key: "bmi",
+    prompt: "What's your BMI, if you know it? A typical healthy range is about 18 to 25.",
+    type: "number",
+    clarify: "I need a number for BMI — what's your BMI?",
+  },
+  {
+    key: "priorFragilityFracture",
+    prompt: "Have you broken a bone from a minor fall or knock since age 50?",
+    type: "boolean",
+    clarify: "Just a yes or no — have you broken a bone from a minor fall since 50?",
+  },
+  {
+    key: "onHormoneTherapy",
+    prompt: "Are you currently on hormone replacement therapy?",
+    type: "boolean",
+    clarify: "Yes or no — are you on hormone replacement therapy?",
+  },
+  {
+    key: "currentSmoker",
+    prompt: "Do you currently smoke?",
+    type: "boolean",
+    clarify: "Yes or no — do you currently smoke?",
+  },
+  {
+    key: "parentalHipFracture",
+    prompt: "Last one — did either of your parents break a hip in their lifetime?",
+    type: "boolean",
+    clarify: "Yes or no — did a parent break a hip?",
+  },
+];
+
+function parseNumber(text: string): number | null {
+  const m = text.match(/-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+}
+
+function parseYesNo(text: string): boolean | null {
+  const t = text.trim().toLowerCase();
+  if (/\b(yes|yeah|yep|yup|correct|true)\b/.test(t)) return true;
+  if (/\b(no|nope|not|false)\b/.test(t)) return false;
+  return null;
+}
+
+type ChatMessage = { role: "bot" | "user"; text: string };
+
 export default function BoneBot() {
-  const [f, setF] = useState<BoneFeatures>(EXAMPLE);
+  const [phase, setPhase] = useState<"intro" | "gathering" | "result">("intro");
+  const [transcript, setTranscript] = useState<ChatMessage[]>([]);
+  const [qIndex, setQIndex] = useState(0);
+  const [collected, setCollected] = useState<Partial<Record<AskedKey, number | boolean>>>({});
+  const [features, setFeatures] = useState<BoneFeatures | null>(null);
   const [result, setResult] = useState<ModelOutput | null>(null);
   const [say, setSay] = useState("");
   const [busy, setBusy] = useState(false);
-  const [question, setQuestion] = useState("");
+  const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
-
-  const num = (k: keyof BoneFeatures) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setF({ ...f, [k]: Number(e.target.value) });
-  const bool = (k: keyof BoneFeatures) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setF({ ...f, [k]: e.target.checked });
 
   async function speak(text: string) {
     try {
@@ -66,22 +143,92 @@ export default function BoneBot() {
     }
   }
 
-  async function ask(q?: string) {
+  function say_(role: "bot" | "user", text: string) {
+    setTranscript((t) => [...t, { role, text }]);
+  }
+
+  function startChat() {
+    setPhase("gathering");
+    setTranscript([]);
+    setQIndex(0);
+    setCollected({});
+    say_("bot", QUESTIONS[0].prompt);
+    speak(QUESTIONS[0].prompt);
+  }
+
+  async function finishGathering(all: Record<AskedKey, number | boolean>) {
+    const full: BoneFeatures = { ...DEFAULTS, ...all } as BoneFeatures;
+    setFeatures(full);
     setBusy(true);
-    const model = scoreBone(f);
+    const model = scoreBone(full);
     setResult(model);
     try {
       const r = await fetch("/api/assistant", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mode: "consumer", result: model, features: f, question: q }),
+        body: JSON.stringify({ mode: "consumer", result: model, features: full }),
       });
       const text = r.ok ? (await r.json()).text : "BoneBot is unavailable right now — check the result above.";
       setSay(text);
+      say_("bot", text);
+      speak(text);
+    } finally {
+      setBusy(false);
+      setPhase("result");
+    }
+  }
+
+  function submitAnswer(raw: string) {
+    if (!raw.trim() || busy) return;
+    say_("user", raw);
+
+    const q = QUESTIONS[qIndex];
+    const value = q.type === "number" ? parseNumber(raw) : parseYesNo(raw);
+
+    if (value === null) {
+      say_("bot", q.clarify);
+      speak(q.clarify);
+      return;
+    }
+
+    const next = { ...collected, [q.key]: value };
+    setCollected(next);
+
+    const nextIndex = qIndex + 1;
+    if (nextIndex < QUESTIONS.length) {
+      setQIndex(nextIndex);
+      say_("bot", QUESTIONS[nextIndex].prompt);
+      speak(QUESTIONS[nextIndex].prompt);
+    } else {
+      finishGathering(next as Record<AskedKey, number | boolean>);
+    }
+  }
+
+  async function askFollowUp(q: string) {
+    if (!q.trim() || !result || !features || busy) return;
+    say_("user", q);
+    setBusy(true);
+    try {
+      const r = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ mode: "consumer", result, features, question: q }),
+      });
+      const text = r.ok ? (await r.json()).text : "BoneBot is unavailable right now.";
+      setSay(text);
+      say_("bot", text);
       speak(text);
     } finally {
       setBusy(false);
     }
+  }
+
+  function submit() {
+    const text = input.trim();
+    if (!text) return;
+    setInput("");
+    if (phase === "gathering") submitAnswer(text);
+    else if (phase === "result") askFollowUp(text);
   }
 
   function listen() {
@@ -97,8 +244,8 @@ export default function BoneBot() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     rec.onresult = (e: any) => {
       const said = e.results[0][0].transcript as string;
-      setQuestion(said);
-      ask(said);
+      if (phase === "gathering") submitAnswer(said);
+      else if (phase === "result") askFollowUp(said);
     };
     rec.onend = () => setListening(false);
     setListening(true);
@@ -117,85 +264,74 @@ export default function BoneBot() {
         </p>
       </header>
 
-      <section className="grid grid-cols-2 gap-4 rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
-        <label className="flex flex-col gap-1 text-sm">
-          Age
-          <input type="number" value={f.age} onChange={num("age")} className="rounded border border-zinc-300 bg-transparent px-2 py-1 dark:border-zinc-700" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Years since menopause
-          <input type="number" value={f.yearsSinceMenopause} onChange={num("yearsSinceMenopause")} className="rounded border border-zinc-300 bg-transparent px-2 py-1 dark:border-zinc-700" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          BMI
-          <input type="number" value={f.bmi} onChange={num("bmi")} className="rounded border border-zinc-300 bg-transparent px-2 py-1 dark:border-zinc-700" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Weight-bearing activity (0–1)
-          <input type="number" step="0.1" min="0" max="1" value={f.weightBearingActivity} onChange={num("weightBearingActivity")} className="rounded border border-zinc-300 bg-transparent px-2 py-1 dark:border-zinc-700" />
-        </label>
-        <label className="col-span-2 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={f.onHormoneTherapy} onChange={bool("onHormoneTherapy")} /> On hormone therapy
-        </label>
-        <label className="col-span-2 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={f.priorFragilityFracture} onChange={bool("priorFragilityFracture")} /> Prior fragility fracture
-        </label>
-        <label className="col-span-2 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={f.currentSmoker} onChange={bool("currentSmoker")} /> Current smoker
-        </label>
-        <label className="col-span-2 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={f.parentalHipFracture} onChange={bool("parentalHipFracture")} /> Parent had a hip fracture
-        </label>
-      </section>
+      {phase === "intro" && (
+        <button
+          onClick={startChat}
+          className="self-start rounded-lg bg-zinc-900 px-5 py-2.5 font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"
+        >
+          Talk to BoneBot
+        </button>
+      )}
 
-      <button
-        onClick={() => ask()}
-        disabled={busy}
-        className="self-start rounded-lg bg-zinc-900 px-5 py-2.5 font-medium text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900"
-      >
-        {busy ? "BoneBot is thinking…" : "Ask BoneBot"}
-      </button>
+      {phase !== "intro" && (
+        <>
+          <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
+            {transcript.map((m, i) => (
+              <p
+                key={i}
+                className={
+                  m.role === "bot"
+                    ? "whitespace-pre-wrap text-zinc-900 dark:text-zinc-100"
+                    : "self-end whitespace-pre-wrap text-right text-zinc-500"
+                }
+              >
+                {m.role === "bot" ? "🦴 " : "you: "}
+                {m.text}
+              </p>
+            ))}
+            {busy && <p className="text-sm text-zinc-500">BoneBot is thinking…</p>}
+          </section>
 
-      {result && band && (
-        <section className="flex flex-col gap-4 rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
-          {!result.validated && (
-            <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
-              ⚠️ Illustrative — coefficients not yet trained on NHANES. Do not present these numbers as real.
-            </p>
+          {result && band && (
+            <section className="flex flex-col gap-3 rounded-xl border border-zinc-200 p-5 dark:border-zinc-800">
+              {!result.validated && (
+                <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+                  ⚠️ Illustrative — coefficients not yet trained on NHANES. Do not present these numbers as real.
+                </p>
+              )}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className={`h-2.5 w-2.5 rounded-full ${band.dot}`} />
+                  <span className="text-lg font-semibold">{band.label}</span>
+                </div>
+                <span className="font-mono text-sm text-zinc-500">
+                  est. T-score {result.estimatedTScore} ({result.tScoreRange[0]} … {result.tScoreRange[1]})
+                </span>
+              </div>
+              <p className="border-t border-zinc-200 pt-3 text-xs text-zinc-400 dark:border-zinc-800">
+                An estimate, not a diagnosis. A DXA bone-density scan gives the real T-score.
+              </p>
+            </section>
           )}
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className={`h-2.5 w-2.5 rounded-full ${band.dot}`} />
-              <span className="text-lg font-semibold">{band.label}</span>
-            </div>
-            <span className="font-mono text-sm text-zinc-500">
-              est. T-score {result.estimatedTScore} ({result.tScoreRange[0]} … {result.tScoreRange[1]})
-            </span>
-          </div>
-
-          {say && <p className="whitespace-pre-wrap">{say}</p>}
-
-          <div className="flex gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+          <div className="flex gap-2">
             <input
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="Ask a follow-up…"
-              aria-label="Ask BoneBot"
-              className="flex-1 rounded-lg border border-zinc-300 bg-transparent px-3 py-2 outline-none focus:border-zinc-500 dark:border-zinc-700"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+              placeholder={phase === "gathering" ? "Type your answer…" : "Ask a follow-up…"}
+              aria-label="Answer BoneBot"
+              disabled={busy}
+              className="flex-1 rounded-lg border border-zinc-300 bg-transparent px-3 py-2 outline-none focus:border-zinc-500 disabled:opacity-40 dark:border-zinc-700"
             />
-            <button onClick={() => ask(question)} disabled={busy || !question.trim()} className="rounded-lg bg-zinc-900 px-4 py-2 text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900">
+            <button onClick={submit} disabled={busy || !input.trim()} className="rounded-lg bg-zinc-900 px-4 py-2 text-white disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900">
               Send
             </button>
             <button onClick={listen} disabled={busy} className={`rounded-lg px-4 py-2 ${listening ? "bg-red-500 text-white" : "border border-zinc-300 dark:border-zinc-700"}`}>
               {listening ? "● Listening" : "🎤 Speak"}
             </button>
           </div>
-
-          <p className="border-t border-zinc-200 pt-3 text-xs text-zinc-400 dark:border-zinc-800">
-            An estimate, not a diagnosis. A DXA bone-density scan gives the real T-score.
-          </p>
-        </section>
+        </>
       )}
     </div>
   );
