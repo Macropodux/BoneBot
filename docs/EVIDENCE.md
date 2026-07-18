@@ -64,6 +64,8 @@ The team wiki indexes this register at
 | `alc-bmd-2004` | Small cross-sectional postmenopausal study reporting an ALC/BMD association; hypothesis-generating only. | [Di Monaco et al., 2004 (PubMed)](https://pubmed.ncbi.nlm.nih.gov/14691689/) |
 | `rbc-bmd-2011` | Cross-sectional study of peripheral blood-cell counts and BMD in healthy postmenopausal women; association, not prediction. | [Kim et al., 2011 (PubMed)](https://pubmed.ncbi.nlm.nih.gov/21786437/) |
 | `osteolaus-blood-counts-2022` | Population-based postmenopausal cohort with two assessments; differential counts did not consistently predict BMD or microarchitecture. | [Biver et al., 2022 (PubMed)](https://pubmed.ncbi.nlm.nih.gov/36111204/) |
+| `ra-frax-ipd-2025` | Individual-person meta-analysis of 29 prospective cohorts (~2M participants) commissioned to update FRAX: RA raised fracture risk (HR 1.49 any clinical fracture, HR 2.23 hip fracture) independent of glucocorticoid exposure and femoral-neck BMD. | [Kanis et al., 2025 (PubMed)](https://pubmed.ncbi.nlm.nih.gov/39955689/) |
+| `ra-fracture-meta-2017` | Meta-analysis of 13 studies: pooled fracture risk ratio 2.25 [1.76–2.87] in RA vs non-RA, 1.99 [1.58–2.50] in the female subgroup. | [Xue et al., 2017 (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC6393106/) |
 
 ## Source use and limits
 
@@ -103,3 +105,19 @@ haematocrit difference in its clinical comparison. Ha et al.'s 2025 review
 describes plausible mechanisms but calls for further validation. The longitudinal
 MrOS study links faster hip BMD loss with anaemia in older men, not an isolated
 RBC-count threshold for postmenopausal women.
+
+### Rheumatoid arthritis appraisal
+
+Rheumatoid arthritis (RA) is a recognised, *independent* clinical risk factor
+for fracture — not merely a proxy for the long-term glucocorticoid use that
+often accompanies it, which is already a separate model feature. Kanis et al.,
+2025 is an individual-person meta-analysis of 29 prospective cohorts
+(~2 million participants) run to update FRAX: RA raised fracture risk (HR 1.49
+for any clinical fracture, HR 2.23 for hip fracture) after adjusting for
+glucocorticoid exposure and femoral-neck BMD. Xue et al., 2017 (13 pooled
+studies) found a similar-sized association (RR 2.25 overall, RR 1.99 in the
+female subgroup). This is why FRAX and NOGG retain RA as a standalone clinical
+risk factor alongside, not instead of, glucocorticoid use. It supports the
+*direction* of the model's existing `rheumatoidArthritis` coefficient in
+`bone-model.ts`; the coefficient's magnitude remains a placeholder pending
+NHANES training, per that file's own validation note.

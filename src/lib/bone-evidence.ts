@@ -181,6 +181,20 @@ export const EVIDENCE_SOURCES: EvidenceSource[] = [
     url: "https://pubmed.ncbi.nlm.nih.gov/36111204/",
     type: "cohort",
   },
+  {
+    id: "ra-frax-ipd-2025",
+    title: "Rheumatoid arthritis and subsequent fracture risk: an individual person meta-analysis to update FRAX",
+    publisher: "Osteoporosis International (PubMed)",
+    url: "https://pubmed.ncbi.nlm.nih.gov/39955689/",
+    type: "systematic-review",
+  },
+  {
+    id: "ra-fracture-meta-2017",
+    title: "Bone fracture risk in patients with rheumatoid arthritis: A meta-analysis",
+    publisher: "Medicine (PMC)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC6393106/",
+    type: "systematic-review",
+  },
 ];
 
 export const EVIDENCE_CARDS: EvidenceCard[] = [
@@ -270,7 +284,7 @@ export const EVIDENCE_CARDS: EvidenceCard[] = [
     approvedWording:
       "Rheumatoid arthritis is one of the health conditions that can be relevant when clinicians assess bone and fracture risk.",
     limits: "Do not attribute an individual result to rheumatoid arthritis or give disease-management advice.",
-    sourceIds: ["nhs-dxa", "nogg-2024"],
+    sourceIds: ["nhs-dxa", "nogg-2024", "ra-frax-ipd-2025", "ra-fracture-meta-2017"],
   },
   {
     id: "alcohol",
