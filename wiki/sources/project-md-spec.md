@@ -1,16 +1,16 @@
 ---
 type: source
-title: "PROJECT.md — BoneWise Spec and Plan"
+title: "PROJECT.md — BoneBot Spec and Plan"
 raw: "PROJECT.md"
 ingested: 2026-07-18
-tags: [spec, bonewise, hackathon]
+tags: [spec, bonebot, hackathon]
 created: 2026-07-18
 updated: 2026-07-18
 ---
 
-# PROJECT.md — BoneWise Spec and Plan
+# PROJECT.md — BoneBot Spec and Plan
 
-`PROJECT.md` is the primary spec and execution plan for **BoneWise**, the project chosen for Hack-Nation Challenge 05 (Women's Hormonal Health). BoneWise is designed to provide hormone-aware bone-health screening for postmenopausal women by combining a user's health profile with wearable activity data.
+`PROJECT.md` is the primary spec and execution plan for **BoneBot**, the project chosen for Hack-Nation Challenge 05 (Women's Hormonal Health). BoneBot is designed to provide hormone-aware bone-health screening for postmenopausal women by combining a user's health profile with wearable activity data.
 
 ## Core Flow and Concept
 

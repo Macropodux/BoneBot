@@ -3,7 +3,7 @@ type: source
 title: "TASKBOARD.md — Execution Plan"
 raw: "TASKBOARD.md"
 ingested: 2026-07-18
-tags: [schedule, bonewise, hackathon]
+tags: [schedule, bonebot, hackathon]
 created: 2026-07-18
 updated: 2026-07-18
 ---

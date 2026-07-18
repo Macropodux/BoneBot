@@ -1,4 +1,4 @@
-# RESEARCH — Clinical & Market Evidence for BoneBot / BoneWise
+# RESEARCH — Clinical & Market Evidence for BoneBot
 
 > **Provenance.** Auto-generated from a deep-research pass on **2026-07-18**
 > (fan-out web search -> source fetch -> 3-vote adversarial verification -> cited

@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-18
 **Status:** approved
-**Scope:** dev/team tooling only — no product code, no build/runtime impact on the BoneWise app.
+**Scope:** dev/team tooling only — no product code, no build/runtime impact on the BoneBot app.
 
 ## Problem
 

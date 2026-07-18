@@ -18,7 +18,7 @@ Created `wiki/sources/agents-md-rules.md`. Raw source cited in place at
 raw-in-place rule. First-pass, source-only ingest — no entity/concept
 extraction; page is an expected orphan pending a later ingest pass.
 
-## [2026-07-18] ingest | PROJECT.md — BoneWise Spec and Plan
+## [2026-07-18] ingest | PROJECT.md — BoneBot Spec and Plan
 
 Created `wiki/sources/project-md-spec.md`. Raw source cited in place at `PROJECT.md`. Source-only ingest.
 
