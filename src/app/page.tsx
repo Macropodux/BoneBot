@@ -37,14 +37,13 @@ import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
 import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-parameters";
 import FloatingBones from "./FloatingBones";
-import VoiceScreen from "./VoiceScreen";
 import { THEME, HEADING_FONT, BODY_FONT } from "@/lib/editorial-theme";
 
 // "Vital Bloom" brand — Emre, 2026-07-19: magenta/violet rebrand. Being
 // phased out in favor of the editorial theme (THEME.accent) below as chat
 // and results get redesigned to match landing; kept until that's complete.
-const ACCENT = "#E11D74";
-const ACCENT_TINT = "#FCE7F1";
+const ACCENT = "#0E6E62";
+const ACCENT_TINT = "#E4F0ED";
 
 // Editorial redesign palette — see src/lib/editorial-theme.ts.
 const LANDING_BG = THEME.bg;
@@ -572,7 +571,7 @@ function TrustedResources({ small }: { small?: boolean }) {
     <ul className={`flex flex-col ${small ? "gap-3" : "gap-4"}`}>
       {RESOURCES.map((r) => (
         <li key={r.url} className={small ? "" : "border-b border-[#E3E9E7] pb-4 last:border-0 last:pb-0"}>
-          <div className={`font-semibold text-[#241436] ${small ? "text-sm" : "text-[15px]"}`}>{r.name}</div>
+          <div className={`font-semibold text-[#221B16] ${small ? "text-sm" : "text-[15px]"}`}>{r.name}</div>
           <p className={`mt-1 leading-[1.5] text-[#4A5452] ${small ? "text-[12.5px]" : "text-[13.5px]"}`}>{r.brief}</p>
           <a
             href={r.url}
@@ -760,7 +759,7 @@ function AnimatedNumber({
 }
 
 export default function Home() {
-  const [screen, setScreen] = useState<"landing" | "chat" | "results" | "voice">("landing");
+  const [screen, setScreen] = useState<"landing" | "chat" | "results">("landing");
   const [showExampleMenu, setShowExampleMenu] = useState(false);
   // Which demo patient is currently loading (runModel's score/implications/
   // summary calls take a beat) — drives the spinner on that one chip so
@@ -2016,7 +2015,7 @@ export default function Home() {
         const rowColor = isPositive ? "#0E7C6E" : "#B0442F";
         const sign = f.contribution > 0 ? "+" : "";
         return `<tr>
-          <td style="padding:6px 0;font-size:13px;color:#241436;">${escapeHtml(f.factor)}${
+          <td style="padding:6px 0;font-size:13px;color:#221B16;">${escapeHtml(f.factor)}${
             detail.value ? `<br><span style="font-size:11px;color:#9AA5A2;">${escapeHtml(detail.value)}</span>` : ""
           }</td>
           <td style="padding:6px 0;font-size:13px;font-weight:700;color:${rowColor};text-align:right;white-space:nowrap;">${sign}${f.contribution.toFixed(1)}</td>
@@ -2033,12 +2032,12 @@ export default function Home() {
           <table role="presentation" width="100%" style="max-width:560px;background-color:#ffffff;border-radius:16px;border:1px solid #E3E9E7;" cellpadding="0" cellspacing="0">
             <tr>
               <td style="padding:20px 32px;border-bottom:1px solid #E3E9E7;">
-                <span style="font-size:19px;font-weight:700;color:#241436;">Bone<span style="color:#E11D74;">Bot</span></span>
+                <span style="font-size:19px;font-weight:700;color:#221B16;">Bone<span style="color:#0E6E62;">Bot</span></span>
               </td>
             </tr>
             <tr>
               <td style="padding:32px;">
-                <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#241436;">
+                <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#221B16;">
                   Dear ${escapeHtml(userName || "there")},<br>Here are the results from your predicted T-score.
                 </p>
                 <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5A6462;">${heading}</div>
@@ -2063,7 +2062,7 @@ export default function Home() {
                 </div>
                 <div style="margin-top:20px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5A6462;">Learn more about osteoporosis and menopause</div>
                 <ul style="margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.8;">
-                  ${RESOURCES.map((r) => `<li><a href="${r.url}" style="color:#E11D74;">${escapeHtml(r.name)}</a></li>`).join("")}
+                  ${RESOURCES.map((r) => `<li><a href="${r.url}" style="color:#0E6E62;">${escapeHtml(r.name)}</a></li>`).join("")}
                 </ul>
               </td>
             </tr>
@@ -2257,7 +2256,7 @@ export default function Home() {
 
   return (
     <div
-      className="flex h-full flex-col bg-[#F5F7F6] text-[#241436] font-[family-name:var(--font-body)]"
+      className="flex h-full flex-col bg-[#FAF7F2] text-[#221B16] font-[family-name:var(--font-source-sans)]"
       style={{ ["--bw-accent" as string]: ACCENT }}
     >
       <style>{`@keyframes bw-blink { 0%,80%,100% { opacity: .25; } 40% { opacity: 1; } }`}</style>
@@ -2342,14 +2341,7 @@ export default function Home() {
                 </button>
               </div>
               <p className="m-0 text-[15px]" style={{ color: LANDING_MUTED }}>
-                No account. No forms. About 3 minutes.{" "}
-                <button
-                  onClick={() => setScreen("voice")}
-                  className="font-semibold underline decoration-1 underline-offset-2 transition-colors"
-                  style={{ color: LANDING_ACCENT }}
-                >
-                  Prefer to talk? Try voice screening.
-                </button>
+                No account. No forms. About 3 minutes.
               </p>
               {showExampleMenu && (
                 <motion.div
@@ -2530,16 +2522,14 @@ export default function Home() {
         </div>
       )}
 
-      {screen === "voice" && <VoiceScreen onExit={goToLanding} />}
-
       {screen === "chat" && (
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#FAF7F2]">
           <FloatingBones />
           <header className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12">
             <button
               type="button"
               onClick={goToLanding}
-              className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+              className="font-[family-name:var(--font-fraunces)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
             >
               Bone<span style={{ color: ACCENT }}>Bot</span>
             </button>
@@ -2561,7 +2551,7 @@ export default function Home() {
                 onClick={() => {
                   if (messages.length <= 1 || window.confirm("Start over? This clears your answers so far.")) restart();
                 }}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
               >
                 Start over
               </button>
@@ -2606,7 +2596,7 @@ export default function Home() {
                     event.preventDefault();
                     submitName();
                   }}
-                  className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#E11D74]"
+                  className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E6E62]"
                 >
                   <input
                     autoFocus
@@ -2619,7 +2609,7 @@ export default function Home() {
                   <button
                     type="submit"
                     disabled={!nameInput.trim()}
-                    className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
+                    className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-fraunces)] text-sm font-bold text-white disabled:opacity-40"
                     style={{ backgroundColor: ACCENT }}
                   >
                     Continue
@@ -2629,7 +2619,7 @@ export default function Home() {
 
               {chatReady && step?.key === "bloodResults" && pendingBloodResults && !bloodEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#241436]">Confirm blood values</div>
+                  <div className="text-sm font-semibold text-[#221B16]">Confirm blood values</div>
                   <div className="text-sm leading-[1.5] text-[#4A5452]">
                     {pendingBloodResults.vitaminD !== null && `Vitamin D: ${pendingBloodResults.vitaminD} nmol/L. `}
                     {pendingBloodResults.calcium !== null && `Calcium: ${pendingBloodResults.calcium} mmol/L. `}
@@ -2652,7 +2642,7 @@ export default function Home() {
                     </button>
                     <button
                       onClick={skipPendingBloodValues}
-                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                     >
                       Skip
                     </button>
@@ -2662,7 +2652,7 @@ export default function Home() {
 
               {chatReady && step?.key === "bloodResults" && pendingBloodResults && bloodEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#241436]">Edit blood values</div>
+                  <div className="text-sm font-semibold text-[#221B16]">Edit blood values</div>
                   <div className="flex flex-wrap gap-3">
                     <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
                       Vitamin D (nmol/L)
@@ -2672,7 +2662,7 @@ export default function Home() {
                         value={bloodEditVitaminD}
                         onChange={(event) => setBloodEditVitaminD(event.target.value)}
                         placeholder="e.g. 55"
-                        className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                        className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                       />
                     </label>
                     <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
@@ -2684,7 +2674,7 @@ export default function Home() {
                         value={bloodEditCalcium}
                         onChange={(event) => setBloodEditCalcium(event.target.value)}
                         placeholder="e.g. 2.3"
-                        className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                        className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                       />
                     </label>
                   </div>
@@ -2699,13 +2689,13 @@ export default function Home() {
                     </button>
                     <button
                       onClick={() => setBloodEditMode(false)}
-                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={skipPendingBloodValues}
-                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                     >
                       Skip
                     </button>
@@ -2715,7 +2705,7 @@ export default function Home() {
 
               {inFlow && step.key === "weight" && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#241436]">Weight & height</div>
+                  <div className="text-sm font-semibold text-[#221B16]">Weight & height</div>
                   <div className="flex flex-wrap gap-4">
                     <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
                       Weight
@@ -2726,12 +2716,12 @@ export default function Home() {
                           value={weightInput}
                           onChange={(event) => setWeightInput(event.target.value)}
                           placeholder="e.g. 65"
-                          className="w-24 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                          className="w-24 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                         />
                         <select
                           value={weightUnit}
                           onChange={(event) => setWeightUnit(event.target.value as "kg" | "lb")}
-                          className="rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                          className="rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                         >
                           <option value="kg">kg</option>
                           <option value="lb">lb</option>
@@ -2748,7 +2738,7 @@ export default function Home() {
                             value={heightCmInput}
                             onChange={(event) => setHeightCmInput(event.target.value)}
                             placeholder="e.g. 162"
-                            className="w-24 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                            className="w-24 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                           />
                         ) : (
                           <>
@@ -2758,7 +2748,7 @@ export default function Home() {
                               value={heightFtInput}
                               onChange={(event) => setHeightFtInput(event.target.value)}
                               placeholder="ft"
-                              className="w-16 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                              className="w-16 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                             />
                             <input
                               type="number"
@@ -2766,14 +2756,14 @@ export default function Home() {
                               value={heightInInput}
                               onChange={(event) => setHeightInInput(event.target.value)}
                               placeholder="in"
-                              className="w-16 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                              className="w-16 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                             />
                           </>
                         )}
                         <select
                           value={heightUnit}
                           onChange={(event) => setHeightUnit(event.target.value as "cm" | "ftin")}
-                          className="rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                          className="rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                         >
                           <option value="cm">cm</option>
                           <option value="ftin">ft / in</option>
@@ -2796,7 +2786,7 @@ export default function Home() {
 
               {chatReady && step && isActivityStep(step.key) && pendingActivityResult && !activityEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#241436]">Confirm activity averages</div>
+                  <div className="text-sm font-semibold text-[#221B16]">Confirm activity averages</div>
                   <div className="text-sm leading-[1.5] text-[#4A5452]">
                     {pendingActivityResult.estimatedSteps !== null &&
                       `~${pendingActivityResult.estimatedSteps.toLocaleString()} steps/day. `}
@@ -2821,7 +2811,7 @@ export default function Home() {
                     </button>
                     <button
                       onClick={skipPendingActivityValues}
-                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                     >
                       Skip
                     </button>
@@ -2831,7 +2821,7 @@ export default function Home() {
 
               {chatReady && step && isActivityStep(step.key) && pendingActivityResult && activityEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#241436]">Edit activity averages</div>
+                  <div className="text-sm font-semibold text-[#221B16]">Edit activity averages</div>
                   <div className="flex flex-wrap gap-3">
                     <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
                       Steps per day
@@ -2841,7 +2831,7 @@ export default function Home() {
                         value={activityEditSteps}
                         onChange={(event) => setActivityEditSteps(event.target.value)}
                         placeholder="e.g. 6500"
-                        className="w-36 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                        className="w-36 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                       />
                     </label>
                     <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
@@ -2852,7 +2842,7 @@ export default function Home() {
                         value={activityEditMinutes}
                         onChange={(event) => setActivityEditMinutes(event.target.value)}
                         placeholder="e.g. 30"
-                        className="w-36 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                        className="w-36 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                       />
                     </label>
                   </div>
@@ -2867,7 +2857,7 @@ export default function Home() {
                     </button>
                     <button
                       onClick={() => setActivityEditMode(false)}
-                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                     >
                       Cancel
                     </button>
@@ -2904,7 +2894,7 @@ export default function Home() {
                     </div>
                   )}
                   <label
-                    className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#E11D74] hover:bg-[#FCE7F1]"
+                    className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E6E62] hover:bg-[#E4F0ED]"
                     aria-disabled={activityUploadBusy || activityImageFiles.length >= MAX_IMAGES}
                   >
                     <span
@@ -2915,7 +2905,7 @@ export default function Home() {
                       ⌚
                     </span>
                     <span className="flex flex-col">
-                      <span className="font-semibold text-[#241436]">
+                      <span className="font-semibold text-[#221B16]">
                         {activityImageFiles.length >= MAX_IMAGES
                           ? "Maximum 3 photos added"
                           : "Upload a weekly Apple Health, Watch, or activity-app summary"}
@@ -2965,7 +2955,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={rejectMenopauseAge}
-                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                   >
                     No, let me re-enter
                   </button>
@@ -2983,7 +2973,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={confirmExistingCareReturnHome}
-                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                   >
                     Return home
                   </button>
@@ -3001,7 +2991,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={confirmRecentDxaSeeExplanation}
-                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                   >
                     See my score explanation
                   </button>
@@ -3025,7 +3015,7 @@ export default function Home() {
                         event.preventDefault();
                         void submitFreeInput();
                       }}
-                      className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#E11D74]"
+                      className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E6E62]"
                     >
                       <input
                         ref={freeInputRef}
@@ -3053,7 +3043,7 @@ export default function Home() {
                       <button
                         type="submit"
                         disabled={flowQuestionBusy || extracting || !freeInput.trim()}
-                        className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
+                        className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-fraunces)] text-sm font-bold text-white disabled:opacity-40"
                         style={{ backgroundColor: ACCENT }}
                       >
                         Send
@@ -3066,7 +3056,7 @@ export default function Home() {
                       type="button"
                       onClick={skipStep}
                       disabled={flowQuestionBusy}
-                      className="self-end rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74] disabled:opacity-50"
+                      className="self-end rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62] disabled:opacity-50"
                     >
                       Skip this question
                     </button>
@@ -3096,7 +3086,7 @@ export default function Home() {
                         </div>
                       )}
                       <label
-                        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#E11D74] hover:bg-[#FCE7F1]"
+                        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E6E62] hover:bg-[#E4F0ED]"
                         aria-disabled={uploadBusy || bloodImageFiles.length >= MAX_IMAGES}
                       >
                         <span
@@ -3107,7 +3097,7 @@ export default function Home() {
                           📎
                         </span>
                         <span className="flex flex-col">
-                          <span className="font-semibold text-[#241436]">
+                          <span className="font-semibold text-[#221B16]">
                             {bloodImageFiles.length >= MAX_IMAGES ? "Maximum 3 photos added" : "Attach a photo instead"}
                           </span>
                           <span className="text-[13px] text-[#5A6462]">
@@ -3145,7 +3135,7 @@ export default function Home() {
                           type="button"
                           onClick={() => answer("Skip", "Skip")}
                           disabled={uploadBusy}
-                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74] disabled:opacity-50"
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62] disabled:opacity-50"
                         >
                           Skip — I don&apos;t have blood-test results
                         </button>
@@ -3163,13 +3153,13 @@ export default function Home() {
       )}
 
       {screen === "chat" && flowMode === "conversation" && (
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#FAF7F2]">
           <FloatingBones />
           <header className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12">
             <button
               type="button"
               onClick={goToLanding}
-              className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+              className="font-[family-name:var(--font-fraunces)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
             >
               Bone<span style={{ color: ACCENT }}>Bot</span>
             </button>
@@ -3181,7 +3171,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={startClassic}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
               >
                 Classic mode
               </button>
@@ -3189,7 +3179,7 @@ export default function Home() {
                 onClick={() => {
                   if (convMessages.length <= 1 || window.confirm("Start over? This clears your answers so far.")) restart();
                 }}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
               >
                 Start over
               </button>
@@ -3255,7 +3245,7 @@ export default function Home() {
                 <div className="flex flex-col gap-3">
                   {pendingBloodResults && !bloodEditMode && (
                     <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                      <div className="text-sm font-semibold text-[#241436]">Confirm blood values</div>
+                      <div className="text-sm font-semibold text-[#221B16]">Confirm blood values</div>
                       <div className="text-sm leading-[1.5] text-[#4A5452]">
                         {pendingBloodResults.vitaminD !== null && `Vitamin D: ${pendingBloodResults.vitaminD} nmol/L. `}
                         {pendingBloodResults.calcium !== null && `Calcium: ${pendingBloodResults.calcium} mmol/L. `}
@@ -3278,7 +3268,7 @@ export default function Home() {
                         </button>
                         <button
                           onClick={skipPendingBloodValues}
-                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                         >
                           Skip
                         </button>
@@ -3288,7 +3278,7 @@ export default function Home() {
 
                   {pendingBloodResults && bloodEditMode && (
                     <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                      <div className="text-sm font-semibold text-[#241436]">Edit blood values</div>
+                      <div className="text-sm font-semibold text-[#221B16]">Edit blood values</div>
                       <div className="flex flex-wrap gap-3">
                         <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
                           Vitamin D (nmol/L)
@@ -3298,7 +3288,7 @@ export default function Home() {
                             value={bloodEditVitaminD}
                             onChange={(event) => setBloodEditVitaminD(event.target.value)}
                             placeholder="e.g. 55"
-                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                           />
                         </label>
                         <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
@@ -3310,7 +3300,7 @@ export default function Home() {
                             value={bloodEditCalcium}
                             onChange={(event) => setBloodEditCalcium(event.target.value)}
                             placeholder="e.g. 2.3"
-                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                           />
                         </label>
                       </div>
@@ -3325,13 +3315,13 @@ export default function Home() {
                         </button>
                         <button
                           onClick={() => setBloodEditMode(false)}
-                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={skipPendingBloodValues}
-                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                         >
                           Skip
                         </button>
@@ -3363,7 +3353,7 @@ export default function Home() {
                         </div>
                       )}
                       <label
-                        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#E11D74] hover:bg-[#FCE7F1]"
+                        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E6E62] hover:bg-[#E4F0ED]"
                         aria-disabled={uploadBusy || bloodImageFiles.length >= MAX_IMAGES}
                       >
                         <span
@@ -3374,7 +3364,7 @@ export default function Home() {
                           📎
                         </span>
                         <span className="flex flex-col">
-                          <span className="font-semibold text-[#241436]">
+                          <span className="font-semibold text-[#221B16]">
                             {bloodImageFiles.length >= MAX_IMAGES
                               ? "Maximum 3 photos added"
                               : "Attach a photo of your blood-test results"}
@@ -3413,7 +3403,7 @@ export default function Home() {
                           type="button"
                           onClick={() => void sendConverseTurn("Skip — I don't have blood-test results.")}
                           disabled={uploadBusy}
-                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74] disabled:opacity-50"
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62] disabled:opacity-50"
                         >
                           Skip — I don&apos;t have blood-test results
                         </button>
@@ -3431,7 +3421,7 @@ export default function Home() {
                       event.preventDefault();
                       if (convInput.trim()) void sendConverseTurn(convInput.trim());
                     }}
-                    className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#E11D74]"
+                    className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E6E62]"
                   >
                     <input
                       ref={convInputRef}
@@ -3447,7 +3437,7 @@ export default function Home() {
                     <button
                       type="submit"
                       disabled={convBusy || !convInput.trim()}
-                      className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
+                      className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-fraunces)] text-sm font-bold text-white disabled:opacity-40"
                       style={{ backgroundColor: ACCENT }}
                     >
                       Send
@@ -3463,7 +3453,7 @@ export default function Home() {
 
       {screen === "results" && !result && (
         <MotionConfig reducedMotion="user">
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#FAF7F2]">
             <FloatingBones />
             <motion.header
               initial={{ opacity: 0, y: -10 }}
@@ -3474,7 +3464,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={goToLanding}
-                className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+                className="font-[family-name:var(--font-fraunces)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
               >
                 Bone<span style={{ color: ACCENT }}>Bot</span>
               </button>
@@ -3488,7 +3478,7 @@ export default function Home() {
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.15 }}
                   onClick={restart}
-                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
+                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
                 >
                   Start over
                 </motion.button>
@@ -3507,11 +3497,11 @@ export default function Home() {
                   </div>
                   {triageResult && (
                     <>
-                      <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#241436]">
+                      <h1 className="mt-3 font-[family-name:var(--font-fraunces)] text-3xl font-bold text-[#221B16]">
                         Very low initial risk
                       </h1>
                       <p
-                        className="mt-4 font-[family-name:var(--font-heading)] text-6xl font-bold tracking-[-0.02em]"
+                        className="mt-4 font-[family-name:var(--font-fraunces)] text-6xl font-bold tracking-[-0.02em]"
                         style={{ color: ACCENT }}
                       >
                         <AnimatedNumber value={triageResult.probabilityPercent} reduceMotion={reduceMotion} />%
@@ -3520,7 +3510,7 @@ export default function Home() {
                   )}
                   {reportedDxa && (
                     <>
-                      <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#241436]">
+                      <h1 className="mt-3 font-[family-name:var(--font-fraunces)] text-3xl font-bold text-[#221B16]">
                         Reported T-score{" "}
                         <AnimatedNumber value={reportedDxa.score} decimals={1} reduceMotion={reduceMotion} />
                       </h1>
@@ -3542,7 +3532,7 @@ export default function Home() {
                   )}
                   {triageResult && (
                     <div className="mt-4 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">
-                      <h2 className="font-[family-name:var(--font-heading)] text-base font-bold text-[#241436]">
+                      <h2 className="font-[family-name:var(--font-fraunces)] text-base font-bold text-[#221B16]">
                         Keep it that way
                       </h2>
                       <ul className="mt-3 list-disc space-y-2 pl-5">
@@ -3568,7 +3558,7 @@ export default function Home() {
                   whileTap={{ scale: 0.98 }}
                   transition={{ duration: 0.15 }}
                   onClick={restart}
-                  className="self-start rounded-[10px] px-5 py-3 font-[family-name:var(--font-heading)] font-bold text-white"
+                  className="self-start rounded-[10px] px-5 py-3 font-[family-name:var(--font-fraunces)] font-bold text-white"
                   style={{ backgroundColor: ACCENT }}
                 >
                   Start over
@@ -3581,7 +3571,7 @@ export default function Home() {
 
       {screen === "results" && result && (
         <MotionConfig reducedMotion="user">
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#FAF7F2]">
             <FloatingBones />
             <motion.header
               initial={{ opacity: 0, y: -10 }}
@@ -3592,7 +3582,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={goToLanding}
-                className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+                className="font-[family-name:var(--font-fraunces)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
               >
                 Bone<span style={{ color: ACCENT }}>Bot</span>
               </button>
@@ -3606,7 +3596,7 @@ export default function Home() {
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.15 }}
                   onClick={() => emailSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
-                  className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
+                  className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
                 >
                   <span aria-hidden>✉️</span> Email this result
                 </motion.button>
@@ -3615,7 +3605,7 @@ export default function Home() {
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.15 }}
                   onClick={restart}
-                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
+                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
                 >
                   Start over
                 </motion.button>
@@ -3650,7 +3640,7 @@ export default function Home() {
                             initial={reduceMotion ? false : { opacity: 0, scale: 0.92 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ duration: 0.4, ease: EASE_OUT, delay: 0.1 }}
-                            className="font-[family-name:var(--font-heading)] text-[52px] font-bold tracking-[-0.02em]"
+                            className="font-[family-name:var(--font-fraunces)] text-[52px] font-bold tracking-[-0.02em]"
                             style={{ color: catMeta.color }}
                           >
                             {catMeta.label}
@@ -3684,14 +3674,14 @@ export default function Home() {
                               opacity: 1,
                             }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute top-[26px] h-3.5 rounded-full border-2 border-[#241436]/50 bg-[#241436]/12"
+                            className="absolute top-[26px] h-3.5 rounded-full border-2 border-[#221B16]/50 bg-[#221B16]/12"
                           />
                           <motion.div
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
                             className="absolute top-0 -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
-                            style={{ backgroundColor: "#7C3AED" }}
+                            style={{ backgroundColor: "#0E6E62" }}
                           >
                             {result.estimatedTScore.toFixed(1)}
                           </motion.div>
@@ -3699,7 +3689,7 @@ export default function Home() {
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute top-[26px] h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#7C3AED]"
+                            className="absolute top-[26px] h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#0E6E62]"
                           />
                         </div>
                         <div className="mt-3.5 flex justify-between gap-2 text-xs font-semibold">
@@ -3719,7 +3709,7 @@ export default function Home() {
                   </motion.div>
 
                   <motion.div variants={reveal} ref={emailSectionRef} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-6 sm:px-8">
-                    <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#241436]">
+                    <div className="font-[family-name:var(--font-fraunces)] text-base font-bold text-[#221B16]">
                       Keep a copy of this result
                     </div>
                     <div className="mt-0.5 text-[13px] text-[#5A6462]">
@@ -3755,7 +3745,7 @@ export default function Home() {
                           placeholder="you@example.com"
                           aria-label="Your email address"
                           disabled={emailSendState === "sending"}
-                          className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#E11D74] disabled:opacity-50"
+                          className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E6E62] disabled:opacity-50"
                         />
                         <motion.button
                           whileHover={emailSendState === "sending" ? {} : { scale: 1.02 }}
@@ -3763,7 +3753,7 @@ export default function Home() {
                           transition={{ duration: 0.15 }}
                           type="submit"
                           disabled={emailSendState === "sending" || !emailAddress.trim()}
-                          className="flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] px-5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-50"
+                          className="flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] px-5 py-2.5 font-[family-name:var(--font-fraunces)] text-sm font-bold text-white disabled:opacity-50"
                           style={{ backgroundColor: ACCENT }}
                         >
                           <span aria-hidden>✉️</span> {emailSendState === "sending" ? "Sending…" : "Email this result"}
@@ -3826,7 +3816,7 @@ export default function Home() {
                               className="flex items-center gap-3"
                             >
                               <div className="w-[110px] flex-shrink-0 sm:w-[150px]">
-                                <div className="truncate text-[13px] text-[#241436]" title={f.factor}>
+                                <div className="truncate text-[13px] text-[#221B16]" title={f.factor}>
                                   {f.factor}
                                 </div>
                                 {detail.value && (
@@ -3850,7 +3840,7 @@ export default function Home() {
                                 />
                               </div>
                               <div
-                                className="w-10 flex-shrink-0 text-right font-[family-name:var(--font-heading)] text-[13px] font-bold"
+                                className="w-10 flex-shrink-0 text-right font-[family-name:var(--font-fraunces)] text-[13px] font-bold"
                                 style={{ color: factorColor }}
                               >
                                 {f.contribution > 0 ? "+" : ""}
@@ -3921,7 +3911,7 @@ export default function Home() {
                       style={{ backgroundColor: ACCENT }}
                     >
                       <div>
-                        <div className="font-[family-name:var(--font-heading)] text-[19px] font-bold text-white">
+                        <div className="font-[family-name:var(--font-fraunces)] text-[19px] font-bold text-white">
                           Next step: talk to your GP about a DXA scan
                         </div>
                         <div className="mt-1 text-sm text-[#CBE6E0]">
@@ -3934,7 +3924,7 @@ export default function Home() {
                         whileTap={{ scale: 0.97 }}
                         transition={{ duration: 0.15 }}
                         onClick={() => qaAsk("What's a DXA scan?")}
-                        className="whitespace-nowrap rounded-[9px] bg-white px-5 py-3 font-[family-name:var(--font-heading)] text-sm font-bold hover:bg-[#FCE7F1]"
+                        className="whitespace-nowrap rounded-[9px] bg-white px-5 py-3 font-[family-name:var(--font-fraunces)] text-sm font-bold hover:bg-[#E4F0ED]"
                         style={{ color: ACCENT }}
                       >
                         What&apos;s a DXA scan?
@@ -4016,7 +4006,7 @@ export default function Home() {
                   className="flex h-[640px] flex-col rounded-2xl border border-[#E3E9E7] bg-white lg:sticky lg:top-0 lg:h-[calc(100vh-10rem)] lg:min-h-[420px]"
                 >
                   <div className="border-b border-[#E3E9E7] px-6 py-[18px]">
-                    <div className="font-[family-name:var(--font-heading)] text-base font-bold">Ask about your result</div>
+                    <div className="font-[family-name:var(--font-fraunces)] text-base font-bold">Ask about your result</div>
                     <div className="mt-0.5 text-[13px] text-[#5A6462]">The AI explains; it never changes your score.</div>
                   </div>
                   <div ref={qaRef} className="flex flex-1 flex-col gap-3 overflow-y-auto px-6 py-5">
@@ -4073,14 +4063,14 @@ export default function Home() {
                         onKeyDown={(e) => e.key === "Enter" && qaInput.trim() && qaAsk(qaInput.trim())}
                         placeholder="Type a question…"
                         aria-label="Ask about your result"
-                        className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#E11D74]"
+                        className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E6E62]"
                       />
                       <motion.button
                         whileHover={{ scale: 1.03 }}
                         whileTap={{ scale: 0.97 }}
                         transition={{ duration: 0.15 }}
                         onClick={() => qaInput.trim() && qaAsk(qaInput.trim())}
-                        className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white"
+                        className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-fraunces)] text-sm font-bold text-white"
                         style={{ backgroundColor: ACCENT }}
                       >
                         Send
