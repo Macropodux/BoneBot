@@ -125,6 +125,22 @@ const STEPS: Step[] = [
     : []),
 ];
 
+// Multilingual mode — BoneBot's own replies (AI-led conversation, results
+// explanations, results Q&A, and the spoken voice) come back in the chosen
+// language; fixed UI chrome stays in English. `name` is what the API routes
+// receive (validated server-side against the same fixed list), `speech` is
+// the locale handed to the browser's speech recognition for voice input.
+const LANGUAGES: { name: string; label: string; speech: string }[] = [
+  { name: "English", label: "English", speech: "en-US" },
+  { name: "Spanish", label: "Español", speech: "es-ES" },
+  { name: "French", label: "Français", speech: "fr-FR" },
+  { name: "German", label: "Deutsch", speech: "de-DE" },
+  { name: "Italian", label: "Italiano", speech: "it-IT" },
+  { name: "Portuguese", label: "Português", speech: "pt-PT" },
+  { name: "Turkish", label: "Türkçe", speech: "tr-TR" },
+  { name: "Chinese", label: "中文", speech: "zh-CN" },
+];
+
 const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   assignedFemale: "Yes",
   age: "67",
@@ -794,6 +810,7 @@ function AnimatedNumber({
 
 export default function Home() {
   const [screen, setScreen] = useState<"landing" | "chat" | "results">("landing");
+  const [language, setLanguage] = useState("English");
   const [showExampleMenu, setShowExampleMenu] = useState(false);
   // Which demo patient is currently loading (runModel's score/implications/
   // summary calls take a beat) — drives the spinner on that one chip so
@@ -1041,6 +1058,7 @@ export default function Home() {
             features: full,
             explanationType,
             name: explainerName,
+            language,
             // Feature 10a — full result context + profile, flattened, for the
             // explainer route on the other side of this call.
             ...resultContext(model),
@@ -1289,6 +1307,7 @@ export default function Home() {
           collected,
           confirmMode: confirmModeValue,
           awaitingConfirm: awaitingConfirmValue,
+          language,
         }),
       });
       if (response.ok) data = (await response.json()) as ConverseTurnResponse;
@@ -1360,7 +1379,7 @@ export default function Home() {
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!Ctor) return;
     const recognition = new Ctor();
-    recognition.lang = "en-US";
+    recognition.lang = LANGUAGES.find((l) => l.name === language)?.speech ?? "en-US";
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
     recognition.onresult = (event) => {
@@ -1666,7 +1685,7 @@ export default function Home() {
       const response = await fetch("/api/assistant", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mode: "consumer", question: raw, stage: "questionnaire", name: userName }),
+        body: JSON.stringify({ mode: "consumer", question: raw, stage: "questionnaire", name: userName, language }),
       });
       if (response.ok) text = (await response.json()).text;
     } catch {
@@ -2317,6 +2336,7 @@ export default function Home() {
           result: resultContext(result),
           profile: features,
           name: userName,
+          language,
         }),
       });
       if (r.ok) text = (await r.json()).text;
@@ -2392,9 +2412,24 @@ export default function Home() {
             <div className={`${LANDING_HEADING_FONT} text-[26px] font-bold tracking-[-0.02em]`} style={{ color: LANDING_INK }}>
               Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
             </div>
+            <label className="ml-auto flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: "#5A6462" }}>
+              <span aria-hidden>🌐</span>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                aria-label="BoneBot's reply language"
+                className="cursor-pointer rounded-lg border-[1.5px] border-[#C6CFCC] bg-transparent px-2 py-[6px] text-[13px] font-semibold text-[#4A5452] outline-none hover:border-[#0E6E62]"
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.name} value={l.name}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               onClick={startClassic}
-              className={`${LANDING_HEADING_FONT} ml-auto inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
+              className={`${LANDING_HEADING_FONT} inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
               style={{ backgroundColor: LANDING_ACCENT }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT)}
