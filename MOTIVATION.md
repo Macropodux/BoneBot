@@ -173,8 +173,7 @@ job is to explain a screening result and route to a clinician and a DXA scan.
 
 ### 4c. How we avoid bias (a design priority, not an afterthought)
 
-The intuition that "Strava users are fitter than non-users" is exactly right, and
-the literature confirms it generalises: wearable-derived datasets primarily
+Wearable-derived datasets primarily
 represent **younger, more active, and more affluent** people, and fitness-tracker
 ownership is confounded with race, socioeconomic status, and health literacy —
 enough that some researchers warn wearable access is becoming a *social determinant
