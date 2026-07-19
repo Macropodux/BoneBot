@@ -197,58 +197,74 @@ function bandColor(tScore: number): string {
   return "#A06D14"; // uncertain
 }
 
-// Five reputable, evidence-based patient resources — shown as static links,
-// never routed through the LLM (no risk of a hallucinated URL).
+// Five reputable, evidence-based patient resources — shown as a brief plus a
+// clearly separate link out, never routed through the LLM (no risk of a
+// hallucinated URL, no risk of the LLM paraphrasing a source incorrectly).
 const RESOURCES = [
   {
     name: "Royal Osteoporosis Society (UK)",
     url: "https://theros.org.uk/information-and-support/",
-    note: "Patient guides on bone density, calcium & vitamin D, exercise, and a helpline.",
+    brief:
+      "The UK's leading bone-health charity. Covers what bone density actually means, how calcium and vitamin D protect bone, safe exercise if you have osteoporosis, and treatment options — plus a nurse-staffed helpline for personal questions.",
   },
   {
     name: "International Osteoporosis Foundation",
     url: "https://www.osteoporosis.foundation/educational-hub",
-    note: "Global patient resources and the “Are you at risk?” screening quiz.",
+    brief:
+      "A global federation of osteoporosis patient societies and researchers. Their hub has the “Are you at risk?” screening quiz and plain-language explainers that link out to guidelines specific to your country.",
   },
   {
     name: "NIH Osteoporosis and Related Bone Diseases Resource Center",
     url: "https://www.niams.nih.gov/health-topics/bone-health-and-osteoporosis",
-    note: "US government-run, plain-language info on prevention, diagnosis, and menopause-related bone loss.",
+    brief:
+      "Run by the US National Institutes of Health. Government-vetted, plain-language pages on how bone density changes after menopause and how prevention and diagnosis work.",
   },
   {
     name: "Bone Health & Osteoporosis Foundation",
     url: "https://www.bonehealthandosteoporosis.org/preventing-fractures/",
-    note: "Clinician-vetted guidance on FRAX risk scoring, DEXA scans, and treatment options.",
+    brief:
+      "A US clinician-and-patient organization (formerly NOF). Their fracture-prevention guidance covers FRAX risk scoring, what a DEXA scan involves, and the range of treatments a doctor might discuss.",
   },
   {
     name: "NHS — Osteoporosis",
     url: "https://www.nhs.uk/conditions/osteoporosis",
-    note: "Concise UK clinical overview: symptoms, causes, diagnosis pathway, and when to see a GP.",
+    brief:
+      "The UK's National Health Service overview. A concise clinical summary: symptoms, what causes bone loss, how osteoporosis is diagnosed, and when it's worth seeing a GP.",
   },
 ] as const;
 
 type ChatMessage = { role: "bot" | "user"; text: string; kind?: "resources" };
 
+// Shared everywhere BoneBot surfaces the resource list — the compact chat
+// bubble version (small) and the full result-page card (below).
+function TrustedResources({ small }: { small?: boolean }) {
+  return (
+    <ul className={`flex flex-col ${small ? "gap-3" : "gap-4"}`}>
+      {RESOURCES.map((r) => (
+        <li key={r.url} className={small ? "" : "border-b border-[#E3E9E7] pb-4 last:border-0 last:pb-0"}>
+          <div className={`font-semibold text-[#15181A] ${small ? "text-sm" : "text-[15px]"}`}>{r.name}</div>
+          <p className={`mt-1 leading-[1.5] text-[#4A5452] ${small ? "text-[12.5px]" : "text-[13.5px]"}`}>{r.brief}</p>
+          <a
+            href={r.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`mt-1.5 inline-flex items-center gap-1 font-semibold ${small ? "text-[12.5px]" : "text-[13px]"}`}
+            style={{ color: ACCENT }}
+          >
+            Visit official site
+            <span aria-hidden>↗</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ResourcesCard() {
   return (
     <div className="max-w-[88%] rounded-[14px_14px_14px_4px] border border-[#E3E9E7] bg-white px-4 py-3.5">
-      <div className="mb-2.5 text-sm font-semibold">A few reputable places to read more:</div>
-      <ul className="flex flex-col gap-2.5">
-        {RESOURCES.map((r) => (
-          <li key={r.url}>
-            <a
-              href={r.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-semibold underline decoration-1 underline-offset-2"
-              style={{ color: ACCENT }}
-            >
-              {r.name} ↗
-            </a>
-            <p className="mt-0.5 text-[13px] leading-[1.5] text-[#5A6462]">{r.note}</p>
-          </li>
-        ))}
-      </ul>
+      <div className="mb-3 text-sm font-semibold">A few reputable places to read more:</div>
+      <TrustedResources small />
     </div>
   );
 }
@@ -772,54 +788,76 @@ export default function Home() {
               {typing && <TypingDots />}
             </div>
           </div>
-          <div className="bg-gradient-to-b from-transparent to-[#F5F7F6] px-6 pb-7 pt-4">
-            <div className="mx-auto flex max-w-[680px] flex-wrap justify-end gap-2.5">
-              {inFlow && step.options.length > 0 &&
-                step.options.map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => answer(opt)}
-                    className="rounded-full border-[1.5px] px-5 py-2.5 text-[15px] font-medium transition-colors"
-                    style={{ borderColor: ACCENT, color: ACCENT }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = ACCENT;
-                      e.currentTarget.style.color = "#FFFFFF";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = "transparent";
-                      e.currentTarget.style.color = ACCENT;
-                    }}
-                  >
-                    {opt}
-                  </button>
-                ))}
+          <div className="border-t border-[#E3E9E7] bg-white px-6 py-5">
+            <div className="mx-auto flex max-w-[680px] flex-col gap-3">
+              {inFlow && step.options.length > 0 && (
+                <div className="flex flex-wrap justify-end gap-2.5">
+                  {step.options.map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => answer(opt)}
+                      className="rounded-full border-[1.5px] px-5 py-2.5 text-[15px] font-medium transition-colors"
+                      style={{ borderColor: ACCENT, color: ACCENT }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = ACCENT;
+                        e.currentTarget.style.color = "#FFFFFF";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.color = ACCENT;
+                      }}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {inFlow && step.options.length === 0 && (
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void submitFreeInput();
-                  }}
-                  className="flex w-full gap-2"
-                >
-                  <input
-                    value={freeInput}
-                    onChange={(event) => setFreeInput(event.target.value)}
-                    placeholder="Type your answer, or ask a bone-health question"
-                    aria-label="Answer or ask a bone-health question"
-                    disabled={flowQuestionBusy}
-                    className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E] disabled:opacity-50"
-                  />
-                  <button
-                    type="submit"
-                    disabled={flowQuestionBusy || !freeInput.trim()}
-                    className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
-                    style={{ backgroundColor: ACCENT }}
+                <div className="flex flex-col gap-2.5">
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void submitFreeInput();
+                    }}
+                    className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E7C6E]"
                   >
-                    Send
-                  </button>
+                    <input
+                      value={freeInput}
+                      onChange={(event) => setFreeInput(event.target.value)}
+                      placeholder="Type your answer, or ask a bone-health question"
+                      aria-label="Answer or ask a bone-health question"
+                      disabled={flowQuestionBusy}
+                      className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
+                    />
+                    <button
+                      type="submit"
+                      disabled={flowQuestionBusy || !freeInput.trim()}
+                      className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      Send
+                    </button>
+                  </form>
+
                   {step.key === "bloodResults" && (
-                    <label className="cursor-pointer rounded-[9px] border border-[#C6CFCC] px-3.5 py-2.5 text-sm font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]">
-                      {uploadBusy ? "Reading…" : "Upload blood results"}
+                    <label
+                      className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E7C6E] hover:bg-[#E4F0ED]"
+                      aria-disabled={uploadBusy}
+                    >
+                      <span
+                        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-base"
+                        style={{ backgroundColor: ACCENT_TINT, color: ACCENT }}
+                        aria-hidden
+                      >
+                        📎
+                      </span>
+                      <span className="flex flex-col">
+                        <span className="font-semibold text-[#15181A]">
+                          {uploadBusy ? "Reading your photo…" : "Attach a photo instead"}
+                        </span>
+                        <span className="text-[13px] text-[#5A6462]">A blood-test result or lab report — JPG, PNG, or WEBP.</span>
+                      </span>
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
@@ -833,9 +871,10 @@ export default function Home() {
                       />
                     </label>
                   )}
-                </form>
+                </div>
               )}
-              {flowQuestionBusy && <p className="w-full text-right text-sm text-[#5A6462]">Checking the approved evidence…</p>}
+
+              {flowQuestionBusy && <p className="text-right text-sm text-[#5A6462]">Checking the approved evidence…</p>}
             </div>
           </div>
         </div>
@@ -918,25 +957,10 @@ export default function Home() {
               </section>
 
               <section className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                <div className="mb-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
                   Trusted resources
                 </div>
-                <ul className="flex flex-col gap-3">
-                  {RESOURCES.map((r) => (
-                    <li key={r.url}>
-                      <a
-                        href={r.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[15px] font-semibold underline decoration-1 underline-offset-2"
-                        style={{ color: ACCENT }}
-                      >
-                        {r.name} ↗
-                      </a>
-                      <p className="mt-0.5 text-[13px] leading-[1.5] text-[#5A6462]">{r.note}</p>
-                    </li>
-                  ))}
-                </ul>
+                <TrustedResources />
               </section>
 
               <button
@@ -1173,25 +1197,10 @@ export default function Home() {
                 )}
 
                 <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                  <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                  <div className="mb-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
                     Trusted resources
                   </div>
-                  <ul className="flex flex-col gap-3">
-                    {RESOURCES.map((r) => (
-                      <li key={r.url}>
-                        <a
-                          href={r.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[15px] font-semibold underline decoration-1 underline-offset-2"
-                          style={{ color: ACCENT }}
-                        >
-                          {r.name} ↗
-                        </a>
-                        <p className="mt-0.5 text-[13px] leading-[1.5] text-[#5A6462]">{r.note}</p>
-                      </li>
-                    ))}
-                  </ul>
+                  <TrustedResources />
                 </div>
               </div>
 
