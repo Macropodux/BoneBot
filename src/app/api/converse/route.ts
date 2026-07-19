@@ -46,6 +46,7 @@ import { z } from "zod";
 import {
   applyDeterministicInferences,
   assembleFeatures,
+  BMI_RANGE,
   decide,
   getField,
   outstandingApplicableFields,
@@ -155,7 +156,15 @@ async function runExtraction(
         f.key === "menopauseAge" && typeof currentAge === "number"
           ? ` [if she gives this relative to now — e.g. "10 years ago" — extract (${currentAge} minus that number of years)]`
           : "";
-      return `- ${f.key}: "${f.question}"${optsText}${hint}${currentMark}${answeredMark}${menoMark}`;
+      const heightMark =
+        f.key === "heightCm"
+          ? ` [in centimetres — convert spoken/metric height, e.g. "1 m 75" or "one metre seventy-five" or "1.75 m" -> 175, "1 m 15" -> 115, "5 ft 6" -> 168]`
+          : "";
+      const weightMark =
+        f.key === "weightKg"
+          ? ` [in kilograms — convert if she gives pounds or stone, e.g. "200 lb" -> 91]`
+          : "";
+      return `- ${f.key}: "${f.question}"${optsText}${hint}${currentMark}${answeredMark}${menoMark}${heightMark}${weightMark}`;
     })
     .join("\n");
 
@@ -177,10 +186,13 @@ async function runExtraction(
         "knowledge, and never invent a field that isn't in the candidate list. A single reply may plainly answer " +
         "more than one candidate field; extract all that apply. Some candidate fields are marked [ALREADY ANSWERED] " +
         "— do NOT re-extract those unless this reply explicitly changes or corrects them (e.g. \"no, I'm 59\", " +
-        "\"actually menopause was at 48\"); if it does, extract the corrected value for that field. One calculation IS " +
-        "allowed: for menopauseAge, if the reply gives her age at menopause relative to now (e.g. \"10 years ago\", " +
-        "\"stopped 8 years back\") and her current age is shown in that field's candidate note, extract her age at " +
-        "menopause as (current age minus that number of years). " +
+        "\"actually menopause was at 48\"); if it does, extract the corrected value for that field. " +
+        "Some conversions ARE allowed and expected: (a) convert spoken numbers and units into the unit the field " +
+        "asks for — especially height into centimetres, e.g. \"1 m 75\" / \"one metre seventy-five\" / \"1.75 m\" -> " +
+        "175, \"1 m 15\" -> 115, \"5 ft 6\" -> 168, and weight into kilograms if she gives pounds or stone; (b) for " +
+        "menopauseAge, if the reply gives her age at menopause relative to now (e.g. \"10 years ago\", \"stopped 8 " +
+        "years back\") and her current age is shown in that field's candidate note, extract her age at menopause as " +
+        "(current age minus that number of years). Do not invent or guess beyond these conversions. " +
         "A short or direct reply (\"yes\", \"no\", a bare " +
         "number, or one of the listed options) is the answer to the question that was just asked — attribute it to " +
         "that field. Return plain values only (e.g. \"Yes\"/\"No\", a " +
@@ -211,15 +223,21 @@ async function runExtraction(
 
 const PhraseSchema = z.object({ reply: z.string() });
 
-async function runPhrase(field: FieldDef, lastUserText: string, isFirstTurn: boolean, extractedSomething: boolean): Promise<string> {
-  const system =
-    "You are BoneBot, a warm, plain-spoken bone-health screening assistant running a short conversational intake. " +
-    "Write ONE reply of 1-2 short sentences, similar in length to a normal chat message. " +
-    (isFirstTurn
+async function runPhrase(field: FieldDef, lastUserText: string, isFirstTurn: boolean, extractedSomething: boolean, clarifyNote?: string): Promise<string> {
+  const fallback = clarifyNote ? `That looks a little off — could you double-check and tell me again? ${field.question}` : field.question;
+
+  const situation = clarifyNote
+    ? `There is a problem with her last reply: ${clarifyNote} Warmly and briefly point this out (never alarmed or accusing), say it might be a typo or a mis-heard word, and ask her to double-check and tell you again by re-answering the required question below. `
+    : isFirstTurn
       ? "Open with a brief, friendly greeting of up to three short sentences. In it, mention once — warmly and briefly — that she can either type or talk to you, can share several details in one message, and that if you ever mishear or get something wrong she can just tell you and you'll fix it (she can change anything she's told you at any point). Then ask the required question below. "
       : extractedSomething
         ? "Briefly and naturally acknowledge what the user just said (do not just repeat it back), then ask the required question below. "
-        : "Her last reply didn't clearly answer the previous question — gently note that and ask the required question below again, without sounding repetitive or frustrated. ") +
+        : "Her last reply didn't clearly answer the previous question — gently note that and ask the required question below again, without sounding repetitive or frustrated. ";
+
+  const system =
+    "You are BoneBot, a warm, plain-spoken bone-health screening assistant running a short conversational intake. " +
+    "Write ONE reply of 1-2 short sentences, similar in length to a normal chat message. " +
+    situation +
     'The REQUIRED question you must ask, in meaning, is: "' +
     field.question +
     '" — you may phrase it naturally and warmly, but you must not change what it is asking, must not ask any ' +
@@ -243,12 +261,12 @@ async function runPhrase(field: FieldDef, lastUserText: string, isFirstTurn: boo
         },
       ],
     });
-    return object.reply.trim() || field.question;
+    return object.reply.trim() || fallback;
   } catch (error) {
     console.error("converse phrasing failed:", error);
     // Degrade gracefully: the scripted question text is always a safe,
     // correct fallback reply, never a stack trace — see AGENTS.md.
-    return field.question;
+    return fallback;
   }
 }
 
@@ -520,11 +538,19 @@ export async function POST(req: Request) {
   const collected: Collected = { ...incomingCollected };
   let extractedSomething = false;
   const capturedThisTurn: Captured[] = [];
+  let currentFieldOutOfRange: { direction: "high" | "low"; min: number; max: number } | null = null;
   for (const proposal of proposals) {
     const field = candidates.find((f) => f.key === proposal.key);
     if (!field) continue; // LLM must only propose from the candidate list
     const result = field.parse(proposal.value);
-    if (!result.ok) continue;
+    if (!result.ok) {
+      // Remember when the just-asked field got a parseable-but-implausible
+      // number, so we can say "that seems high/low" instead of re-asking blankly.
+      if (currentField && field.key === currentField.key && result.outOfRange) {
+        currentFieldOutOfRange = result.outOfRange;
+      }
+      continue;
+    }
     if (answeredKeys.has(field.key)) {
       // She is correcting a field she already answered ("no, I'm 59"). Overwrite,
       // but only when the value actually changed — this is what makes "just tell
@@ -540,6 +566,33 @@ export async function POST(req: Request) {
       collected[field.key] = result.value;
       extractedSomething = true;
       capturedThisTurn.push({ field, value: result.value });
+    }
+  }
+
+  // The just-asked question got a value that parses but is outside the
+  // plausible range (e.g. age 120). Don't re-ask blankly — flag it warmly.
+  if (currentField && currentFieldOutOfRange && collected[currentField.key] === undefined) {
+    const label = FIELD_LABELS[currentField.key] ?? "that value";
+    const unit = FIELD_UNITS[currentField.key] ?? "";
+    const { min, max } = currentFieldOutOfRange;
+    const clarifyNote = `BoneBot's screening is standardized for ${label} between ${min} and ${max}${unit}, so it cannot reliably account for a value outside that range. This is most often a typo or a mis-heard number, but it may also be that she is genuinely outside the validated range.`;
+    return finishTurn(collected, lastUserText, isFirstTurn, false, clarifyNote);
+  }
+
+  // A weight+height pair whose BMI is physically implausible (~BMI 97 from
+  // 128 kg / 115 cm) is almost always a mis-heard height or a kg/lb mix-up.
+  // Clear the pair and ask her to double-check, instead of silently wiping
+  // both (which the BMI guard in applyDeterministicInferences would do) and
+  // re-asking with no explanation.
+  if (typeof collected.weightKg === "number" && typeof collected.heightCm === "number") {
+    const bmi = collected.weightKg / (collected.heightCm / 100) ** 2;
+    if (bmi < BMI_RANGE.min || bmi > BMI_RANGE.max) {
+      const w = collected.weightKg;
+      const h = collected.heightCm;
+      delete collected.weightKg;
+      delete collected.heightCm;
+      const clarifyNote = `The weight (${w} kg) and height (${h} cm) she gave produce an unusual BMI (about ${Math.round(bmi)}), which usually means the height was mis-heard or a unit was mixed up.`;
+      return finishTurn(collected, lastUserText, isFirstTurn, false, clarifyNote);
     }
   }
 
@@ -574,6 +627,7 @@ async function finishTurn(
   lastUserText: string,
   isFirstTurn: boolean,
   extractedSomething: boolean,
+  clarifyNote?: string,
 ): Promise<Response> {
   const collected = applyDeterministicInferences(collectedIn);
   const decision = decide(collected);
@@ -638,7 +692,7 @@ async function finishTurn(
   }
 
   const { field } = decision;
-  const reply = await runPhrase(field, lastUserText, isFirstTurn, extractedSomething);
+  const reply = await runPhrase(field, lastUserText, isFirstTurn, extractedSomething, clarifyNote);
 
   const response: ConverseResponse = {
     reply,

@@ -42,7 +42,9 @@ export type FieldKey =
 // sentinel — different from `undefined` (field not yet collected at all).
 export type FieldValue = string | number | boolean | null;
 
-export type ParseResult = { ok: true; value: FieldValue } | { ok: false };
+export type ParseResult =
+  | { ok: true; value: FieldValue }
+  | { ok: false; outOfRange?: { direction: "high" | "low"; min: number; max: number } };
 
 export type FieldDef = {
   key: FieldKey;
@@ -144,7 +146,11 @@ function parseNumber(min: number, max: number, opts: { integer?: boolean } = {},
     const n = Number(cleaned);
     if (!Number.isFinite(n)) return { ok: false };
     if (opts.integer && !Number.isInteger(n)) return { ok: false };
-    if (n < min || n > max) return { ok: false };
+    // A finite, correctly-typed number that's simply outside the plausible
+    // range is reported with a direction so the caller can say "that seems
+    // high/low", distinct from a value it couldn't parse at all.
+    if (n < min) return { ok: false, outOfRange: { direction: "low", min, max } };
+    if (n > max) return { ok: false, outOfRange: { direction: "high", min, max } };
     return { ok: true, value: n };
   };
 }
