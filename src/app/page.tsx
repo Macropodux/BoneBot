@@ -852,9 +852,11 @@ export default function Home() {
   // friends) and the same results screen — only how the intake questions
   // are asked differs. See AGENTS.md: the model still predicts (scoreBone,
   // via runModelFromFeatures), this only changes how BoneFeatures is
-  // collected. Defaults to "conversation" — the STEPS flow stays reachable
-  // via "Classic mode" (see startClassic()).
-  const [flowMode, setFlowMode] = useState<"conversation" | "classic">("conversation");
+  // collected. Defaults to (and, per product decision, is now permanently)
+  // "classic" — no UI path switches into "conversation" anymore, so that
+  // screen is unreachable; left in place rather than deleted in case it's
+  // revisited later.
+  const [flowMode, setFlowMode] = useState<"conversation" | "classic">("classic");
   const [convMessages, setConvMessages] = useState<ChatMessage[]>([]);
   const [convBusy, setConvBusy] = useState(false);
   const [convCollected, setConvCollected] = useState<Record<string, unknown>>({});
@@ -865,6 +867,7 @@ export default function Home() {
   const [convOptions, setConvOptions] = useState<string[] | undefined>(undefined);
   const [convInput, setConvInput] = useState("");
   const [micListening, setMicListening] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   // Web Speech API feature-detect. A lazy initializer (not an effect) so
   // there's no extra render/cascading setState — safe because the mic
   // button it gates is only ever rendered once screen === "chat", well
@@ -932,6 +935,7 @@ export default function Home() {
     window.setTimeout(() => {
       setTyping(false);
       setMessages((m) => [...m, { role: "bot", text }]);
+      void speak(text);
     }, delay);
   }
 
@@ -1167,6 +1171,7 @@ export default function Home() {
   // route — silent, best-effort; never blocks the conversation if
   // ElevenLabs is unavailable (see AGENTS.md "degrade gracefully").
   async function speak(text: string) {
+    if (!voiceEnabled) return;
     try {
       const response = await fetch("/api/tts", {
         method: "POST",
@@ -1249,7 +1254,7 @@ export default function Home() {
     setConvCollected(nextCollected);
     setConvAwaitingConfirm(Boolean(data.awaitingConfirm));
     setConvMessages((m) => [...m, { role: "bot", text: data!.reply }]);
-    if (confirmModeValue) void speak(data.reply);
+    void speak(data.reply);
 
     if (data.gateExit) {
       setConvField(null);
@@ -2174,7 +2179,7 @@ export default function Home() {
     setUserName("");
     setNameInput("");
     setAwaitingName(false);
-    setFlowMode("conversation");
+    setFlowMode("classic");
     setConvMessages([]);
     setConvBusy(false);
     setConvCollected({});
@@ -2285,14 +2290,14 @@ export default function Home() {
         >
           {/* Top bar */}
           <header
-            className="sticky top-0 z-20 flex flex-wrap items-center gap-5 px-5 py-[18px] sm:px-16"
+            className="sticky top-0 z-20 flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 sm:px-12"
             style={{ borderBottom: `1px solid ${LANDING_BORDER}`, backgroundColor: LANDING_BG }}
           >
-            <div className={`${LANDING_HEADING_FONT} text-[24px] font-bold tracking-[-0.01em]`} style={{ color: LANDING_INK }}>
+            <div className={`${LANDING_HEADING_FONT} text-[19px] font-bold tracking-[-0.02em]`} style={{ color: LANDING_INK }}>
               Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
             </div>
             <button
-              onClick={startConversation}
+              onClick={startClassic}
               className={`${LANDING_HEADING_FONT} ml-auto inline-flex min-h-[48px] items-center justify-center rounded-full px-[26px] text-[16px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
               style={{ backgroundColor: LANDING_ACCENT }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
@@ -2327,7 +2332,7 @@ export default function Home() {
               </p>
               <div className="mt-2 flex flex-wrap gap-3.5">
                 <button
-                  onClick={startConversation}
+                  onClick={startClassic}
                   className={`${LANDING_HEADING_FONT} inline-flex min-h-[56px] items-center justify-center rounded-full px-[34px] text-[18px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
                   style={{ backgroundColor: LANDING_ACCENT }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
@@ -2575,6 +2580,16 @@ export default function Home() {
               <div className="rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
                 Screening flag, not a diagnosis
               </div>
+              <button
+                type="button"
+                onClick={() => setVoiceEnabled((v) => !v)}
+                aria-label={voiceEnabled ? "Mute BoneBot's voice" : "Unmute BoneBot's voice"}
+                aria-pressed={voiceEnabled}
+                title={voiceEnabled ? "Voice on" : "Voice off"}
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
+              >
+                <span aria-hidden>{voiceEnabled ? "🔊" : "🔇"}</span>
+              </button>
               <button
                 onClick={() => {
                   if (messages.length <= 1 || window.confirm("Start over? This clears your answers so far.")) restart();
@@ -3233,6 +3248,16 @@ export default function Home() {
               </div>
               <button
                 type="button"
+                onClick={() => setVoiceEnabled((v) => !v)}
+                aria-label={voiceEnabled ? "Mute BoneBot's voice" : "Unmute BoneBot's voice"}
+                aria-pressed={voiceEnabled}
+                title={voiceEnabled ? "Voice on" : "Voice off"}
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
+              >
+                <span aria-hidden>{voiceEnabled ? "🔊" : "🔇"}</span>
+              </button>
+              <button
+                type="button"
                 onClick={startClassic}
                 className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
               >
@@ -3579,7 +3604,7 @@ export default function Home() {
                         className="mt-4 font-[family-name:var(--font-fraunces)] text-6xl font-bold tracking-[-0.02em]"
                         style={{ color: ACCENT }}
                       >
-                        <AnimatedNumber value={triageResult.probabilityPercent} reduceMotion={reduceMotion} />%
+                        <AnimatedNumber value={triageResult.probabilityPercent} decimals={1} reduceMotion={reduceMotion} />%
                       </p>
                     </>
                   )}
