@@ -249,6 +249,21 @@ const AGE_MIDPOINT: Record<string, number> = {
   "85 or older": 88,
 };
 const AGE_BRACKETS = Object.keys(AGE_MIDPOINT);
+// features.age is a real reported age (e.g. 63), never one of the
+// AGE_MIDPOINT sample points (47, 52, 57...) — so the "which bracket is
+// yours" check has to bucket the real age into a range, not compare for
+// equality against the midpoint used to project the model at that bracket.
+function ageBracketFor(age: number): string {
+  if (age < 50) return "Under 50";
+  if (age < 55) return "50–54";
+  if (age < 60) return "55–59";
+  if (age < 65) return "60–64";
+  if (age < 70) return "65–69";
+  if (age < 75) return "70–74";
+  if (age < 80) return "75–79";
+  if (age < 85) return "80–84";
+  return "85 or older";
+}
 const MENOPAUSE_AGE_MIDPOINT: Record<string, number> = { "Before 40": 35, "40–45": 42, "After 45": 48, "Not sure": 48 };
 const MENOPAUSE_STATUS = { Yes: "yes", No: "no", "Not sure": "not-sure" } as const;
 const FULL_QUESTION_START = 7;
@@ -1395,7 +1410,11 @@ export default function Home() {
   }
 
   function stopMic() {
-    speechRecognitionRef.current?.stop();
+    try {
+      speechRecognitionRef.current?.stop();
+    } catch {
+      // already stopped/ended — fall through to reset state below
+    }
     setMicListening(false);
   }
 
@@ -2693,7 +2712,7 @@ export default function Home() {
             <button
               type="button"
               onClick={goToLanding}
-              className={`${LANDING_HEADING_FONT} text-[19px] font-bold tracking-[-0.02em] cursor-pointer`}
+              className={`${LANDING_HEADING_FONT} text-[26px] font-bold tracking-[-0.02em] cursor-pointer`}
               style={{ color: LANDING_INK }}
             >
               Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
@@ -3345,7 +3364,7 @@ export default function Home() {
             <button
               type="button"
               onClick={goToLanding}
-              className={`${LANDING_HEADING_FONT} text-[19px] font-bold tracking-[-0.02em] cursor-pointer`}
+              className={`${LANDING_HEADING_FONT} text-[26px] font-bold tracking-[-0.02em] cursor-pointer`}
               style={{ color: LANDING_INK }}
             >
               Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
@@ -3356,20 +3375,13 @@ export default function Home() {
                 Screening flag, not a diagnosis
               </div>
               <button
-                type="button"
-                onClick={() => setVoiceEnabled((v) => !v)}
-                aria-label={voiceEnabled ? "Mute BoneBot's voice" : "Unmute BoneBot's voice"}
-                aria-pressed={voiceEnabled}
-                title={voiceEnabled ? "Voice on" : "Voice off"}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
-              >
-                <span aria-hidden>{voiceEnabled ? "🔊" : "🔇"}</span>
-              </button>
-              <button
                 onClick={() => {
                   if (convMessages.length <= 1 || window.confirm("Start over? This clears your answers so far.")) restart();
                 }}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                className={`${LANDING_HEADING_FONT} inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
+                style={{ backgroundColor: LANDING_ACCENT }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT)}
               >
                 Start over
               </button>
@@ -3385,24 +3397,18 @@ export default function Home() {
           </div>
           <div className="relative z-10 border-t border-[#E3E9E7] bg-white/90 px-6 py-5 backdrop-blur-sm">
             <div className="mx-auto flex max-w-[680px] flex-col gap-3">
-              {micSupported && convChatReady && convField && (
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    onClick={() => (micListening ? stopMic() : startMicForConversation())}
-                    className="flex items-center gap-2 rounded-full border-[1.5px] px-4 py-2 text-[13px] font-semibold transition-colors"
-                    style={
-                      micListening
-                        ? { borderColor: ACCENT, backgroundColor: ACCENT, color: "#fff" }
-                        : { borderColor: "#C6CFCC", color: "#4A5452" }
-                    }
-                  >
-                    <span aria-hidden>{micListening ? "⏹" : "🎤"}</span>
-                    {micListening ? "Listening… tap to stop" : "Answer by voice"}
-                  </button>
-                  {convConfirmMode && <span className="text-[12px] text-[#9AA5A2]">Voice mode on</span>}
-                </div>
-              )}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setVoiceEnabled((v) => !v)}
+                  aria-label={voiceEnabled ? "Mute BoneBot's voice" : "Unmute BoneBot's voice"}
+                  aria-pressed={voiceEnabled}
+                  title={voiceEnabled ? "Voice on" : "Voice off"}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-[#D5DCDA] bg-white text-[13px] text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                >
+                  <span aria-hidden>{voiceEnabled ? "🔊" : "🔇"}</span>
+                </button>
+              </div>
 
               {convChatReady &&
                 convField &&
@@ -3428,6 +3434,26 @@ export default function Home() {
                         {opt}
                       </button>
                     ))}
+                  </div>
+                )}
+
+              {micSupported &&
+                convChatReady &&
+                convField &&
+                !(convInputType === "text" || convInputType === "number" || convField === "confirm") && (
+                  <div className="flex items-center justify-end gap-2">
+                    {convConfirmMode && <span className="text-[12px] text-[#9AA5A2]">Voice mode on</span>}
+                    <button
+                      type="button"
+                      onClick={() => (micListening ? stopMic() : startMicForConversation())}
+                      aria-label={micListening ? "Stop listening" : "Answer by voice"}
+                      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-white shadow-sm ring-1 ring-inset ring-white/20 transition-all duration-150 hover:brightness-110 active:scale-95"
+                      style={{ backgroundColor: micListening ? "#B0442F" : ACCENT }}
+                    >
+                      <span aria-hidden className="text-[15px] leading-none">
+                        {micListening ? "⏹" : "🎤"}
+                      </span>
+                    </button>
                   </div>
                 )}
 
@@ -3621,9 +3647,30 @@ export default function Home() {
                       onChange={(event) => setConvInput(event.target.value)}
                       placeholder={convField === "confirm" ? "Or type a correction…" : "Type your answer"}
                       aria-label="Answer BoneBot"
-                      disabled={convBusy}
+                      disabled={convBusy || micListening}
                       className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
                     />
+                    {micSupported && (
+                      <button
+                        type="button"
+                        onClick={() => (micListening ? stopMic() : startMicForConversation())}
+                        disabled={convBusy}
+                        aria-label={micListening ? "Stop listening" : "Answer by voice"}
+                        className="group relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-white shadow-sm ring-1 ring-inset ring-white/20 transition-all duration-150 hover:brightness-110 active:scale-95 disabled:opacity-50"
+                        style={{ backgroundColor: micListening ? "#B0442F" : ACCENT }}
+                      >
+                        {micListening && (
+                          <span
+                            aria-hidden
+                            className="absolute inset-0 rounded-full"
+                            style={{ boxShadow: "0 0 0 4px rgba(176,68,47,0.18)" }}
+                          />
+                        )}
+                        <span aria-hidden className="text-[15px] leading-none">
+                          {micListening ? "⏹" : "🎤"}
+                        </span>
+                      </button>
+                    )}
                     <button
                       type="submit"
                       disabled={convBusy || !convInput.trim()}
@@ -3634,16 +3681,24 @@ export default function Home() {
                     </button>
                   </form>
                 )}
+                {convChatReady &&
+                  convField &&
+                  (convInputType === "text" || convInputType === "number" || convField === "confirm") &&
+                  convConfirmMode && <p className="text-[12px] text-[#9AA5A2]">Voice mode on</p>}
 
-              {convChatReady && convField && convField !== "confirm" && convInputType !== "image" && (
-                <button
-                  type="button"
-                  onClick={() => void sendConverseTurn("Not sure — skip this one")}
-                  className="self-end rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
-                >
-                  Skip this question
-                </button>
-              )}
+              {convChatReady &&
+                convField &&
+                convField !== "confirm" &&
+                convInputType !== "image" &&
+                convMessages.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => void sendConverseTurn("Not sure — skip this one")}
+                    className="self-end rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                  >
+                    Skip this question
+                  </button>
+                )}
 
               {convBusy && <p className="text-right text-sm text-[#5A6462]">BoneBot is thinking…</p>}
             </div>
@@ -3665,7 +3720,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={goToLanding}
-                className={`${LANDING_HEADING_FONT} text-[19px] font-bold tracking-[-0.02em] cursor-pointer`}
+                className={`${LANDING_HEADING_FONT} text-[26px] font-bold tracking-[-0.02em] cursor-pointer`}
                 style={{ color: LANDING_INK }}
               >
                 Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
@@ -3763,8 +3818,10 @@ export default function Home() {
                   whileTap={{ scale: 0.98 }}
                   transition={{ duration: 0.15 }}
                   onClick={restart}
-                  className="self-start rounded-[10px] px-5 py-3 font-[family-name:var(--font-fraunces)] font-bold text-white"
-                  style={{ backgroundColor: ACCENT }}
+                  className={`${LANDING_HEADING_FONT} self-start inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
+                  style={{ backgroundColor: LANDING_ACCENT }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT)}
                 >
                   Start over
                 </motion.button>
@@ -3788,7 +3845,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={goToLanding}
-                className={`${LANDING_HEADING_FONT} text-[19px] font-bold tracking-[-0.02em] cursor-pointer`}
+                className={`${LANDING_HEADING_FONT} text-[26px] font-bold tracking-[-0.02em] cursor-pointer`}
                 style={{ color: LANDING_INK }}
               >
                 Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
@@ -4179,7 +4236,7 @@ export default function Home() {
                       <div className="mt-6 flex h-[150px] items-end gap-1.5 sm:gap-2.5">
                         {AGE_BRACKETS.map((bracket, index) => {
                           const projected = scoreBone({ ...features, age: AGE_MIDPOINT[bracket] });
-                          const isYours = AGE_MIDPOINT[bracket] === features.age;
+                          const isYours = bracket === ageBracketFor(features.age);
                           // Same color-per-band scale as every other bar — your
                           // bracket isn't a different color, it's the same scale
                           // at full strength (others fade to 70% opacity).
