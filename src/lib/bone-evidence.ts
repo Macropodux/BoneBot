@@ -439,3 +439,34 @@ export function usesOnlySelectedEvidence(
   const allowedIds = new Set(cards.map((card) => card.id));
   return evidenceIds.length > 0 && evidenceIds.every((id) => allowedIds.has(id));
 }
+
+/**
+ * Combines multiple evidence selections (e.g. question-keyword matches plus a
+ * person's own result-based cards) into one deduplicated set. Null/undefined
+ * selections are ignored, so callers can pass through an absent selection
+ * (e.g. no result supplied) without a separate branch.
+ */
+export function mergeEvidence(
+  ...selections: ({ cards: EvidenceCard[]; sources: EvidenceSource[] } | null | undefined)[]
+): { cards: EvidenceCard[]; sources: EvidenceSource[] } {
+  const cardIds = new Set<string>();
+  for (const selection of selections) {
+    for (const card of selection?.cards ?? []) cardIds.add(card.id);
+  }
+  return evidenceForCardIds(cardIds);
+}
+
+/**
+ * Relaxed citation check for the Q&A path, where an answer may be grounded in
+ * the supplied result/model context instead of, or as well as, an evidence
+ * card. Unlike usesOnlySelectedEvidence, this does not require at least one
+ * citation — but it still rejects any citation that wasn't actually supplied,
+ * so the model can never claim support from a card it wasn't given.
+ */
+export function citesOnlyAllowedEvidence(
+  evidenceIds: string[],
+  cards: EvidenceCard[],
+): boolean {
+  const allowedIds = new Set(cards.map((card) => card.id));
+  return evidenceIds.every((id) => allowedIds.has(id));
+}

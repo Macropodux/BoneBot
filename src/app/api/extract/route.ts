@@ -25,6 +25,44 @@ type Body = {
   rawText?: string;
 };
 
+// Yes/no risk-factor fields. normaliseFreeAnswer() on the client already
+// recognises a plain "Yes"/"No" for these — the extractor's job is turning a
+// hedged or qualified reply ("only socially", "don't have any") into that
+// same plain "Yes"/"No", never into anything more specific.
+const YES_NO_FIELDS = new Set([
+  "assignedFemale",
+  "menopauseStatus",
+  "existingCare",
+  "knowsDxa",
+  "fracture",
+  "parent",
+  "smoke",
+  "steroids",
+]);
+
+// Numeric fields. normaliseFreeAnswer() expects a plain number (or year) as
+// text for these.
+const NUMERIC_FIELDS = new Set(["age", "dxaScore", "dxaYear", "menopause", "weight"]);
+
+function fieldGuidance(fieldKey: string): string {
+  if (YES_NO_FIELDS.has(fieldKey)) {
+    return (
+      "This is a yes/no risk-factor question. Treat ANY affirmative reply — including qualified, hedged, or " +
+      'minimising ones such as "only socially", "sometimes", "occasionally", "a bit", "a little", or "used to" — ' +
+      'as affirmative and return exactly "Yes". Treat clear negations such as "no", "never", "none", "not really", ' +
+      'or "don\'t have any" as "No". Return exactly "Yes" or "No", or null only if the reply truly does not ' +
+      "address the question at all."
+    );
+  }
+  if (NUMERIC_FIELDS.has(fieldKey)) {
+    return (
+      "This field expects a number (e.g. an age in years, a T-score, or a year). Extract only the number the " +
+      'reply plainly states, as a plain numeric string (e.g. "67"). Return null if no number is given.'
+    );
+  }
+  return "Return only what the reply plainly states for this field, or null if it does not clearly answer the question.";
+}
+
 export async function POST(req: Request) {
   if (!process.env.OPENAI_API_KEY) {
     return Response.json({ error: "BoneBot is unavailable: no API key configured." }, { status: 503 });
@@ -41,11 +79,11 @@ export async function POST(req: Request) {
       model: openai(MODEL),
       schema: ExtractSchema,
       system:
-        "You extract a single candidate answer to one bone-health screening question from a user's free-text reply. Return only what the text plainly states — never infer, guess, calculate, or add outside knowledge. If the text does not clearly answer the question, return null for value. Do not diagnose or give advice.",
+        "You extract a single candidate answer to one bone-health screening question from a user's free-text reply. Return only what the text plainly implies for the specific field described — never infer unrelated facts, guess, calculate, or add outside knowledge. Follow the field-specific instruction in the user message exactly. If the text does not clearly answer the question, return null for value. Do not diagnose or give advice.",
       messages: [
         {
           role: "user",
-          content: `Question field: ${fieldKey}\nQuestion asked: ${question}\nUser's reply: ${rawText}\n\nReturn the single value the reply gives for this field (e.g. a number, a year, or a short word like "yes"/"no"/"not sure"), or null if the reply does not clearly answer it. Also return your confidence (0 to 1) that this value is correct.`,
+          content: `Question field: ${fieldKey}\nQuestion asked: ${question}\nUser's reply: ${rawText}\n\n${fieldGuidance(fieldKey)}\n\nAlso return your confidence (0 to 1) that this value is correct.`,
         },
       ],
     });

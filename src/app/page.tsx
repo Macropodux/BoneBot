@@ -49,8 +49,8 @@ const STEPS: Step[] = [
   { key: "parent", q: "Did either of your parents ever fracture a hip?", options: [] },
   { key: "smoke", q: "Do you currently smoke?", options: [] },
   { key: "steroids", q: "Have you ever taken corticosteroids (like prednisone) for 3 months or more?", options: [] },
-  { key: "bloodResults", q: "If you have blood-test results, upload an image now. Otherwise, type skip to continue.", options: [] },
-  { key: "weight", q: "Is your weight under 57 kg (about 125 lb)?", options: [] },
+  { key: "bloodResults", q: "If you have blood-test results, upload an image now — or tap Skip to continue without one.", options: [] },
+  { key: "weight", q: "What's your weight and height? BoneBot uses these to calculate your BMI.", options: [] },
 ];
 
 const EXAMPLE_ANSWERS: Record<StepKey, string> = {
@@ -67,7 +67,7 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   smoke: "No",
   steroids: "No",
   bloodResults: "Skip",
-  weight: "No",
+  weight: "24.5",
 };
 
 // Fields the 7-question flow never asks about — photo upload (vitaminD,
@@ -114,6 +114,7 @@ function mapAnswersToFeatures(answers: Record<StepKey, string>, bloodResults: Up
     : MENOPAUSE_AGE_MIDPOINT[answers.menopause] ?? 48;
   const answerOrDefault = (answer: string, defaultValue: number) =>
     answer === "Yes" ? true : answer === "No" ? false : Boolean(defaultValue);
+  const parsedBmi = Number(answers.weight);
   return {
     age,
     yearsSinceMenopause: Number.isFinite(parsedMenopauseAge)
@@ -123,9 +124,9 @@ function mapAnswersToFeatures(answers: Record<StepKey, string>, bloodResults: Up
     parentalHipFracture: answerOrDefault(answers.parent, tScoreModel.imputationDefaults.parentalHipFracture),
     currentSmoker: answerOrDefault(answers.smoke, tScoreModel.imputationDefaults.currentSmoker),
     glucocorticoids: answerOrDefault(answers.steroids, tScoreModel.imputationDefaults.glucocorticoids),
-    // "Under 57kg" is a low-body-weight screening proxy, not a measured BMI —
-    // a rough stand-in until BMI (or height+weight) is asked directly.
-    bmi: answers.weight === "Yes" ? 20 : answers.weight === "No" ? 26 : tScoreModel.imputationDefaults.bmi,
+    // BMI computed deterministically from the weight+height step (kg / m^2) —
+    // see computeBmi()/submitWeightHeight() below.
+    bmi: Number.isFinite(parsedBmi) ? parsedBmi : tScoreModel.imputationDefaults.bmi,
     ...FIELD_DEFAULTS,
     vitaminD: bloodResults?.vitaminD ?? FIELD_DEFAULTS.vitaminD,
     calcium: bloodResults?.calcium ?? FIELD_DEFAULTS.calcium,
@@ -196,6 +197,18 @@ function bandColor(tScore: number): string {
   if (tScore <= -2.5) return "#B0442F"; // elevated
   if (tScore >= -1.0) return "#0E7C6E"; // lower
   return "#A06D14"; // uncertain
+}
+
+// Feature 10a — the exact result-context shape sent to /api/assistant
+// alongside the profile, so the explainer LLM never has to re-derive the
+// deterministic score.
+function resultContext(model: ModelOutput) {
+  return {
+    estimatedTScore: model.estimatedTScore,
+    tScoreRange: model.tScoreRange,
+    category: model.category,
+    contributions: model.contributions,
+  };
 }
 
 // Five reputable, evidence-based patient resources — shown as a brief plus a
@@ -352,6 +365,16 @@ export default function Home() {
   // for an otherwise-unparseable free-text answer.
   const [extracting, setExtracting] = useState(false);
 
+  // Feature 7 — dedicated weight+height entry for the "weight" step; BMI is
+  // computed deterministically (kg / m^2) and stored as the step's answer.
+  const [weightInput, setWeightInput] = useState("");
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg");
+  const [heightUnit, setHeightUnit] = useState<"cm" | "ftin">("cm");
+  const [heightCmInput, setHeightCmInput] = useState("");
+  const [heightFtInput, setHeightFtInput] = useState("");
+  const [heightInInput, setHeightInInput] = useState("");
+  const [bmiError, setBmiError] = useState("");
+
   const [qaMessages, setQaMessages] = useState<ChatMessage[]>([]);
   const [qaTyping, setQaTyping] = useState(false);
   const [qaInput, setQaInput] = useState("");
@@ -389,6 +412,13 @@ export default function Home() {
     setBloodEditError("");
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
+    setWeightInput("");
+    setWeightUnit("kg");
+    setHeightUnit("cm");
+    setHeightCmInput("");
+    setHeightFtInput("");
+    setHeightInInput("");
+    setBmiError("");
     botSay(
       "Hi, I'm BoneBot. I’ll start with four quick questions. If the model finds a higher initial probability, I’ll ask for a few more details. The model calculates the result; AI only explains it."
     );
@@ -411,7 +441,16 @@ export default function Home() {
         const response = await fetch("/api/assistant", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ mode: "consumer", result: model, features: full, explanationType }),
+          body: JSON.stringify({
+            mode: "consumer",
+            result: model,
+            features: full,
+            explanationType,
+            // Feature 10a — full result context + profile, flattened, for the
+            // explainer route on the other side of this call.
+            ...resultContext(model),
+            profile: full,
+          }),
         });
         return response.ok ? (await response.json()).text : fallback;
       } catch {
@@ -462,7 +501,7 @@ export default function Home() {
       return;
     }
     setStepIdx(FULL_QUESTION_START);
-    botSay("Your initial screening estimate is above our threshold, so I’ll ask a few more questions to create your full bone-health screening result.");
+    botSay("We’ll continue with the full questionnaire to get a more precise result.");
     window.setTimeout(() => botSay(STEPS[FULL_QUESTION_START].q), 900);
   }
 
@@ -569,8 +608,11 @@ export default function Home() {
       return /\b(skip|no|none|continue)\b/.test(lower) ? "Skip" : null;
     }
     if (key === "weight") {
-      const match = lower.match(/\d+(?:\.\d+)?/);
-      if (match) return Number(match[0]) < 57 ? "Yes" : "No";
+      // The weight step is now a dedicated weight+height form that computes
+      // BMI directly (see submitWeightHeight()); this guards any BMI value
+      // that still arrives as free text.
+      const value = Number(text.replace(/[^0-9.]/g, ""));
+      return Number.isFinite(value) && value >= 12 && value <= 60 ? String(value) : null;
     }
     if (/(not sure|don't know|do not know)/.test(lower)) return "Not sure";
     if (key === "fracture" && /\b(broke|broken|fracture)\b/.test(lower)) return "Yes";
@@ -612,6 +654,20 @@ export default function Home() {
     const value = normaliseFreeAnswer(step.key, raw);
     if (value && value !== "Not sure" && value !== "Unknown") {
       answer(value, raw);
+      return;
+    }
+    if (step.key === "age" && value === null && /\d/.test(raw)) {
+      // A number was given but fell outside BoneBot's supported age range —
+      // a graceful, specific re-ask instead of the generic clarify loop.
+      setMessages((items) => [
+        ...items,
+        { role: "user", text: raw },
+        {
+          role: "bot",
+          text: "BoneBot's screening is designed for adults around and after menopause — could you enter your age in years?",
+        },
+      ]);
+      setFreeInput("");
       return;
     }
     const looksLikeQuestion = /\?|^(what|why|how|can|is|are|does|do)\b/i.test(raw);
@@ -775,6 +831,47 @@ export default function Home() {
     if (STEPS[stepIdx]?.key === "bloodResults") answer("Uploaded", "Edited values confirmed");
   }
 
+  const BMI_RANGE = { min: 12, max: 60 };
+
+  // Feature 7 — BMI computed deterministically from weight + height
+  // (kg / m^2). Accepts kg or lb for weight, and cm or ft/in for height.
+  function computeBmi(): number | null {
+    const weightNum = Number(weightInput);
+    if (!Number.isFinite(weightNum) || weightNum <= 0) return null;
+    const weightKg = weightUnit === "kg" ? weightNum : weightNum * 0.453592;
+
+    let heightM: number | null = null;
+    if (heightUnit === "cm") {
+      const cm = Number(heightCmInput);
+      if (Number.isFinite(cm) && cm > 0) heightM = cm / 100;
+    } else {
+      const feet = heightFtInput.trim() === "" ? 0 : Number(heightFtInput);
+      const inches = heightInInput.trim() === "" ? 0 : Number(heightInInput);
+      if (Number.isFinite(feet) && Number.isFinite(inches) && feet + inches > 0) {
+        heightM = (feet * 12 + inches) * 0.0254;
+      }
+    }
+    if (heightM === null || heightM <= 0) return null;
+    return weightKg / (heightM * heightM);
+  }
+
+  function submitWeightHeight() {
+    const bmi = computeBmi();
+    if (bmi === null) {
+      setBmiError("Please enter both your weight and height.");
+      return;
+    }
+    if (bmi < BMI_RANGE.min || bmi > BMI_RANGE.max) {
+      setBmiError(
+        `That doesn't look like a valid BMI (expected ${BMI_RANGE.min}–${BMI_RANGE.max}) — please check your weight and height.`,
+      );
+      return;
+    }
+    setBmiError("");
+    const heightDisplay = heightUnit === "cm" ? `${heightCmInput} cm` : `${heightFtInput || 0} ft ${heightInInput || 0} in`;
+    answer(bmi.toFixed(1), `${weightInput} ${weightUnit}, ${heightDisplay} (BMI ${bmi.toFixed(1)})`);
+  }
+
   function tryExample() {
     runModel(EXAMPLE_ANSWERS);
   }
@@ -827,6 +924,13 @@ export default function Home() {
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
     setUncertaintyNotes([]);
+    setWeightInput("");
+    setWeightUnit("kg");
+    setHeightUnit("cm");
+    setHeightCmInput("");
+    setHeightFtInput("");
+    setHeightInInput("");
+    setBmiError("");
   }
 
   async function qaAsk(q: string) {
@@ -839,7 +943,13 @@ export default function Home() {
       const r = await fetch("/api/assistant", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mode: "consumer", result, features, question: q }),
+        body: JSON.stringify({
+          mode: "consumer",
+          question: q,
+          stage: "results",
+          result: resultContext(result),
+          profile: features,
+        }),
       });
       if (r.ok) text = (await r.json()).text;
     } catch {
@@ -1067,7 +1177,88 @@ export default function Home() {
                 </div>
               )}
 
-              {inFlow && step.options.length === 0 && !pendingBloodResults && (
+              {inFlow && step.key === "weight" && (
+                <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
+                  <div className="text-sm font-semibold text-[#15181A]">Weight & height</div>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
+                      Weight
+                      <div className="flex gap-1.5">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          value={weightInput}
+                          onChange={(event) => setWeightInput(event.target.value)}
+                          placeholder="e.g. 65"
+                          className="w-24 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                        />
+                        <select
+                          value={weightUnit}
+                          onChange={(event) => setWeightUnit(event.target.value as "kg" | "lb")}
+                          className="rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                        >
+                          <option value="kg">kg</option>
+                          <option value="lb">lb</option>
+                        </select>
+                      </div>
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
+                      Height
+                      <div className="flex items-center gap-1.5">
+                        {heightUnit === "cm" ? (
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            value={heightCmInput}
+                            onChange={(event) => setHeightCmInput(event.target.value)}
+                            placeholder="e.g. 162"
+                            className="w-24 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                          />
+                        ) : (
+                          <>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              value={heightFtInput}
+                              onChange={(event) => setHeightFtInput(event.target.value)}
+                              placeholder="ft"
+                              className="w-16 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                            />
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              value={heightInInput}
+                              onChange={(event) => setHeightInInput(event.target.value)}
+                              placeholder="in"
+                              className="w-16 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                            />
+                          </>
+                        )}
+                        <select
+                          value={heightUnit}
+                          onChange={(event) => setHeightUnit(event.target.value as "cm" | "ftin")}
+                          className="rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                        >
+                          <option value="cm">cm</option>
+                          <option value="ftin">ft / in</option>
+                        </select>
+                      </div>
+                    </label>
+                  </div>
+                  {bmiError && <div className="text-[13px] text-[#B0442F]">{bmiError}</div>}
+                  <div className="flex flex-wrap gap-2.5">
+                    <button
+                      onClick={submitWeightHeight}
+                      className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      Continue
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {inFlow && step.options.length === 0 && !pendingBloodResults && step.key !== "weight" && (
                 <div className="flex flex-col gap-2.5">
                   <form
                     onSubmit={(event) => {
@@ -1095,35 +1286,45 @@ export default function Home() {
                   </form>
 
                   {step.key === "bloodResults" && (
-                    <label
-                      className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E7C6E] hover:bg-[#E4F0ED]"
-                      aria-disabled={uploadBusy}
-                    >
-                      <span
-                        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-base"
-                        style={{ backgroundColor: ACCENT_TINT, color: ACCENT }}
-                        aria-hidden
+                    <div className="flex flex-col gap-2.5">
+                      <label
+                        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E7C6E] hover:bg-[#E4F0ED]"
+                        aria-disabled={uploadBusy}
                       >
-                        📎
-                      </span>
-                      <span className="flex flex-col">
-                        <span className="font-semibold text-[#15181A]">
-                          {uploadBusy ? "Reading your photo…" : "Attach a photo instead"}
+                        <span
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-base"
+                          style={{ backgroundColor: ACCENT_TINT, color: ACCENT }}
+                          aria-hidden
+                        >
+                          📎
                         </span>
-                        <span className="text-[13px] text-[#5A6462]">A blood-test result or lab report — JPG, PNG, or WEBP.</span>
-                      </span>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        className="sr-only"
+                        <span className="flex flex-col">
+                          <span className="font-semibold text-[#15181A]">
+                            {uploadBusy ? "Reading your photo…" : "Attach a photo instead"}
+                          </span>
+                          <span className="text-[13px] text-[#5A6462]">A blood-test result or lab report — JPG, PNG, or WEBP.</span>
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="sr-only"
+                          disabled={uploadBusy}
+                          onChange={(event) => {
+                            const image = event.target.files?.[0];
+                            if (image) void uploadBloodResults(image);
+                            event.currentTarget.value = "";
+                          }}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => answer("Skip", "Skip")}
                         disabled={uploadBusy}
-                        onChange={(event) => {
-                          const image = event.target.files?.[0];
-                          if (image) void uploadBloodResults(image);
-                          event.currentTarget.value = "";
-                        }}
-                      />
-                    </label>
+                        className="self-start rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E] disabled:opacity-50"
+                      >
+                        Skip — I don&apos;t have blood-test results
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
