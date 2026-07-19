@@ -3,8 +3,7 @@
 **Hack-Nation Challenge 05 — Women's Hormonal Health.** Product name: **BoneBot**.
 
 > **Read this before spawning an agent.** It is the shared brain. `AGENTS.md` =
-> the rules; this = the plan; `PLAYBOOK.md` = how to build fast; `RUNBOOK.md` =
-> schedule & non-negotiables.
+> the rules; this = the plan.
 
 ---
 

@@ -103,9 +103,7 @@ lint`.
 ## Also referenced
 
 The file points to `node_modules/next/dist/docs/` for version-matched
-Next.js 16 documentation (breaking changes vs. training-data assumptions),
-and to `RUNBOOK.md` as the separate human-facing runbook covering schedule,
-timeline, checklists, and strategy.
+Next.js 16 documentation (breaking changes vs. training-data assumptions).
 
 ## Where this fits
 

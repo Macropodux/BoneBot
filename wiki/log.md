@@ -73,3 +73,13 @@ built") is now built (`/api/blood-results`, `/api/document`), and that
 `[[ai-handover-md]]` is now the more current architecture reference. The
 output-card layout and category bands in the original ingest are still
 accurate and were left as-is.
+
+## [2026-07-19] remove | TASKBOARD.md, RUNBOOK.md — Source Docs Deleted
+
+`TASKBOARD.md`, `RUNBOOK.md`, `PLAYBOOK.md`, and `BUSINESS.md` were deleted
+from the repo root (no code referenced them; `PLAYBOOK.md`/`BUSINESS.md` were
+never ingested into this wiki). Removed `wiki/sources/taskboard-md-plan.md`
+and `wiki/sources/runbook-md-schedule.md` since their raw sources no longer
+exist, and dropped their entries from `wiki/index.md`, `wiki/SCHEMA.md`'s
+raw-in-place doc list, and the "Also referenced" note in
+`wiki/sources/agents-md-rules.md`.

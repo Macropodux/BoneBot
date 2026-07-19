@@ -7,7 +7,7 @@ shows, then returns an **estimated-T-score report** — spoken back, **built for
 the consumer** (a clinician view is future work, not this build). The plain `/screen` form is the zero-dependency
 **fallback demo**. No login.
 
-- The narration is the demo script in `PROJECT.md` / `RUNBOOK.md §2`.
+- The narration is the demo script in `PROJECT.md`.
 - The number comes from `src/lib/bone-model.ts` (a regression predicting an
   **estimated T-score**, trained on real DXA scans in NHANES) — computed
   deterministically. **The LLM only explains it; it never sets the number.**
