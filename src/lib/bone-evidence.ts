@@ -748,7 +748,7 @@ export function selectEvidenceForQuestion(question: string): { cards: EvidenceCa
   return cardIds.size ? evidenceForCardIds(cardIds) : null;
 }
 
-function evidenceForCardIds(cardIds: Set<string>): { cards: EvidenceCard[]; sources: EvidenceSource[] } {
+export function evidenceForCardIds(cardIds: Set<string>): { cards: EvidenceCard[]; sources: EvidenceSource[] } {
   const cards = EVIDENCE_CARDS.filter((card) => cardIds.has(card.id));
   const sourceIds = new Set(cards.flatMap((card) => card.sourceIds));
   const sources = EVIDENCE_SOURCES.filter((source) => sourceIds.has(source.id));

@@ -34,6 +34,7 @@ import {
   parseDailyActivity,
 } from "@/lib/activity-input";
 import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model";
+import type { EvidenceSource } from "@/lib/bone-evidence";
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
 import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-parameters";
 import FloatingBones from "./FloatingBones";
@@ -592,6 +593,35 @@ function TrustedResources({ small }: { small?: boolean }) {
   );
 }
 
+// Compact linked citation list for an AI-written explanation — the specific
+// evidence-file sources (src/lib/bone-evidence.ts) that backed it, distinct
+// from the general TrustedResources reading list above. Renders nothing if
+// the explanation didn't resolve to any sources (e.g. the API call failed
+// and a fallback string is showing instead).
+function EvidenceSources({ sources }: { sources: EvidenceSource[] }) {
+  if (sources.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] text-[#9AA5A2]">
+      <span>Sources:</span>
+      {sources.map((source, i) => (
+        <span key={source.id}>
+          <a
+            href={source.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={source.title}
+            className="font-semibold underline decoration-1 underline-offset-2"
+            style={{ color: ACCENT }}
+          >
+            {source.publisher}
+          </a>
+          {i < sources.length - 1 ? "," : ""}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // Labels a section as LLM-written (vs. the deterministic model output above
 // it) — the same "model predicts, LLM only explains" honesty rule, made
 // visible in the UI so it's never ambiguous which parts are which.
@@ -780,6 +810,12 @@ export default function Home() {
   const [scoreExplanation, setScoreExplanation] = useState("");
   const [implicationsExplanation, setImplicationsExplanation] = useState("");
   const [summaryExplanation, setSummaryExplanation] = useState("");
+  // Evidence sources (from src/lib/bone-evidence.ts, via /api/assistant) that
+  // back each AI-written explanation — rendered as a small linked reading
+  // list under the relevant card so a claim can be traced to its source.
+  const [scoreSources, setScoreSources] = useState<EvidenceSource[]>([]);
+  const [implicationsSources, setImplicationsSources] = useState<EvidenceSource[]>([]);
+  const [summarySources, setSummarySources] = useState<EvidenceSource[]>([]);
   const [reportedDxa, setReportedDxa] = useState<{ score: number; year?: number } | null>(null);
   const [freeInput, setFreeInput] = useState("");
   const [userName, setUserName] = useState("");
@@ -1023,7 +1059,10 @@ export default function Home() {
         : "This screening result is a reason to discuss a DXA scan and wider fracture-risk assessment with your GP. It is not a diagnosis.";
     // Falls back to the static per-band CAT_META.desc — see its render site.
     const summaryFallback = CAT_META[CATEGORY_MAP[model.category]].desc;
-    const getExplanation = async (explanationType: "score" | "implications" | "summary", fallback: string) => {
+    const getExplanation = async (
+      explanationType: "score" | "implications" | "summary",
+      fallback: string,
+    ): Promise<{ text: string; sources: EvidenceSource[] }> => {
       try {
         const response = await fetch("/api/assistant", {
           method: "POST",
@@ -1040,19 +1079,24 @@ export default function Home() {
             profile: full,
           }),
         });
-        return response.ok ? (await response.json()).text : fallback;
+        if (!response.ok) return { text: fallback, sources: [] };
+        const body = (await response.json()) as { text: string; sources?: EvidenceSource[] };
+        return { text: body.text, sources: body.sources ?? [] };
       } catch {
-        return fallback;
+        return { text: fallback, sources: [] };
       }
     };
-    const [scoreText, implicationsText, summaryText] = await Promise.all([
+    const [scoreResult, implicationsResult, summaryResult] = await Promise.all([
       getExplanation("score", scoreFallback),
       getExplanation("implications", implicationsFallback),
       getExplanation("summary", summaryFallback),
     ]);
-    setScoreExplanation(scoreText);
-    setImplicationsExplanation(implicationsText);
-    setSummaryExplanation(summaryText);
+    setScoreExplanation(scoreResult.text);
+    setImplicationsExplanation(implicationsResult.text);
+    setSummaryExplanation(summaryResult.text);
+    setScoreSources(scoreResult.sources);
+    setImplicationsSources(implicationsResult.sources);
+    setSummarySources(summaryResult.sources);
     setQaMessages([{ role: "bot", text: "Ask a question about your bone-health screening result." }]);
     setScreen("results");
   }
@@ -2144,6 +2188,9 @@ export default function Home() {
     setScoreExplanation("");
     setImplicationsExplanation("");
     setSummaryExplanation("");
+    setScoreSources([]);
+    setImplicationsSources([]);
+    setSummarySources([]);
     setPendingMenopauseAge(null);
     setPendingExistingCareConfirm(false);
     setPendingRecentDxaAnswers(null);
@@ -3758,6 +3805,7 @@ export default function Home() {
                           </motion.div>
                         </div>
                         <Markdown text={summaryExplanation || catMeta.desc} className="text-pretty text-base leading-[1.6] text-[#4A5452]" />
+                        <EvidenceSources sources={summarySources} />
                       </>
 
                     <div className="mt-8 mb-2">
@@ -3970,6 +4018,7 @@ export default function Home() {
                       <AIWrittenBadge />
                     </div>
                     <Markdown text={scoreExplanation} className="mt-4 text-[15px] leading-[1.65] text-[#4A5452]" />
+                    <EvidenceSources sources={scoreSources} />
                   </motion.div>
 
                   <motion.div variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
@@ -3980,6 +4029,7 @@ export default function Home() {
                       <AIWrittenBadge />
                     </div>
                     <Markdown text={implicationsExplanation} className="mt-4 text-[15px] leading-[1.65] text-[#4A5452]" />
+                    <EvidenceSources sources={implicationsSources} />
                   </motion.div>
 
                   {bloodResults && (
