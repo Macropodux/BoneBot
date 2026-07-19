@@ -117,11 +117,12 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
 // Demo-only canned profiles for "Try an example" — one per risk band, so a
 // judge/reviewer can see all three result screens without answering 14
 // questions three times. Never used outside the landing page's example flow.
-const EXAMPLE_PATIENTS: { id: string; label: string; blurb: string; answers: Record<StepKey, string> }[] = [
+const EXAMPLE_PATIENTS: { id: string; label: string; blurb: string; name: string; answers: Record<StepKey, string> }[] = [
   {
     id: "low",
     label: "Low risk",
     blurb: "55, active, no major risk factors",
+    name: "Alice",
     answers: {
       assignedFemale: "Yes",
       age: "55",
@@ -145,12 +146,14 @@ const EXAMPLE_PATIENTS: { id: string; label: string; blurb: string; answers: Rec
     id: "moderate",
     label: "Moderate risk",
     blurb: "67, a few contributing factors",
+    name: "Barbara",
     answers: EXAMPLE_ANSWERS,
   },
   {
     id: "elevated",
     label: "Elevated risk",
     blurb: "78, prior fracture, smoker, low activity",
+    name: "Carol",
     answers: {
       assignedFemale: "Yes",
       age: "78",
@@ -799,7 +802,12 @@ export default function Home() {
     window.setTimeout(() => botSay(STEPS[0].q), 1400);
   }
 
-  async function runModel(all: Record<StepKey, string>) {
+  async function runModel(all: Record<StepKey, string>, nameOverride?: string) {
+    // Accepts an explicit name (rather than always reading the userName state)
+    // because the "Try an example" path calls setUserName() and runModel() in
+    // the same tick — the state update wouldn't be visible in this closure
+    // yet, so the very first /api/assistant call would go out with no name.
+    const explainerName = nameOverride ?? userName;
     const { features: full, provided } = mapAnswersToFeatures(all, bloodResults);
     setFeatures(full);
     const model = scoreBone(full, provided);
@@ -822,7 +830,7 @@ export default function Home() {
             result: model,
             features: full,
             explanationType,
-            name: userName,
+            name: explainerName,
             // Feature 10a — full result context + profile, flattened, for the
             // explainer route on the other side of this call.
             ...resultContext(model),
@@ -1513,9 +1521,10 @@ export default function Home() {
     answer(bmi.toFixed(1), `${weightInput} ${weightUnit}, ${heightDisplay} (BMI ${bmi.toFixed(1)})`);
   }
 
-  function tryExample(answers: Record<StepKey, string>) {
+  function tryExample(answers: Record<StepKey, string>, name: string) {
     setShowExampleMenu(false);
-    runModel(answers);
+    setUserName(name);
+    runModel(answers, name);
   }
 
   function buildResultEmail(): { subject: string; text: string } {
@@ -1716,26 +1725,28 @@ export default function Home() {
               <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ACCENT }} />
               Bone-health screening for postmenopausal women
             </div>
-            <h1 className="max-w-[880px] text-balance font-[family-name:var(--font-heading)] text-[2.85rem] font-bold leading-[1.02] tracking-[-0.035em] text-[#12211E] sm:text-6xl lg:text-[4.6rem]">
-              Know your bone{" "}
-              <span className="relative whitespace-nowrap" style={{ color: FRACTURE }}>
-                fracture
-                <span
-                  aria-hidden
-                  className="absolute inset-x-0 -bottom-1 h-[3px] rounded-full"
-                  style={{ backgroundColor: FRACTURE, opacity: 0.35 }}
-                />
-              </span>{" "}
-              risk
-              <br />
-              before you break something.
+            <h1 className="max-w-[880px] font-[family-name:var(--font-heading)] text-[2.85rem] font-bold leading-[1.02] tracking-[-0.035em] text-[#12211E] sm:text-6xl lg:text-[4.6rem]">
+              <span className="block">
+                Know your bone{" "}
+                <span className="relative whitespace-nowrap" style={{ color: FRACTURE }}>
+                  fracture
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-0 -bottom-1 h-[3px] rounded-full"
+                    style={{ backgroundColor: FRACTURE, opacity: 0.35 }}
+                  />
+                </span>{" "}
+                risk
+              </span>
+              <span className="block">before you break something.</span>
             </h1>
             <p className="mt-7 max-w-[600px] text-pretty text-lg leading-[1.6] text-[#41504C] sm:text-[19px]">
               <span className="block">Three minutes. An NHANES-trained model does the maths.</span>
               <span className="block">AI turns the result into plain English.</span>
             </p>
             <p className="mt-3 max-w-[600px] text-pretty text-[15px] leading-[1.6]" style={{ color: ACCENT }}>
-              Designed around bone changes after menopause. A bone-health tool built with women in mind.
+              <span className="block">Designed around bone changes after menopause.</span>
+              <span className="block">A bone-health tool built with women in mind.</span>
             </p>
             <div className="mt-9 flex flex-wrap justify-center gap-3.5">
               <button
@@ -1759,7 +1770,7 @@ export default function Home() {
                 {EXAMPLE_PATIENTS.map((patient) => (
                   <button
                     key={patient.id}
-                    onClick={() => tryExample(patient.answers)}
+                    onClick={() => tryExample(patient.answers, patient.name)}
                     className="flex flex-col items-start gap-0.5 rounded-[10px] border-[1.5px] border-[#C6CFCC] bg-white px-4 py-2.5 text-left transition-colors hover:border-[#0E7C6E]"
                   >
                     <span className="font-[family-name:var(--font-heading)] text-[14px] font-bold text-[#15181A]">
@@ -2964,7 +2975,7 @@ export default function Home() {
                   initial={reduceMotion ? false : { opacity: 0, x: 16 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.45, ease: EASE_OUT, delay: 0.15 }}
-                  className="flex h-[640px] flex-col rounded-2xl border border-[#E3E9E7] bg-white lg:sticky lg:top-8 lg:h-[calc(100vh-12rem)] lg:min-h-[420px]"
+                  className="flex h-[640px] flex-col rounded-2xl border border-[#E3E9E7] bg-white lg:sticky lg:top-0 lg:h-[calc(100vh-10rem)] lg:min-h-[420px]"
                 >
                   <div className="border-b border-[#E3E9E7] px-6 py-[18px]">
                     <div className="font-[family-name:var(--font-heading)] text-base font-bold">Ask about your result</div>
