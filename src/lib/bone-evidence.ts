@@ -195,6 +195,13 @@ export const EVIDENCE_SOURCES: EvidenceSource[] = [
     url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC6393106/",
     type: "systematic-review",
   },
+  {
+    id: "bhof-clinicians-guide-2022",
+    title: "The clinician's guide to prevention and treatment of osteoporosis",
+    publisher: "Osteoporosis International (Bone Health and Osteoporosis Foundation)",
+    url: "https://link.springer.com/article/10.1007/s00198-021-05900-y",
+    type: "guideline",
+  },
 ];
 
 export const EVIDENCE_CARDS: EvidenceCard[] = [
@@ -204,7 +211,7 @@ export const EVIDENCE_CARDS: EvidenceCard[] = [
     approvedWording:
       "A DXA scan measures bone density, but clinicians interpret it alongside fracture-risk factors and the wider health picture.",
     limits: "Do not call this estimated T-score a DXA result, diagnosis, or fracture-risk calculation.",
-    sourceIds: ["nhs-dxa", "nogg-2024"],
+    sourceIds: ["nhs-dxa", "nogg-2024", "bhof-clinicians-guide-2022"],
   },
   {
     id: "age",
