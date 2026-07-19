@@ -853,7 +853,7 @@ export default function Home() {
     const model = scoreBone(full, provided);
     setResult(model);
 
-    const scoreFallback = `Your estimated T-score is ${model.estimatedTScore}, with an uncertainty range of ${model.tScoreRange[0]} to ${model.tScoreRange[1]}. This is a screening estimate, not a DXA measurement or diagnosis.`;
+    const scoreFallback = `Your estimated T-score is ${model.estimatedTScore}. This is a screening estimate, not a DXA measurement or diagnosis.`;
     const implicationsFallback =
       model.category === "lower"
         ? "This result is reassuring, but it cannot decide on its own whether a scan is appropriate. Keep supporting your bone health and discuss screening at a routine GP visit if that is relevant to you."
@@ -1610,7 +1610,7 @@ export default function Home() {
       "",
       `BoneBot screening result: ${catMeta.label}`,
       "",
-      `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
+      `Estimated T-score: ${result.estimatedTScore}`,
       `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
       "",
       "What drove this result:",
@@ -1668,7 +1668,7 @@ export default function Home() {
                 <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5A6462;">${heading}</div>
                 <div style="margin-top:10px;font-size:34px;font-weight:700;color:${catMeta.color};">${escapeHtml(catMeta.label)}</div>
                 <div style="margin-top:14px;font-size:15px;line-height:1.6;color:#4A5452;">
-                  Estimated T-score: <strong>${result.estimatedTScore}</strong> (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]}) &mdash; ${escapeHtml(rangeText)} range.
+                  Estimated T-score: <strong>${result.estimatedTScore}</strong> &mdash; ${escapeHtml(rangeText)} range.
                 </div>
                 ${
                   rows
@@ -1855,8 +1855,6 @@ export default function Home() {
   const cat = result ? CATEGORY_MAP[result.category] : "low";
   const catMeta = CAT_META[cat];
   const marker = result ? markerPercent(result.estimatedTScore) : 50;
-  const rangeLeftPct = result ? markerPercent(result.tScoreRange[0]) : 50;
-  const rangeRightPct = result ? markerPercent(result.tScoreRange[1]) : 50;
   const reportedActivitySteps = parseDailyActivity(answers.averageDailySteps ?? "", 100_000);
   const reportedActivityMinutes = parseDailyActivity(answers.averageDailyActiveMinutes ?? "", 1_440);
 
@@ -2823,18 +2821,6 @@ export default function Home() {
                             <div className="w-1/3" style={{ backgroundColor: "#F0DFAE" }} />
                             <div className="w-1/3" style={{ backgroundColor: "#BFDDD3" }} />
                           </div>
-                          {/* Uncertainty range — the box, not just the point estimate. Draws in
-                              from the centre so the meter visibly resolves to your result. */}
-                          <motion.div
-                            initial={reduceMotion ? false : { left: "50%", width: 0, opacity: 0 }}
-                            animate={{
-                              left: `${rangeLeftPct}%`,
-                              width: `${Math.max(3, rangeRightPct - rangeLeftPct)}%`,
-                              opacity: 1,
-                            }}
-                            transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute top-0 h-3.5 rounded-full border-2 border-dashed border-[#4A5452]"
-                          />
                           <motion.div
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
@@ -2860,9 +2846,8 @@ export default function Home() {
                           ))}
                         </div>
                         <p className="mt-4 text-sm leading-[1.6] text-[#4A5452]">
-                          The dashed box is the uncertainty range — your true score most likely sits inside it. A
-                          T-score compares your bone density to a healthy young adult: 0 is average, and lower (more
-                          negative) means less dense bone.
+                          A T-score compares your bone density to a healthy young adult: 0 is average, and lower
+                          (more negative) means less dense bone.
                         </p>
                       </div>
                   </motion.div>
