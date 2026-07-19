@@ -222,17 +222,36 @@ so evaluation splits by what each model does:
 
 ## 5. Architecture: separate the prediction from the message
 
-Two distinct components, deliberately decoupled:
+Two distinct components, deliberately decoupled — as built and deployed:
 
-1. **Risk model (quantitative).** The calibrated classifier described above takes the
-   structured inputs and returns a probability + confidence + no-call flag, with
-   SHAP contributions for transparency. This is the part that is benchmarked and
-   validated.
-2. **Message-delivery layer (LLM).** A language model turns that numeric output into
-   a clear, non-alarming explanation for the user — comprehensive and informative,
-   assuming **no prior medical or biological knowledge**, and always ending in a
-   concrete next step (e.g. "worth asking your GP about a DXA scan"). It also drives
-   the natural-language intake in section 3b.
+1. **Risk models (quantitative).** Two linear models, both trained in
+   `model/train_bonebot.ipynb` on NHANES 2013-2014 with scikit-learn and exported as
+   plain coefficients into `model/model-parameters.ts`, which the app re-executes
+   directly as a TypeScript dot product — no separate Python service and no model
+   artifact loaded at runtime:
+   - A **logistic-regression triage gate** (`src/lib/triage-model.ts`, age + BMI +
+     menopausal status only) returns an estimated probability and a
+     `proceedToFullAssessment` flag against the locked threshold from
+     `docs/TRIAGE_THRESHOLD_AUDIT.md` (2%, chosen on validation only for >=95%
+     sensitivity, then audited once on a held-out split).
+   - A **Ridge regression** over the full feature set (`src/lib/bone-model.ts`)
+     returns an estimated T-score, a 95% prediction interval, a three-band
+     `elevated / uncertain / lower` category, and per-factor contributions computed
+     as signed linear terms (`coefficient x value`) — not SHAP. `"uncertain"` is the
+     de facto no-call state, replacing an earlier hard `T <= -2.5` cutoff that
+     over-flagged.
+   This is the part that is benchmarked and validated (§4d).
+2. **Message-delivery layer (LLM).** A language model (`src/app/api/assistant/route.ts`,
+   via the Vercel AI SDK) receives only the finished numeric output above — plus a
+   fixed, clinician-approved evidence-card library it may cite from — and turns it
+   into a clear, non-alarming explanation for the user — comprehensive and
+   informative, assuming **no prior medical or biological knowledge**, and always
+   ending in a concrete next step (e.g. "worth asking your GP about a DXA scan").
+   Every claim it makes is checked server-side against the cited evidence before
+   being shown. It also drives the natural-language intake in section 3b. The
+   result-email step is deliberately *not* LLM-generated: it is a static,
+   client-built template (the user's own model output plus a hardcoded general
+   risk-factor list and resource links) sent verbatim through a thin proxy.
 
 Keeping these separate matters: the LLM never invents the risk number, and the risk
 number never reaches the user as a bare, frightening figure. The model is
@@ -354,8 +373,7 @@ This is a research benchmark and a screening-triage demonstrator — **not a med
 device and not a diagnosis**. Every prediction routes back to a clinician and a DXA
 scan. Limitations (cross-sectional single-cycle data, self-reported fields, small n
 after the multimodal intersection, reference-population assumptions, and the wearable
-selection issues discussed above) are documented in limitations.md and reported
-honestly rather than hidden.
+selection issues discussed above) are reported honestly rather than hidden.
 
 ---
 
