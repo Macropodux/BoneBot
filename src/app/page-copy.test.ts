@@ -6,7 +6,7 @@ const model = readFileSync(new URL("../lib/bone-model.ts", import.meta.url), "ut
 
 describe("landing and questionnaire copy", () => {
   it("uses clear landing language and removes superseded claims", () => {
-    expect(page).toContain("Know your bone risk{\" \"}");
+    expect(page).toContain("Know your bone fracture risk{\" \"}");
     expect(page).toContain(">before</em> you break something.");
     expect(page).toContain("Three minutes. An NHANES-trained model does the maths. AI turns the result into plain English.");
     expect(page).toContain("Designed around bone changes after menopause. A bone-health tool built with women in mind.");

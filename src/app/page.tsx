@@ -1211,9 +1211,19 @@ export default function Home() {
     start();
   }
 
-  // Optional voice playback of BoneBot's reply via the existing /api/tts
-  // route — silent, best-effort; never blocks the conversation if
-  // ElevenLabs is unavailable (see AGENTS.md "degrade gracefully").
+  // Free, keyless fallback when ElevenLabs is unavailable (missing key,
+  // upstream error, no credits) — the browser's own speech synthesis, same
+  // spirit as the SpeechRecognition mic input already used for voice input.
+  function speakWithBrowser(text: string) {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  }
+
+  // Voice playback of BoneBot's reply — ElevenLabs via /api/tts first (higher
+  // quality), falling back to the browser's built-in speech synthesis if the
+  // key is missing/invalid or ElevenLabs errors. Never blocks the
+  // conversation either way (see AGENTS.md "degrade gracefully").
   async function speak(text: string) {
     if (!voiceEnabled) return;
     try {
@@ -1222,14 +1232,17 @@ export default function Home() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ text }),
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        speakWithBrowser(text);
+        return;
+      }
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audio.onended = () => URL.revokeObjectURL(url);
       void audio.play().catch(() => {});
     } catch {
-      /* TTS is optional — silent fallback. */
+      speakWithBrowser(text);
     }
   }
 
@@ -2340,12 +2353,12 @@ export default function Home() {
             className="sticky top-0 z-20 flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 sm:px-12"
             style={{ borderBottom: `1px solid ${LANDING_BORDER}`, backgroundColor: LANDING_BG }}
           >
-            <div className={`${LANDING_HEADING_FONT} text-[19px] font-bold tracking-[-0.02em]`} style={{ color: LANDING_INK }}>
+            <div className={`${LANDING_HEADING_FONT} text-[26px] font-bold tracking-[-0.02em]`} style={{ color: LANDING_INK }}>
               Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
             </div>
             <button
               onClick={startClassic}
-              className={`${LANDING_HEADING_FONT} ml-auto inline-flex min-h-[48px] items-center justify-center rounded-full px-[26px] text-[16px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
+              className={`${LANDING_HEADING_FONT} ml-auto inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
               style={{ backgroundColor: LANDING_ACCENT }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT)}
@@ -2368,7 +2381,7 @@ export default function Home() {
                 className={`${LANDING_HEADING_FONT} text-balance text-[clamp(42px,6.5vw,84px)] font-[480] leading-[1.04] tracking-[-0.015em]`}
                 style={{ color: LANDING_INK, fontOpticalSizing: "auto" }}
               >
-                Know your bone risk{" "}
+                Know your bone fracture risk{" "}
                 <em style={{ color: LANDING_ACCENT }}>before</em> you break something.
               </h1>
               <p className="m-0 max-w-[620px] text-pretty text-[clamp(19px,1.6vw,22px)] leading-[1.6]" style={{ color: LANDING_BODY }}>
@@ -2702,10 +2715,19 @@ export default function Home() {
                       type="button"
                       onClick={() => (micListening ? stopMic() : startMic((t) => { setNameInput(t); submitName(t); }))}
                       aria-label={micListening ? "Stop listening" : "Answer by voice"}
-                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-colors"
+                      className="group relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-white shadow-sm ring-1 ring-inset ring-white/20 transition-all duration-150 hover:brightness-110 active:scale-95"
                       style={{ backgroundColor: micListening ? "#B0442F" : ACCENT }}
                     >
-                      <span aria-hidden>{micListening ? "⏹" : "🎤"}</span>
+                      {micListening && (
+                        <span
+                          aria-hidden
+                          className="absolute inset-0 rounded-full"
+                          style={{ boxShadow: "0 0 0 4px rgba(176,68,47,0.18)" }}
+                        />
+                      )}
+                      <span aria-hidden className="text-[15px] leading-none">
+                        {micListening ? "⏹" : "🎤"}
+                      </span>
                     </button>
                   )}
                   <button
@@ -3108,69 +3130,79 @@ export default function Home() {
                 pendingRecentDxaAnswers === null &&
                 step.key !== "weight" && (
                 <div className="flex flex-col gap-2.5">
-                  {/* Questions with chip options (Yes/No, etc.) are answered
-                      by tapping a chip only — free typing is reserved for
-                      questions that have no chips to pick from. */}
-                  {step.options.length === 0 && (
-                    <form
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        void submitFreeInput();
-                      }}
-                      className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E6E62]"
-                    >
-                      <input
-                        ref={freeInputRef}
-                        // Age has no valid non-numeric answer (unlike dxaScore/
-                        // dxaYear/menopause, which also accept a typed "not
-                        // sure"/"unknown"), so it's the one free-text step
-                        // that can safely be restricted to digits only.
-                        type={step.key === "age" || isActivityStep(step.key) ? "number" : "text"}
-                        inputMode={step.key === "age" || isActivityStep(step.key) ? "numeric" : undefined}
-                        value={freeInput}
-                        onChange={(event) => setFreeInput(event.target.value)}
-                        placeholder={
-                          step.key === "age"
-                            ? "Type your age in years"
-                            : step.key === "averageDailySteps"
-                              ? "Average steps per day"
-                              : step.key === "averageDailyActiveMinutes"
-                                ? "Average active minutes per day"
+                  {/* The input bar (with voice) stays visible even for chip
+                      questions (Yes/No, etc.) so it doesn't disappear whenever
+                      a multiple-choice step comes up — normaliseFreeAnswer()
+                      already resolves typed/spoken "yes"/"no" for these. */}
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void submitFreeInput();
+                    }}
+                    className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E6E62]"
+                  >
+                    <input
+                      ref={freeInputRef}
+                      // Age has no valid non-numeric answer (unlike dxaScore/
+                      // dxaYear/menopause, which also accept a typed "not
+                      // sure"/"unknown"), so it's the one free-text step
+                      // that can safely be restricted to digits only.
+                      type={step.key === "age" || isActivityStep(step.key) ? "number" : "text"}
+                      inputMode={step.key === "age" || isActivityStep(step.key) ? "numeric" : undefined}
+                      value={freeInput}
+                      onChange={(event) => setFreeInput(event.target.value)}
+                      placeholder={
+                        step.key === "age"
+                          ? "Type your age in years"
+                          : step.key === "averageDailySteps"
+                            ? "Average steps per day"
+                            : step.key === "averageDailyActiveMinutes"
+                              ? "Average active minutes per day"
+                              : step.options.length > 0
+                                ? "Or type/speak your answer"
                                 : "Type your answer, or ask a bone-health question"
-                        }
-                        aria-label="Answer or ask a bone-health question"
-                        disabled={flowQuestionBusy || extracting || micListening}
-                        className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
-                      />
-                      {micSupported && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            micListening
-                              ? stopMic()
-                              : startMic((t) => {
-                                  setFreeInput(t);
-                                  void submitFreeInput(t);
-                                })
-                          }
-                          disabled={flowQuestionBusy || extracting}
-                          aria-label={micListening ? "Stop listening" : "Answer by voice"}
-                          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-colors disabled:opacity-50"
-                          style={{ backgroundColor: micListening ? "#B0442F" : ACCENT }}
-                        >
-                          <span aria-hidden>{micListening ? "⏹" : "🎤"}</span>
-                        </button>
-                      )}
+                      }
+                      aria-label="Answer or ask a bone-health question"
+                      disabled={flowQuestionBusy || extracting || micListening}
+                      className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
+                    />
+                    {micSupported && (
                       <button
-                        type="submit"
-                        disabled={flowQuestionBusy || extracting || !freeInput.trim()}
-                        className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-fraunces)] text-sm font-bold text-white disabled:opacity-40"
-                        style={{ backgroundColor: ACCENT }}
+                        type="button"
+                        onClick={() =>
+                          micListening
+                            ? stopMic()
+                            : startMic((t) => {
+                                setFreeInput(t);
+                                void submitFreeInput(t);
+                              })
+                        }
+                        disabled={flowQuestionBusy || extracting}
+                        aria-label={micListening ? "Stop listening" : "Answer by voice"}
+                        className="group relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-white shadow-sm ring-1 ring-inset ring-white/20 transition-all duration-150 hover:brightness-110 active:scale-95 disabled:opacity-50"
+                        style={{ backgroundColor: micListening ? "#B0442F" : ACCENT }}
                       >
-                        Send
+                        {micListening && (
+                          <span
+                            aria-hidden
+                            className="absolute inset-0 rounded-full"
+                            style={{ boxShadow: "0 0 0 4px rgba(176,68,47,0.18)" }}
+                          />
+                        )}
+                        <span aria-hidden className="text-[15px] leading-none">
+                          {micListening ? "⏹" : "🎤"}
+                        </span>
                       </button>
-                    </form>
-                  )}
+                    )}
+                    <button
+                      type="submit"
+                      disabled={flowQuestionBusy || extracting || !freeInput.trim()}
+                      className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-fraunces)] text-sm font-bold text-white disabled:opacity-40"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      Send
+                    </button>
+                  </form>
 
                   {SKIPPABLE[step.key] && step.key !== "bloodResults" && (
                     <button
