@@ -37,7 +37,6 @@ import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
 import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-parameters";
 import FloatingBones from "./FloatingBones";
-import VoiceScreen from "./VoiceScreen";
 import { THEME, HEADING_FONT, BODY_FONT } from "@/lib/editorial-theme";
 
 // "Vital Bloom" brand — Emre, 2026-07-19: magenta/violet rebrand. Being
@@ -692,7 +691,7 @@ function AnimatedNumber({
 }
 
 export default function Home() {
-  const [screen, setScreen] = useState<"landing" | "chat" | "results" | "voice">("landing");
+  const [screen, setScreen] = useState<"landing" | "chat" | "results">("landing");
   const [showExampleMenu, setShowExampleMenu] = useState(false);
   // Which demo patient is currently loading (runModel's score/implications/
   // summary calls take a beat) — drives the spinner on that one chip so
@@ -1978,14 +1977,7 @@ export default function Home() {
                 </button>
               </div>
               <p className="m-0 text-[15px]" style={{ color: LANDING_MUTED }}>
-                No account. No forms. About 3 minutes.{" "}
-                <button
-                  onClick={() => setScreen("voice")}
-                  className="font-semibold underline decoration-1 underline-offset-2 transition-colors"
-                  style={{ color: LANDING_ACCENT }}
-                >
-                  Prefer to talk? Try voice screening.
-                </button>
+                No account. No forms. About 3 minutes.
               </p>
               {showExampleMenu && (
                 <motion.div
@@ -2165,8 +2157,6 @@ export default function Home() {
           </section>
         </div>
       )}
-
-      {screen === "voice" && <VoiceScreen onExit={goToLanding} />}
 
       {screen === "chat" && (
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#FAF7F2]">
