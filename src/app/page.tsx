@@ -99,25 +99,52 @@ const MENOPAUSE_AGE_MIDPOINT: Record<string, number> = { "Before 40": 35, "40–
 const MENOPAUSE_STATUS = { Yes: "yes", No: "no", "Not sure": "not-sure" } as const;
 const FULL_QUESTION_START = 7;
 
+// Free-text questions the user is allowed to skip with a button instead of
+// typing. A skipped answer is stored as "Not sure" → the model uses its
+// published population-average default and the field is NOT counted as a
+// personal driver of the result (see mapAnswersToFeatures / scoreBone).
+// Age and the gate/routing questions are required and never appear here.
+const SKIPPABLE: Partial<Record<StepKey, true>> = {
+  menopause: true,
+  fracture: true,
+  parent: true,
+  smoke: true,
+  steroids: true,
+  bloodResults: true,
+  weight: true,
+};
+
 const LOW_RISK_GUIDANCE = [
   "Keep active with weight-bearing and muscle-strengthening activity that feels safe and suitable for you.",
   "Avoid smoking. If you smoke, getting support to stop benefits your overall health as well as your bones.",
   "Keep high alcohol intake low. If your health changes or you have a fracture after a minor fall, speak with a clinician.",
 ] as const;
 
-function mapAnswersToFeatures(answers: Record<StepKey, string>, bloodResults: UploadedBloodResults | null): BoneFeatures {
+// Returns the feature vector plus the subset of feature keys the user actually
+// answered. Everything not in `provided` was imputed (skipped, "not sure", or
+// never asked in this short flow) and must not be shown as a personal driver of
+// the result — see scoreBone().
+function mapAnswersToFeatures(
+  answers: Record<StepKey, string>,
+  bloodResults: UploadedBloodResults | null,
+): { features: BoneFeatures; provided: Array<keyof BoneFeatures> } {
   const parsedAge = Number(answers.age);
   const age = Number.isFinite(parsedAge) ? parsedAge : AGE_MIDPOINT[answers.age] ?? 65;
   const parsedMenopauseAge = Number(answers.menopause);
+  const menopauseKnown =
+    Number.isFinite(parsedMenopauseAge) ||
+    (answers.menopause in MENOPAUSE_AGE_MIDPOINT && answers.menopause !== "Not sure");
   const menopauseAge = Number.isFinite(parsedMenopauseAge)
     ? parsedMenopauseAge
     : MENOPAUSE_AGE_MIDPOINT[answers.menopause] ?? 48;
+  const isYesNo = (answer: string) => answer === "Yes" || answer === "No";
   const answerOrDefault = (answer: string, defaultValue: number) =>
     answer === "Yes" ? true : answer === "No" ? false : Boolean(defaultValue);
   const parsedBmi = Number(answers.weight);
-  return {
+
+  const features: BoneFeatures = {
     age,
-    yearsSinceMenopause: Number.isFinite(parsedMenopauseAge)
+    yearsSinceMenopause: menopauseKnown
       ? Math.max(0, age - menopauseAge)
       : tScoreModel.imputationDefaults.yearsSinceMenopause,
     priorFragilityFracture: answerOrDefault(answers.fracture, tScoreModel.imputationDefaults.priorFragilityFracture),
@@ -131,6 +158,18 @@ function mapAnswersToFeatures(answers: Record<StepKey, string>, bloodResults: Up
     vitaminD: bloodResults?.vitaminD ?? FIELD_DEFAULTS.vitaminD,
     calcium: bloodResults?.calcium ?? FIELD_DEFAULTS.calcium,
   };
+
+  const provided: Array<keyof BoneFeatures> = ["age"];
+  if (menopauseKnown) provided.push("yearsSinceMenopause");
+  if (isYesNo(answers.fracture)) provided.push("priorFragilityFracture");
+  if (isYesNo(answers.parent)) provided.push("parentalHipFracture");
+  if (isYesNo(answers.smoke)) provided.push("currentSmoker");
+  if (isYesNo(answers.steroids)) provided.push("glucocorticoids");
+  if (Number.isFinite(parsedBmi)) provided.push("bmi");
+  if (bloodResults?.vitaminD != null) provided.push("vitaminD");
+  if (bloodResults?.calcium != null) provided.push("calcium");
+
+  return { features, provided };
 }
 
 const CATEGORY_MAP = { lower: "low", uncertain: "moderate", elevated: "elevated" } as const;
@@ -209,6 +248,45 @@ function resultContext(model: ModelOutput) {
     category: model.category,
     contributions: model.contributions,
   };
+}
+
+const activityLabel = (level: number) => (level < 0.34 ? "Low" : level < 0.67 ? "Moderate" : "High");
+
+// The actual value BoneBot used for each factor, plus — where docs/
+// INPUT_SPEC.md defines one — the reference range, so "+2.3" isn't just an
+// abstract number: you can see whether your own value is high, low, or
+// typical before you see how it moved the estimate.
+function factorDetail(factorLabel: string, f: BoneFeatures): { value: string; reference?: string } {
+  switch (factorLabel) {
+    case "Age":
+      return { value: `${f.age} years` };
+    case "Years since menopause":
+      return { value: `${f.yearsSinceMenopause} years` };
+    case "Hormone therapy":
+      return { value: f.onHormoneTherapy ? "Currently on hormone therapy" : "Not on hormone therapy" };
+    case "Prior fragility fracture":
+      return { value: f.priorFragilityFracture ? "Yes, since age 50" : "None reported" };
+    case "Body mass index":
+      return { value: `BMI ${f.bmi}`, reference: "normal range 18.5–25" };
+    case "Weight-bearing activity":
+      return { value: `${activityLabel(f.weightBearingActivity)} activity`, reference: "higher is more protective" };
+    case "Current smoker":
+      return { value: f.currentSmoker ? "Yes" : "No" };
+    case "Parental hip fracture":
+      return { value: f.parentalHipFracture ? "Yes" : "No" };
+    case "Glucocorticoid use":
+      return { value: f.glucocorticoids ? "Yes, 3+ months" : "None reported" };
+    case "Rheumatoid arthritis":
+      return { value: f.rheumatoidArthritis ? "Yes" : "No" };
+    case "High alcohol intake":
+      return { value: f.highAlcohol ? "3+ units/day" : "Below 3 units/day" };
+    case "Vitamin D":
+      return { value: `${f.vitaminD} nmol/L`, reference: "sufficient 50–125, deficient below 30" };
+    case "Serum calcium":
+      return { value: `${f.calcium} mmol/L`, reference: "normal range 2.2–2.6" };
+    default:
+      return { value: "" };
+  }
 }
 
 // Five reputable, evidence-based patient resources — shown as a brief plus a
@@ -361,6 +439,9 @@ export default function Home() {
   const [clarificationCounts, setClarificationCounts] = useState<Partial<Record<StepKey, number>>>({});
   const [unresolvedAnswerCount, setUnresolvedAnswerCount] = useState(0);
   const [uncertaintyNotes, setUncertaintyNotes] = useState<string[]>([]);
+  const [emailAddress, setEmailAddress] = useState("");
+  const [emailSendState, setEmailSendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [emailSendError, setEmailSendError] = useState("");
   // Feature 2 — busy flag while /api/extract is proposing a candidate value
   // for an otherwise-unparseable free-text answer.
   const [extracting, setExtracting] = useState(false);
@@ -381,6 +462,7 @@ export default function Home() {
 
   const chatRef = useRef<HTMLDivElement>(null);
   const qaRef = useRef<HTMLDivElement>(null);
+  const emailSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
@@ -426,9 +508,9 @@ export default function Home() {
   }
 
   async function runModel(all: Record<StepKey, string>) {
-    const full = mapAnswersToFeatures(all, bloodResults);
+    const { features: full, provided } = mapAnswersToFeatures(all, bloodResults);
     setFeatures(full);
-    const model = scoreBone(full);
+    const model = scoreBone(full, provided);
     setResult(model);
 
     const scoreFallback = `Your estimated T-score is ${model.estimatedTScore}, with an uncertainty range of ${model.tScoreRange[0]} to ${model.tScoreRange[1]}. This is a screening estimate, not a DXA measurement or diagnosis.`;
@@ -724,6 +806,14 @@ export default function Home() {
     setMessages((items) => [...items, { role: "bot", text }]);
   }
 
+  function skipStep() {
+    const step = STEPS[stepIdx];
+    if (typing || flowQuestionBusy || !SKIPPABLE[step.key]) return;
+    // "Not sure"/"Skip" both route to the model's published default in
+    // mapAnswersToFeatures and leave the field out of the shown drivers.
+    answer(step.key === "bloodResults" ? "Skip" : "Not sure", "Skipped this question");
+  }
+
   // Feature 1 — the image extraction only ever PROPOSES vitaminD/calcium.
   // When either is present, hold them in pendingBloodResults and show a
   // confirm/edit/skip step; only a user action calls setBloodResults(), which
@@ -876,29 +966,53 @@ export default function Home() {
     runModel(EXAMPLE_ANSWERS);
   }
 
-  // No backend involved on purpose: this opens her own email app with the
-  // result pre-filled. No new dependency, no API key, works immediately —
-  // a server-sent email would need both and neither exists yet.
-  function emailResultHref(): string {
-    if (!result) return "";
-    const lines = [
-      `BoneBot screening result — ${catMeta.label}`,
-      "",
-      `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
-      `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
-      "",
-      "What drove this result:",
-      ...result.contributions
-        .slice(0, 5)
-        .map((f) => `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}`),
-      "",
-      "This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score — please discuss this result with your GP or clinician.",
-      "",
-      "— BoneBot, Hack-Nation 6th Global AI Hackathon",
-    ];
-    const subject = encodeURIComponent(`My BoneBot bone-health screening result — ${catMeta.label}`);
-    const body = encodeURIComponent(lines.join("\n"));
-    return `mailto:?subject=${subject}&body=${body}`;
+  function buildResultEmail(): { subject: string; text: string } {
+    const lines = result
+      ? [
+          `BoneBot screening result — ${catMeta.label}`,
+          "",
+          `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
+          `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
+          "",
+          "What drove this result:",
+          ...result.contributions.slice(0, 5).map((f) => {
+            const detail = features ? factorDetail(f.factor, features) : { value: "" };
+            const valueNote = detail.value ? ` (${detail.value})` : "";
+            return `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}${valueNote}`;
+          }),
+          "",
+          "This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score — please discuss this result with your GP or clinician.",
+          "",
+          "— BoneBot, Hack-Nation 6th Global AI Hackathon",
+        ]
+      : [];
+    return {
+      subject: `My BoneBot bone-health screening result — ${catMeta.label}`,
+      text: lines.join("\n"),
+    };
+  }
+
+  async function sendResultEmail() {
+    if (!emailAddress.trim() || emailSendState === "sending") return;
+    setEmailSendState("sending");
+    setEmailSendError("");
+    try {
+      const { subject, text } = buildResultEmail();
+      const r = await fetch("/api/send-result", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ to: emailAddress.trim(), subject, text }),
+      });
+      if (r.ok) {
+        setEmailSendState("sent");
+      } else {
+        setEmailSendError(await r.text());
+        setEmailSendState("error");
+      }
+    } catch {
+      setEmailSendError("Couldn't send that email right now.");
+      setEmailSendState("error");
+    }
   }
 
   function restart() {
@@ -931,6 +1045,9 @@ export default function Home() {
     setHeightFtInput("");
     setHeightInInput("");
     setBmiError("");
+    setEmailAddress("");
+    setEmailSendState("idle");
+    setEmailSendError("");
   }
 
   async function qaAsk(q: string) {
@@ -1285,6 +1402,17 @@ export default function Home() {
                     </button>
                   </form>
 
+                  {SKIPPABLE[step.key] && step.key !== "bloodResults" && (
+                    <button
+                      type="button"
+                      onClick={skipStep}
+                      disabled={flowQuestionBusy}
+                      className="self-end text-[13px] font-semibold text-[#5A6462] underline underline-offset-2 hover:text-[#0E7C6E] disabled:opacity-40"
+                    >
+                      Skip this question
+                    </button>
+                  )}
+
                   {step.key === "bloodResults" && (
                     <div className="flex flex-col gap-2.5">
                       <label
@@ -1437,12 +1565,12 @@ export default function Home() {
             <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
               Screening flag — not a diagnosis
             </div>
-            <a
-              href={emailResultHref()}
+            <button
+              onClick={() => emailSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
               className="hidden items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E] sm:flex"
             >
               <span aria-hidden>✉️</span> Email this result
-            </a>
+            </button>
             <button
               onClick={restart}
               className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
@@ -1559,15 +1687,16 @@ export default function Home() {
                   <p className="mb-5 text-[13px] leading-[1.5] text-[#5A6462]">
                     Each bar is how much that factor pushed your estimate — <span style={{ color: ACCENT }}>green pushes it up (better)</span>, <span style={{ color: "#B0442F" }}>red pushes it down</span>. Longer bar, bigger effect.
                   </p>
-                  <div className="flex flex-col gap-3.5">
+                  <div className="flex flex-col gap-4">
                     {(() => {
                       const maxAbs = Math.max(...result.contributions.map((f) => Math.abs(f.contribution)), 0.1);
                       return result.contributions.map((f) => {
                         const isPositive = f.direction === "raises";
                         const widthPct = Math.max(4, Math.round((Math.abs(f.contribution) / maxAbs) * 100));
+                        const detail = features ? factorDetail(f.factor, features) : { value: "" };
                         return (
                           <div key={f.factor}>
-                            <div className="mb-1 flex items-baseline justify-between gap-3 text-[13.5px]">
+                            <div className="flex items-baseline justify-between gap-3 text-[13.5px]">
                               <span className="text-[#15181A]">{f.factor}</span>
                               <span
                                 className="font-[family-name:var(--font-heading)] font-bold"
@@ -1577,6 +1706,12 @@ export default function Home() {
                                 {f.contribution.toFixed(1)}
                               </span>
                             </div>
+                            {detail.value && (
+                              <div className="mb-1.5 text-[12.5px]">
+                                <span className="font-medium text-[#4A5452]">{detail.value}</span>
+                                {detail.reference && <span className="text-[#9AA5A2]"> · {detail.reference}</span>}
+                              </div>
+                            )}
                             <div className="h-2 overflow-hidden rounded-full bg-[#F0F2F1]">
                               <div
                                 className="h-full rounded-full"
@@ -1592,8 +1727,8 @@ export default function Home() {
                     })()}
                   </div>
                   <div className="mt-5 text-[13px] leading-[1.5] text-[#5A6462]">
-                    Weights follow established clinical and NHANES-derived risk factors — only the factors that
-                    measurably moved this estimate are shown above.
+                    Weights follow established clinical and NHANES-derived risk factors. Only factors you
+                    answered are shown — anything you skipped uses a population average and is left out here.
                   </div>
                 </div>
 
@@ -1684,22 +1819,52 @@ export default function Home() {
                   </div>
                 )}
 
-                <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-[#E3E9E7] bg-white px-7 py-6 sm:flex-row sm:items-center sm:px-8">
-                  <div>
-                    <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
-                      Keep a copy of this result
-                    </div>
-                    <div className="mt-0.5 text-[13px] text-[#5A6462]">
-                      Email it to yourself, or bring it to your GP appointment.
-                    </div>
+                <div ref={emailSectionRef} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-6 sm:px-8">
+                  <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
+                    Keep a copy of this result
                   </div>
-                  <a
-                    href={emailResultHref()}
-                    className="flex items-center gap-2 whitespace-nowrap rounded-[9px] px-5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white"
-                    style={{ backgroundColor: ACCENT }}
-                  >
-                    <span aria-hidden>✉️</span> Email this result
-                  </a>
+                  <div className="mt-0.5 text-[13px] text-[#5A6462]">
+                    We&apos;ll email it to you — bring it to your GP appointment.
+                  </div>
+
+                  {emailSendState === "sent" ? (
+                    <p className="mt-4 flex items-center gap-2 text-sm font-semibold" style={{ color: ACCENT }}>
+                      <span aria-hidden>✓</span> Sent to {emailAddress}.
+                    </p>
+                  ) : (
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void sendResultEmail();
+                      }}
+                      className="mt-4 flex flex-col gap-2 sm:flex-row"
+                    >
+                      <input
+                        type="email"
+                        required
+                        value={emailAddress}
+                        onChange={(event) => {
+                          setEmailAddress(event.target.value);
+                          if (emailSendState === "error") setEmailSendState("idle");
+                        }}
+                        placeholder="you@example.com"
+                        aria-label="Your email address"
+                        disabled={emailSendState === "sending"}
+                        className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E] disabled:opacity-50"
+                      />
+                      <button
+                        type="submit"
+                        disabled={emailSendState === "sending" || !emailAddress.trim()}
+                        className="flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] px-5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-50"
+                        style={{ backgroundColor: ACCENT }}
+                      >
+                        <span aria-hidden>✉️</span> {emailSendState === "sending" ? "Sending…" : "Email this result"}
+                      </button>
+                    </form>
+                  )}
+                  {emailSendState === "error" && (
+                    <p className="mt-2 text-sm text-[#B0442F]">{emailSendError || "Couldn't send that email right now."}</p>
+                  )}
                 </div>
 
                 <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
