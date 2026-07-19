@@ -879,6 +879,11 @@ export default function Home() {
   const convChatRef = useRef<HTMLDivElement>(null);
   const convInputRef = useRef<HTMLInputElement>(null);
   const speechRecognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  // Synchronous re-entrancy lock: setAwaitingName(false) is async, so a fast
+  // double name-submit (Enter + click within the same tick) would otherwise run
+  // beginQuestions() twice and print the first question ("assigned female at
+  // birth?") twice. A ref flips immediately, so the second call bails.
+  const questionsStartedRef = useRef(false);
 
   useEffect(() => {
     // stepIdx (not just messages/typing) because the chip row now renders
@@ -938,12 +943,14 @@ export default function Home() {
     setUserName("");
     setNameInput("");
     setAwaitingName(true);
+    questionsStartedRef.current = false;
     botSay("Hi, I'm BoneBot 👋 Before we start — what should I call you?");
   }
 
   function submitName() {
     const name = nameInput.trim();
-    if (!name) return;
+    if (!name || questionsStartedRef.current) return;
+    questionsStartedRef.current = true;
     setMessages((m) => [...m, { role: "user", text: name }]);
     setUserName(name);
     setNameInput("");
