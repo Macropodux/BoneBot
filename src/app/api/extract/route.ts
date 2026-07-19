@@ -35,9 +35,9 @@ const YES_NO_FIELDS = new Set([
   "existingCare",
   "knowsDxa",
   "fracture",
-  "parent",
   "smoke",
   "steroids",
+  "secondaryCondition",
 ]);
 
 // Numeric fields. normaliseFreeAnswer() expects a plain number (or year) as
@@ -45,6 +45,32 @@ const YES_NO_FIELDS = new Set([
 const NUMERIC_FIELDS = new Set(["age", "dxaScore", "dxaYear", "menopause", "weight"]);
 
 function fieldGuidance(fieldKey: string): string {
+  // Prior-fragility-fracture field: only a LOW-trauma fracture (fall from
+  // standing height or less, a minor bump) counts as a fragility fracture.
+  // A HIGH-trauma fracture (car accident, sports injury, major fall from
+  // height, other high-impact cause) is not one, even though a fracture did
+  // happen — so it must extract as "No".
+  if (fieldKey === "fracture") {
+    return (
+      "This is a yes/no question about prior FRAGILITY fractures specifically, not any fracture. Return exactly " +
+      '"Yes" only if the reply describes a fracture from a LOW-trauma event — a fall from standing height or ' +
+      'less, or a minor bump or knock. Return exactly "No" if the reply describes a fracture from a HIGH-trauma ' +
+      "event — a car accident, a sports injury, a major fall from height, or another high-impact cause — because " +
+      'that is NOT a fragility fracture, even though a bone did break (example: "broke my arm in a car accident" ' +
+      '-> "No"). Also return "No" for clear negations such as "no", "never", "none", or "don\'t have any". Return ' +
+      "null only if the reply truly does not address the question at all."
+    );
+  }
+  // Secondary-cause-of-bone-loss field: only thyroid disease or chronic
+  // kidney disease count here (coeliac disease is not part of this model).
+  if (fieldKey === "secondaryCondition") {
+    return (
+      "This is a yes/no question about secondary causes of bone loss. Return exactly \"Yes\" only if the reply " +
+      "mentions thyroid disease (including an overactive thyroid / hyperthyroidism) or chronic kidney disease. " +
+      'Return exactly "No" if the reply denies having either, or mentions only an unrelated condition. Return ' +
+      "null only if the reply truly does not address the question at all."
+    );
+  }
   if (YES_NO_FIELDS.has(fieldKey)) {
     return (
       "This is a yes/no risk-factor question. Treat ANY affirmative reply — including qualified, hedged, or " +
