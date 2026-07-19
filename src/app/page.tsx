@@ -49,7 +49,7 @@ const STEPS: Step[] = [
   { key: "parent", q: "Did either of your parents ever fracture a hip?", options: [] },
   { key: "smoke", q: "Do you currently smoke?", options: [] },
   { key: "steroids", q: "Have you ever taken corticosteroids (like prednisone) for 3 months or more?", options: [] },
-  { key: "bloodResults", q: "If you have blood-test results, upload an image now. Otherwise, type skip to continue.", options: [] },
+  { key: "bloodResults", q: "If you have blood-test results, upload an image now — or skip this question to continue.", options: [] },
   { key: "weight", q: "Is your weight under 57 kg (about 125 lb)?", options: [] },
 ];
 
@@ -99,24 +99,51 @@ const MENOPAUSE_AGE_MIDPOINT: Record<string, number> = { "Before 40": 35, "40–
 const MENOPAUSE_STATUS = { Yes: "yes", No: "no", "Not sure": "not-sure" } as const;
 const FULL_QUESTION_START = 7;
 
+// Free-text questions the user is allowed to skip with a button instead of
+// typing. A skipped answer is stored as "Not sure" → the model uses its
+// published population-average default and the field is NOT counted as a
+// personal driver of the result (see mapAnswersToFeatures / scoreBone).
+// Age and the gate/routing questions are required and never appear here.
+const SKIPPABLE: Partial<Record<StepKey, true>> = {
+  menopause: true,
+  fracture: true,
+  parent: true,
+  smoke: true,
+  steroids: true,
+  bloodResults: true,
+  weight: true,
+};
+
 const LOW_RISK_GUIDANCE = [
   "Keep active with weight-bearing and muscle-strengthening activity that feels safe and suitable for you.",
   "Avoid smoking. If you smoke, getting support to stop benefits your overall health as well as your bones.",
   "Keep high alcohol intake low. If your health changes or you have a fracture after a minor fall, speak with a clinician.",
 ] as const;
 
-function mapAnswersToFeatures(answers: Record<StepKey, string>, bloodResults: UploadedBloodResults | null): BoneFeatures {
+// Returns the feature vector plus the subset of feature keys the user actually
+// answered. Everything not in `provided` was imputed (skipped, "not sure", or
+// never asked in this short flow) and must not be shown as a personal driver of
+// the result — see scoreBone().
+function mapAnswersToFeatures(
+  answers: Record<StepKey, string>,
+  bloodResults: UploadedBloodResults | null,
+): { features: BoneFeatures; provided: Array<keyof BoneFeatures> } {
   const parsedAge = Number(answers.age);
   const age = Number.isFinite(parsedAge) ? parsedAge : AGE_MIDPOINT[answers.age] ?? 65;
   const parsedMenopauseAge = Number(answers.menopause);
+  const menopauseKnown =
+    Number.isFinite(parsedMenopauseAge) ||
+    (answers.menopause in MENOPAUSE_AGE_MIDPOINT && answers.menopause !== "Not sure");
   const menopauseAge = Number.isFinite(parsedMenopauseAge)
     ? parsedMenopauseAge
     : MENOPAUSE_AGE_MIDPOINT[answers.menopause] ?? 48;
+  const isYesNo = (answer: string) => answer === "Yes" || answer === "No";
   const answerOrDefault = (answer: string, defaultValue: number) =>
     answer === "Yes" ? true : answer === "No" ? false : Boolean(defaultValue);
-  return {
+
+  const features: BoneFeatures = {
     age,
-    yearsSinceMenopause: Number.isFinite(parsedMenopauseAge)
+    yearsSinceMenopause: menopauseKnown
       ? Math.max(0, age - menopauseAge)
       : tScoreModel.imputationDefaults.yearsSinceMenopause,
     priorFragilityFracture: answerOrDefault(answers.fracture, tScoreModel.imputationDefaults.priorFragilityFracture),
@@ -130,6 +157,18 @@ function mapAnswersToFeatures(answers: Record<StepKey, string>, bloodResults: Up
     vitaminD: bloodResults?.vitaminD ?? FIELD_DEFAULTS.vitaminD,
     calcium: bloodResults?.calcium ?? FIELD_DEFAULTS.calcium,
   };
+
+  const provided: Array<keyof BoneFeatures> = ["age"];
+  if (menopauseKnown) provided.push("yearsSinceMenopause");
+  if (isYesNo(answers.fracture)) provided.push("priorFragilityFracture");
+  if (isYesNo(answers.parent)) provided.push("parentalHipFracture");
+  if (isYesNo(answers.smoke)) provided.push("currentSmoker");
+  if (isYesNo(answers.steroids)) provided.push("glucocorticoids");
+  if (isYesNo(answers.weight)) provided.push("bmi");
+  if (bloodResults?.vitaminD != null) provided.push("vitaminD");
+  if (bloodResults?.calcium != null) provided.push("calcium");
+
+  return { features, provided };
 }
 
 const CATEGORY_MAP = { lower: "low", uncertain: "moderate", elevated: "elevated" } as const;
@@ -400,9 +439,9 @@ export default function Home() {
   }
 
   async function runModel(all: Record<StepKey, string>) {
-    const full = mapAnswersToFeatures(all, bloodResults);
+    const { features: full, provided } = mapAnswersToFeatures(all, bloodResults);
     setFeatures(full);
-    const model = scoreBone(full);
+    const model = scoreBone(full, provided);
     setResult(model);
 
     const scoreFallback = `Your estimated T-score is ${model.estimatedTScore}, with an uncertainty range of ${model.tScoreRange[0]} to ${model.tScoreRange[1]}. This is a screening estimate, not a DXA measurement or diagnosis.`;
@@ -618,6 +657,20 @@ export default function Home() {
       answer(value, raw);
       return;
     }
+    // Age is required and out-of-range ages (notably under 18) get a clear,
+    // specific message rather than the generic "unclear answer" flow.
+    if (step.key === "age" && value === null && /\d/.test(raw)) {
+      setMessages((items) => [
+        ...items,
+        { role: "user", text: raw },
+        {
+          role: "bot",
+          text: "BoneBot screens adults (ages 18–110), and is designed for postmenopausal women. Please enter an age in that range.",
+        },
+      ]);
+      setFreeInput("");
+      return;
+    }
     const looksLikeQuestion = /\?|^(what|why|how|can|is|are|does|do)\b/i.test(raw);
     if (!looksLikeQuestion) {
       if (value === null) {
@@ -670,6 +723,14 @@ export default function Home() {
     }
     setFlowQuestionBusy(false);
     setMessages((items) => [...items, { role: "bot", text }]);
+  }
+
+  function skipStep() {
+    const step = STEPS[stepIdx];
+    if (typing || flowQuestionBusy || !SKIPPABLE[step.key]) return;
+    // "Not sure"/"Skip" both route to the model's published default in
+    // mapAnswersToFeatures and leave the field out of the shown drivers.
+    answer(step.key === "bloodResults" ? "Skip" : "Not sure", "Skipped this question");
   }
 
   // Feature 1 — the image extraction only ever PROPOSES vitaminD/calcium.
@@ -1123,6 +1184,17 @@ export default function Home() {
                     </button>
                   </form>
 
+                  {SKIPPABLE[step.key] && (
+                    <button
+                      type="button"
+                      onClick={skipStep}
+                      disabled={flowQuestionBusy}
+                      className="self-end text-[13px] font-semibold text-[#5A6462] underline underline-offset-2 hover:text-[#0E7C6E] disabled:opacity-40"
+                    >
+                      Skip this question
+                    </button>
+                  )}
+
                   {step.key === "bloodResults" && (
                     <label
                       className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E7C6E] hover:bg-[#E4F0ED]"
@@ -1420,8 +1492,8 @@ export default function Home() {
                     })()}
                   </div>
                   <div className="mt-5 text-[13px] leading-[1.5] text-[#5A6462]">
-                    Weights follow established clinical and NHANES-derived risk factors — only the factors that
-                    measurably moved this estimate are shown above.
+                    Weights follow established clinical and NHANES-derived risk factors. Only factors you
+                    answered are shown — anything you skipped uses a population average and is left out here.
                   </div>
                 </div>
 
