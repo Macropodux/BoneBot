@@ -19,6 +19,7 @@
 // sanity-check, not a measurement.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import {
   motion,
   AnimatePresence,
@@ -4330,6 +4331,9 @@ export default function Home() {
           BoneBot is a screening flag, not a diagnosis. It does not provide medical advice. Discuss results with
           your clinician.
         </div>
+        <Link href="/literature" className="text-[12.5px] font-semibold underline" style={{ color: THEME.accent }}>
+          Literature &amp; evidence
+        </Link>
       </footer>
     </div>
   );
