@@ -197,11 +197,7 @@ function existingBoneCareStep(answers: IntakeAnswers): IntakeResponse {
   }
 
   if (!answers.knowsDxaTScore) {
-    return response(
-      "existing-care",
-      "Please ask your GP or the clinic that arranged the scan for the report and its recommended follow-up. It would not be safe to substitute a new estimate here.",
-      null,
-    );
+    return fullAssessmentStep(answers, scoreTriage({ age: answers.age!, menopauseStatus: answers.menopauseStatus! }));
   }
 
   if (answers.dxaTScore === undefined) {
@@ -241,7 +237,7 @@ function fullAssessmentStep(answers: IntakeAnswers, triage: TriageOutput): Intak
 
   const next = questions.find((item) => answers[item.id] === undefined);
   if (next) {
-    return response("full-assessment", "Your initial screen is above the 5% threshold, so I’ll ask a few more questions for the T-score estimate.", next, {
+    return response("full-assessment", `Your initial screen is above BoneBot’s ${triage.thresholdPercent}% threshold, so I’ll ask a few more questions for the T-score estimate.`, next, {
       missingRequired: requiredFeatureLabels(answers),
       triage,
     });

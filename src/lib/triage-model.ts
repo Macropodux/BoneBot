@@ -45,7 +45,7 @@ export function scoreTriage(features: TriageFeatures): TriageOutput {
     estimatedProbability: probability,
     probabilityPercent: round1(probability * 100),
     thresholdPercent: TRIAGE_THRESHOLD * 100,
-    proceedToFullAssessment: probability > TRIAGE_THRESHOLD,
+    proceedToFullAssessment: probability >= TRIAGE_THRESHOLD,
     validated: TRIAGE_MODEL_IS_VALIDATED,
     usedDefaultBmi,
   };

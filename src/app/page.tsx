@@ -24,9 +24,16 @@ const ACCENT = "#0E7C6E";
 const ACCENT_HOVER = "#0A5A50";
 const ACCENT_TINT = "#E4F0ED";
 
-type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "weight";
+type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "weight";
 
 type Step = { key: StepKey; q: string; options: string[] };
+
+type UploadedBloodResults = {
+  vitaminD: number | null;
+  calcium: number | null;
+  alkalinePhosphatase: number | null;
+  redBloodCellCount: number | null;
+};
 
 const STEPS: Step[] = [
   { key: "assignedFemale", q: "Were you assigned female at birth?", options: ["Yes", "No"] },
@@ -37,12 +44,15 @@ const STEPS: Step[] = [
   },
   { key: "menopauseStatus", q: "Have your periods stopped for good?", options: ["Yes", "No", "Not sure"] },
   { key: "existingCare", q: "Have you already been diagnosed with osteoporosis, had a bone scan, or taken bone medication?", options: ["Yes", "No"] },
-  { key: "menopause", q: "At what age did you reach menopause?", options: ["Before 40", "40–45", "After 45", "Not sure"] },
-  { key: "fracture", q: "Have you broken a bone since age 50 — even from a minor fall or bump?", options: ["Yes", "No"] },
-  { key: "parent", q: "Did either of your parents ever fracture a hip?", options: ["Yes", "No", "Not sure"] },
-  { key: "smoke", q: "Do you currently smoke?", options: ["Yes", "No"] },
-  { key: "steroids", q: "Have you ever taken corticosteroids (like prednisone) for 3 months or more?", options: ["Yes", "No", "Not sure"] },
-  { key: "weight", q: "Last one — is your weight under 57 kg (about 125 lb)?", options: ["Yes", "No", "Not sure"] },
+  { key: "knowsDxa", q: "Do you know the T-score from your most recent DXA bone-density scan?", options: ["Yes", "No"] },
+  { key: "dxaScore", q: "What was the T-score on that scan?", options: [] },
+  { key: "dxaYear", q: "What year was that scan performed?", options: [] },
+  { key: "menopause", q: "At what age did you reach menopause?", options: [] },
+  { key: "fracture", q: "Have you broken a bone since age 50 — even from a minor fall or bump?", options: [] },
+  { key: "parent", q: "Did either of your parents ever fracture a hip?", options: [] },
+  { key: "smoke", q: "Do you currently smoke?", options: [] },
+  { key: "steroids", q: "Have you ever taken corticosteroids (like prednisone) for 3 months or more?", options: [] },
+  { key: "weight", q: "Is your weight under 57 kg (about 125 lb)?", options: [] },
 ];
 
 const EXAMPLE_ANSWERS: Record<StepKey, string> = {
@@ -50,6 +60,9 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   age: "65–69",
   menopauseStatus: "Yes",
   existingCare: "No",
+  knowsDxa: "No",
+  dxaScore: "",
+  dxaYear: "",
   menopause: "40–45",
   fracture: "No",
   parent: "Yes",
@@ -85,6 +98,7 @@ const AGE_MIDPOINT: Record<string, number> = {
 const AGE_BRACKETS = Object.keys(AGE_MIDPOINT);
 const MENOPAUSE_AGE_MIDPOINT: Record<string, number> = { "Before 40": 35, "40–45": 42, "After 45": 48, "Not sure": 48 };
 const MENOPAUSE_STATUS = { Yes: "yes", No: "no", "Not sure": "not-sure" } as const;
+const FULL_QUESTION_START = 7;
 
 const LOW_RISK_GUIDANCE = [
   "Keep active with weight-bearing and muscle-strengthening activity that feels safe and suitable for you.",
@@ -92,7 +106,7 @@ const LOW_RISK_GUIDANCE = [
   "Keep high alcohol intake low. If your health changes or you have a fracture after a minor fall, speak with a clinician.",
 ] as const;
 
-function mapAnswersToFeatures(answers: Record<StepKey, string>): BoneFeatures {
+function mapAnswersToFeatures(answers: Record<StepKey, string>, bloodResults: UploadedBloodResults | null): BoneFeatures {
   const age = AGE_MIDPOINT[answers.age] ?? 65;
   const menopauseAge = MENOPAUSE_AGE_MIDPOINT[answers.menopause] ?? 48;
   return {
@@ -106,6 +120,8 @@ function mapAnswersToFeatures(answers: Record<StepKey, string>): BoneFeatures {
     // a rough stand-in until BMI (or height+weight) is asked directly.
     bmi: answers.weight === "Yes" ? 20 : 26,
     ...FIELD_DEFAULTS,
+    vitaminD: bloodResults?.vitaminD ?? FIELD_DEFAULTS.vitaminD,
+    calcium: bloodResults?.calcium ?? FIELD_DEFAULTS.calcium,
   };
 }
 
@@ -282,6 +298,13 @@ export default function Home() {
   const [result, setResult] = useState<ModelOutput | null>(null);
   const [triageResult, setTriageResult] = useState<TriageOutput | null>(null);
   const [routeMessage, setRouteMessage] = useState("");
+  const [scoreExplanation, setScoreExplanation] = useState("");
+  const [implicationsExplanation, setImplicationsExplanation] = useState("");
+  const [reportedDxa, setReportedDxa] = useState<{ score: number; year?: number } | null>(null);
+  const [freeInput, setFreeInput] = useState("");
+  const [flowQuestionBusy, setFlowQuestionBusy] = useState(false);
+  const [bloodResults, setBloodResults] = useState<UploadedBloodResults | null>(null);
+  const [uploadBusy, setUploadBusy] = useState(false);
 
   const [qaMessages, setQaMessages] = useState<ChatMessage[]>([]);
   const [qaTyping, setQaTyping] = useState(false);
@@ -310,30 +333,45 @@ export default function Home() {
     setStepIdx(0);
     setMessages([]);
     setAnswers({});
+    setReportedDxa(null);
+    setFreeInput("");
+    setBloodResults(null);
     botSay(
-      "Hi, I'm BoneBot. I'll ask you 7 quick questions, then a model trained on NHANES data estimates your bone-health risk. I only explain the result — I never decide it."
+      "Hi, I'm BoneBot. I’ll start with four quick questions. If the model finds a higher initial probability, I’ll ask for a few more details. The model calculates the result; AI only explains it."
     );
     window.setTimeout(() => botSay(STEPS[0].q), 1400);
   }
 
   async function runModel(all: Record<StepKey, string>) {
-    const full = mapAnswersToFeatures(all);
+    const full = mapAnswersToFeatures(all, bloodResults);
     setFeatures(full);
     const model = scoreBone(full);
     setResult(model);
 
-    let explanation = `Your screening result is ${CATEGORY_MAP[model.category]} risk. Ask me anything about what that means.`;
-    try {
-      const r = await fetch("/api/assistant", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mode: "consumer", result: model, features: full }),
-      });
-      if (r.ok) explanation = (await r.json()).text;
-    } catch {
-      /* fall back to the plain sentence above — never a stack trace */
-    }
-    setQaMessages([{ role: "bot", text: explanation }]);
+    const scoreFallback = `Your estimated T-score is ${model.estimatedTScore}, with an uncertainty range of ${model.tScoreRange[0]} to ${model.tScoreRange[1]}. This is a screening estimate, not a DXA measurement or diagnosis.`;
+    const implicationsFallback =
+      model.category === "lower"
+        ? "This result is reassuring, but it cannot decide on its own whether a scan is appropriate. Keep supporting your bone health and discuss screening at a routine GP visit if that is relevant to you."
+        : "This screening result is a reason to discuss a DXA scan and wider fracture-risk assessment with your GP. It is not a diagnosis.";
+    const getExplanation = async (explanationType: "score" | "implications", fallback: string) => {
+      try {
+        const response = await fetch("/api/assistant", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ mode: "consumer", result: model, features: full, explanationType }),
+        });
+        return response.ok ? (await response.json()).text : fallback;
+      } catch {
+        return fallback;
+      }
+    };
+    const [scoreText, implicationsText] = await Promise.all([
+      getExplanation("score", scoreFallback),
+      getExplanation("implications", implicationsFallback),
+    ]);
+    setScoreExplanation(scoreText);
+    setImplicationsExplanation(implicationsText);
+    setQaMessages([{ role: "bot", text: "Ask a question about your bone-health screening result." }]);
     setScreen("results");
   }
 
@@ -355,36 +393,77 @@ export default function Home() {
     setScreen("results");
   }
 
+  function continueAfterTriage(nextAnswers: Partial<Record<StepKey, string>>) {
+    const triage = scoreTriage({
+      age: AGE_MIDPOINT[nextAnswers.age ?? ""] ?? 65,
+      menopauseStatus:
+        nextAnswers.menopauseStatus === "Yes"
+          ? MENOPAUSE_STATUS.Yes
+          : nextAnswers.menopauseStatus === "No"
+            ? MENOPAUSE_STATUS.No
+            : MENOPAUSE_STATUS["Not sure"],
+    });
+    if (!triage.proceedToFullAssessment) {
+      void finishAtGate(`Your initial screening estimate is ${triage.probabilityPercent}%, below BoneBot’s ${triage.thresholdPercent}% threshold for the full assessment.`, triage);
+      return;
+    }
+    setStepIdx(FULL_QUESTION_START);
+    botSay("Your initial screening estimate is above our threshold, so I’ll ask a few more questions to create your full bone-health screening result.");
+    window.setTimeout(() => botSay(STEPS[FULL_QUESTION_START].q), 900);
+  }
+
+  function showReportedDxa(nextAnswers: Partial<Record<StepKey, string>>) {
+    const score = Number(nextAnswers.dxaScore);
+    const year = nextAnswers.dxaYear === "Unknown" ? undefined : Number(nextAnswers.dxaYear);
+    setReportedDxa({ score, year: Number.isFinite(year) ? year : undefined });
+    setTriageResult(null);
+    setResult(null);
+    setQaMessages([]);
+    setRouteMessage("This is an explanation of the DXA score you reported. It does not replace the original scan report or your clinician’s assessment.");
+    setScreen("results");
+  }
+
   function answer(opt: string) {
-    if (typing) return;
+    if (typing || flowQuestionBusy) return;
     const step = STEPS[stepIdx];
     const nextAnswers = { ...answers, [step.key]: opt };
     setMessages((m) => [...m, { role: "user", text: opt }]);
     setAnswers(nextAnswers);
+    setFreeInput("");
 
     if (stepIdx === 3) {
       if (nextAnswers.assignedFemale !== "Yes") {
         void finishAtGate("BoneBot is currently calibrated for people assigned female at birth. A clinician can help you find the right bone-health assessment.");
-        return;
+      } else if (nextAnswers.existingCare === "Yes") {
+        setStepIdx(4);
+        botSay(STEPS[4].q);
+      } else {
+        continueAfterTriage(nextAnswers);
       }
-      if (nextAnswers.existingCare === "Yes") {
-        void finishAtGate("Because you may already have a scan result, diagnosis, or treatment plan, BoneBot will not replace it with an estimate. Please ask your GP or scan provider for your most recent DXA report and recommended follow-up.");
-        return;
+      return;
+    }
+
+    if (stepIdx === 4) {
+      if (opt === "No") continueAfterTriage(nextAnswers);
+      else {
+        setStepIdx(5);
+        botSay(STEPS[5].q);
       }
-      const triage = scoreTriage({
-        age: AGE_MIDPOINT[nextAnswers.age ?? ""] ?? 65,
-        menopauseStatus:
-          nextAnswers.menopauseStatus === "Yes"
-            ? MENOPAUSE_STATUS.Yes
-            : nextAnswers.menopauseStatus === "No"
-              ? MENOPAUSE_STATUS.No
-              : MENOPAUSE_STATUS["Not sure"],
-      });
-      if (!triage.proceedToFullAssessment) {
-        void finishAtGate(`Your initial screening estimate is ${triage.probabilityPercent}%, below BoneBot’s ${triage.thresholdPercent}% threshold for the full assessment.`, triage);
-        return;
+      return;
+    }
+
+    if (stepIdx === 5) {
+      if (opt === "Unknown") continueAfterTriage(nextAnswers);
+      else {
+        setStepIdx(6);
+        botSay(STEPS[6].q);
       }
-      botSay("Your initial screening estimate is above our threshold, so I’ll ask a few more questions to create your full bone-health screening result.");
+      return;
+    }
+
+    if (stepIdx === 6) {
+      showReportedDxa(nextAnswers);
+      return;
     }
 
     const nextIdx = stepIdx + 1;
@@ -393,8 +472,98 @@ export default function Home() {
       botSay(STEPS[nextIdx].q);
     } else {
       botSay("That's everything. Running your answers through the risk model…");
-      runModel(nextAnswers as Record<StepKey, string>);
+      void runModel(nextAnswers as Record<StepKey, string>);
     }
+  }
+
+  function normaliseFreeAnswer(key: StepKey, raw: string): string | null {
+    const text = raw.trim();
+    const lower = text.toLowerCase();
+    if (!text) return null;
+    if (key === "dxaScore") {
+      if (/(not sure|don't know|do not know|unknown)/.test(lower)) return "Unknown";
+      const value = Number(text.replace(/[^0-9.+-]/g, ""));
+      return Number.isFinite(value) && value >= -5 && value <= 3 ? String(value) : null;
+    }
+    if (key === "dxaYear") {
+      if (/(not sure|don't know|do not know|unknown)/.test(lower)) return "Unknown";
+      const value = Number(text.replace(/\D/g, ""));
+      return Number.isInteger(value) && value >= 1900 && value <= new Date().getFullYear() ? String(value) : null;
+    }
+    if (key === "menopause") {
+      if (/(not sure|don't know|do not know)/.test(lower)) return "Not sure";
+      const match = lower.match(/\d{2}/);
+      if (!match) return null;
+      const age = Number(match[0]);
+      return age < 40 ? "Before 40" : age <= 45 ? "40–45" : "After 45";
+    }
+    if (key === "weight") {
+      const match = lower.match(/\d+(?:\.\d+)?/);
+      if (match) return Number(match[0]) < 57 ? "Yes" : "No";
+    }
+    if (/(not sure|don't know|do not know)/.test(lower)) return "Not sure";
+    if (key === "fracture" && /\b(broke|broken|fracture)\b/.test(lower)) return "Yes";
+    if (key === "parent" && /\b(mother|father|mum|dad|parent)\b/.test(lower) && /\b(did|had|yes)\b/.test(lower)) return "Yes";
+    if (/\b(no|nope|never)\b/.test(lower)) return "No";
+    if (/\b(don't|do not|didn't|did not)\b/.test(lower)) return "No";
+    if (/\b(yes|yeah|yep|i do|i have)\b/.test(lower)) return "Yes";
+    return null;
+  }
+
+  async function submitFreeInput() {
+    const raw = freeInput.trim();
+    const step = STEPS[stepIdx];
+    if (!raw || !step || flowQuestionBusy) return;
+    const value = normaliseFreeAnswer(step.key, raw);
+    if (value) {
+      answer(value);
+      return;
+    }
+    setMessages((items) => [...items, { role: "user", text: raw }]);
+    setFreeInput("");
+    setFlowQuestionBusy(true);
+    let text = "BoneBot can only answer questions about this bone-health screening and the evidence it uses.";
+    try {
+      const response = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ mode: "consumer", question: raw, stage: "questionnaire" }),
+      });
+      if (response.ok) text = (await response.json()).text;
+    } catch {
+      /* Keep the fixed, evidence-bounded fallback visible. */
+    }
+    setFlowQuestionBusy(false);
+    setMessages((items) => [...items, { role: "bot", text }]);
+  }
+
+  async function uploadBloodResults(image: File) {
+    setUploadBusy(true);
+    let message = "BoneBot could not read that image. You can still type your answer.";
+    try {
+      const formData = new FormData();
+      formData.append("image", image);
+      const response = await fetch("/api/blood-results", { method: "POST", body: formData });
+      const body = (await response.json()) as UploadedBloodResults | { error: string };
+      if (!response.ok || "error" in body) {
+        message = "error" in body ? body.error : message;
+      } else {
+        setBloodResults(body);
+        const extracted = [
+          body.vitaminD !== null ? `vitamin D ${body.vitaminD} nmol/L` : null,
+          body.calcium !== null ? `calcium ${body.calcium} mmol/L` : null,
+          body.alkalinePhosphatase !== null ? `ALP ${body.alkalinePhosphatase} U/L` : null,
+          body.redBloodCellCount !== null ? `RBC ${body.redBloodCellCount}` : null,
+        ].filter(Boolean);
+        message = extracted.length
+          ? `I read: ${extracted.join(", ")}. Vitamin D and calcium are included in the current estimate; ALP and RBC are shown only as context.`
+          : "I could not identify a supported blood-result value in that image. You can still type your answer.";
+      }
+    } catch {
+      /* Keep the fixed fallback visible. */
+    }
+    setUploadBusy(false);
+    setMessages((items) => [...items, { role: "bot", text: message }]);
   }
 
   function tryExample() {
@@ -411,6 +580,11 @@ export default function Home() {
     setFeatures(null);
     setTriageResult(null);
     setRouteMessage("");
+    setReportedDxa(null);
+    setScoreExplanation("");
+    setImplicationsExplanation("");
+    setFreeInput("");
+    setBloodResults(null);
   }
 
   async function qaAsk(q: string) {
@@ -542,7 +716,7 @@ export default function Home() {
           </div>
           <div className="bg-gradient-to-b from-transparent to-[#F5F7F6] px-6 pb-7 pt-4">
             <div className="mx-auto flex max-w-[680px] flex-wrap justify-end gap-2.5">
-              {inFlow &&
+              {inFlow && step.options.length > 0 &&
                 step.options.map((opt) => (
                   <button
                     key={opt}
@@ -561,6 +735,49 @@ export default function Home() {
                     {opt}
                   </button>
                 ))}
+              {inFlow && step.options.length === 0 && (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void submitFreeInput();
+                  }}
+                  className="flex w-full gap-2"
+                >
+                  <input
+                    value={freeInput}
+                    onChange={(event) => setFreeInput(event.target.value)}
+                    placeholder="Type your answer, or ask a bone-health question"
+                    aria-label="Answer or ask a bone-health question"
+                    disabled={flowQuestionBusy}
+                    className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E] disabled:opacity-50"
+                  />
+                  <button
+                    type="submit"
+                    disabled={flowQuestionBusy || !freeInput.trim()}
+                    className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
+                    style={{ backgroundColor: ACCENT }}
+                  >
+                    Send
+                  </button>
+                  {stepIdx >= FULL_QUESTION_START && (
+                    <label className="cursor-pointer rounded-[9px] border border-[#C6CFCC] px-3.5 py-2.5 text-sm font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]">
+                      {uploadBusy ? "Reading…" : "Upload blood results"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        disabled={uploadBusy}
+                        onChange={(event) => {
+                          const image = event.target.files?.[0];
+                          if (image) void uploadBloodResults(image);
+                          event.currentTarget.value = "";
+                        }}
+                      />
+                    </label>
+                  )}
+                </form>
+              )}
+              {flowQuestionBusy && <p className="w-full text-right text-sm text-[#5A6462]">Checking the approved evidence…</p>}
             </div>
           </div>
         </div>
@@ -603,6 +820,21 @@ export default function Home() {
                     <p className="mt-2 text-sm text-[#5A6462]">
                       Below the {triageResult.thresholdPercent}% threshold BoneBot uses to move to the full
                       assessment.
+                    </p>
+                  </>
+                )}
+                {reportedDxa && (
+                  <>
+                    <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#15181A]">
+                      Reported T-score {reportedDxa.score.toFixed(1)}
+                    </h1>
+                    <p className="mt-2 text-sm text-[#5A6462]">
+                      {reportedDxa.score <= -2.5
+                        ? "This reported score is in the osteoporosis range."
+                        : reportedDxa.score < -1
+                          ? "This reported score is in the low bone-density range."
+                          : "This reported score is in the normal bone-density range."}
+                      {reportedDxa.year ? ` Reported from ${reportedDxa.year}.` : ""}
                     </p>
                   </>
                 )}
@@ -783,7 +1015,34 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div
+                <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                  <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                    Understanding your estimated T-score
+                  </div>
+                  <p className="mt-4 whitespace-pre-wrap text-[15px] leading-[1.65] text-[#4A5452]">{scoreExplanation}</p>
+                </div>
+
+                <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                  <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                    What this could mean for you
+                  </div>
+                  <p className="mt-4 whitespace-pre-wrap text-[15px] leading-[1.65] text-[#4A5452]">{implicationsExplanation}</p>
+                </div>
+
+                {bloodResults && (
+                  <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                    <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">Uploaded blood results</div>
+                    <p className="mt-3 text-sm leading-[1.6] text-[#4A5452]">
+                      {bloodResults.vitaminD !== null && `Vitamin D: ${bloodResults.vitaminD} nmol/L. `}
+                      {bloodResults.calcium !== null && `Calcium: ${bloodResults.calcium} mmol/L. `}
+                      {bloodResults.alkalinePhosphatase !== null && `ALP: ${bloodResults.alkalinePhosphatase} U/L. `}
+                      {bloodResults.redBloodCellCount !== null && `RBC: ${bloodResults.redBloodCellCount}. `}
+                      Vitamin D and calcium are included in the current estimate; ALP and RBC are contextual only.
+                    </p>
+                  </div>
+                )}
+
+                {result.category !== "lower" && <div
                   className="flex flex-col items-start justify-between gap-5 rounded-2xl px-7 py-6 sm:flex-row sm:items-center sm:px-8"
                   style={{ backgroundColor: ACCENT }}
                 >
@@ -803,7 +1062,7 @@ export default function Home() {
                   >
                     What&apos;s a DEXA scan?
                   </button>
-                </div>
+                </div>}
 
                 {features && (
                   <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
