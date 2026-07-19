@@ -47,11 +47,14 @@ substitute for a measured DXA T-score. Source: `bhof-clinicians-guide-2022`.
   and must not be weighted into a T-score or fracture-risk estimate without a
   separately validated modelling and clinical-review decision.
 - Thyroid disease, coeliac disease, and chronic kidney disease are contextual,
-  chat-only cards answering "does this affect my bones?" style questions. They
-  are not `BoneFeatures` inputs, are not collected anywhere in the
-  questionnaire, and must not be weighted into a T-score or fracture-risk
-  estimate without a separately validated modelling and clinical-review
-  decision.
+  chat-only cards answering "does this affect my bones?" style questions.
+  None are collected in the questionnaire or weighted into a T-score or
+  fracture-risk estimate today. Thyroid disease and chronic kidney disease
+  feed a single pending `secondaryCondition` `BoneFeatures` input that stays
+  inert until `SECONDARY_CONDITION_TRAINED` flips true and a validated
+  coefficient lands. Coeliac disease is excluded from that feature by NHANES
+  data availability (see "Secondary-cause cards" below), not policy, and is
+  not on a path to becoming a model input under the current training cycle.
 
 ## Curation rules
 
@@ -159,9 +162,24 @@ NOGG (already registered as `nogg-2024`) and NICE list thyroid disease
 (particularly hyperthyroidism and long-term thyroid-hormone treatment),
 coeliac disease and other malabsorption, and chronic kidney disease among the
 recognised secondary causes of osteoporosis, alongside age and menopause.
-These three were added as **chat-only evidence cards** answering
-condition-specific questions in BoneBot's "ask about your result" flow — they
-are not `BoneFeatures` inputs and carry no model coefficient.
+All three currently ship as **chat-only evidence cards** answering
+condition-specific questions in BoneBot's "ask about your result" flow, and
+none are `BoneFeatures` inputs or carry a model coefficient today.
+
+Thyroid disease and chronic kidney disease are, however, on a defined (if
+untrained) path into the model. `model/train_bonebot.ipynb` derives a single
+pending `secondaryCondition` feature — see `bone-model.ts` and
+`model-parameters.ts` — as thyroid disease (NHANES `MCQ160M`) **or** chronic
+kidney disease (eGFR < 60, CKD-EPI 2021, from serum creatinine `LBXSCR`). It
+stays inert (coefficient `0`, question not asked) behind the
+`SECONDARY_CONDITION_TRAINED` flag until the model is retrained with a real
+coefficient. **Coeliac disease is excluded from that feature, and cannot be
+added to it under the current training data**: NHANES 2013-2014 — BoneBot's
+training cycle — never ran coeliac serology; that panel only exists in the
+2009-2010 cycle. Coeliac disease therefore has no source variable to derive a
+model feature from and remains a chat-only card, not a "not yet validated"
+input like the other two — closing that gap would need a retrain on a
+different NHANES cycle, not just a coefficient.
 
 - **Thyroid disease.** Vestergaard & Mosekilde's 2003 meta-analysis found
   endogenous hyperthyroidism raises osteoporosis and fracture risk through
@@ -175,7 +193,9 @@ are not `BoneFeatures` inputs and carry no model coefficient.
   or osteoporosis), and a review of treated adult coeliac disease found reduced
   BMD persists even after treatment, including in postmenopausal patients. The
   card must not diagnose coeliac disease or malabsorption, or give dietary or
-  gluten-free treatment advice.
+  gluten-free treatment advice. Unlike the other two cards, this one has no
+  route to becoming a `secondaryCondition` model input under the current
+  NHANES training cycle (see above).
 - **Chronic kidney disease.** A 2020 systematic review found 18–32% of CKD
   patients also have osteoporosis with over 2.5x the fracture risk of the
   general population, rising to roughly 4x in advanced disease; a 2025 review
@@ -183,7 +203,10 @@ are not `BoneFeatures` inputs and carry no model coefficient.
   must not diagnose CKD, estimate kidney function, or give kidney-related bone
   treatment advice.
 
-All three follow the same clinical-boundary rule as ALP/ALC/RBC: BoneBot may
-explain the recognised association and redirect the person to the clinician
-managing that condition, never diagnose it, estimate its severity, or advise
-on its treatment.
+All three follow the same clinical-boundary rule as ALP/ALC/RBC today: BoneBot
+may explain the recognised association and redirect the person to the
+clinician managing that condition, never diagnose it, estimate its severity,
+or advise on its treatment. That rule holds regardless of the model-input
+distinction above — even once `SECONDARY_CONDITION_TRAINED` is true and
+thyroid/CKD feed `secondaryCondition`, the per-condition chat cards still may
+not diagnose or give dosing/treatment advice.

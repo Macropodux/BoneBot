@@ -198,12 +198,25 @@ Our mitigations:
 
 ### 4d. How we evaluate
 
-Because the osteoporosis-positive class is a minority, accuracy alone is misleading.
-We report **PR-AUC** (primary, given imbalance), balanced accuracy, recall per class,
-ROC-AUC, and **Brier score / calibration**. The headline result is the
-**with-vs-without-wearable ablation** (delta PR-AUC). We also add a **no-call band**:
-when the calibrated probability sits in an uncertain range, the tool abstains and
-says "confirm with a DXA scan" rather than guessing.
+Because the osteoporosis-positive class is a minority, accuracy alone is misleading,
+so evaluation splits by what each model does:
+
+- **Heavyweight T-score regression.** MAE and R² on a held-out split.
+- **Ablation classifier (does our added signal beat the field's age+BMI baseline?).**
+  ROC-AUC and PR-AUC for age+BMI alone, +menopause, +wearable activity, and the
+  full feature set, benchmarked against an OST-style age+weight reference. This is
+  the headline result: the field drops menopause status and objective wearable
+  activity, and the ablation shows both add PR-AUC over the baseline the existing
+  tools already use.
+- **Lightweight triage routing model.** A locked-threshold protocol, not a single
+  aggregate score: threshold candidates are compared on a validation split only,
+  the highest candidate meeting a predeclared ≥95% sensitivity safety target is
+  locked, and a one-time held-out audit then reports sensitivity, negative
+  predictive value, false-negative count, Brier score, 10-bin calibration, and
+  bootstrap 95% confidence intervals at that locked threshold. Full method and
+  results in [`docs/TRIAGE_THRESHOLD_AUDIT.md`](docs/TRIAGE_THRESHOLD_AUDIT.md),
+  computed by the tested helpers in `model/triage_audit.py` and run from
+  `model/train_bonebot.ipynb`.
 
 ---
 

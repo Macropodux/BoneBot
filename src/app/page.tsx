@@ -10,10 +10,13 @@
 // (via /api/assistant) only explains it — same architecture as before, now
 // behind this UI. Screening flag, never a diagnosis.
 //
-// The design's 7 questions don't cover all 13 BoneFeatures fields (no photo
-// upload yet, and a few history fields it never asks). Those use the same
-// illustrative-defaults pattern as before; see mapAnswersToFeatures() below —
-// flagged there for a clinical sanity-check, not a measurement.
+// The design's 7 questions don't cover all 13 BoneFeatures fields. Blood-test
+// values (vitaminD, calcium) and activity (weightBearingActivity) are
+// user-provided via photo upload / a quick chip when given; the remaining
+// history fields this short flow never asks (hormone therapy, rheumatoid
+// arthritis, alcohol) still use the same illustrative-defaults pattern as
+// before; see mapAnswersToFeatures() below — flagged there for a clinical
+// sanity-check, not a measurement.
 
 import { useEffect, useRef, useState } from "react";
 import { resolveAmbiguousAnswer } from "@/lib/ambiguity";
@@ -26,7 +29,7 @@ const ACCENT_HOVER = "#0A5A50";
 const ACCENT_TINT = "#E4F0ED";
 const FRACTURE = "#B0442F";
 
-type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "bloodResults" | "weight" | "secondaryCondition";
+type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "bloodResults" | "weight" | "activity" | "secondaryCondition";
 
 type Step = { key: StepKey; q: string; options: string[] };
 
@@ -35,6 +38,17 @@ type UploadedBloodResults = {
   calcium: number | null;
   alkalinePhosphatase: number | null;
   redBloodCellCount: number | null;
+};
+
+// Feature: wearable/activity-app screenshot extraction — mirrors
+// UploadedBloodResults. weightBearingActivity is the deterministic 0..1
+// mapping (from /api/activity-extract, re-derived from steps/active-minutes
+// by plain code, never chosen by the model); the raw steps/minutes are kept
+// only to show the user what was read.
+type UploadedActivityResult = {
+  weightBearingActivity: number | null;
+  estimatedSteps: number | null;
+  estimatedActiveMinutes: number | null;
 };
 
 const STEPS: Step[] = [
@@ -52,6 +66,7 @@ const STEPS: Step[] = [
   { key: "steroids", q: "Have you ever taken corticosteroids (like prednisone) for 3 months or more?", options: [] },
   { key: "bloodResults", q: "If you have blood-test results, upload an image now, or tap Skip to continue without one.", options: [] },
   { key: "weight", q: "What's your weight and height? BoneBot uses these to calculate your BMI.", options: [] },
+  { key: "activity", q: "How active are you day-to-day, with weight-bearing activity like walking, jogging, or strength training? You can also upload a screenshot from your watch or activity app instead.", options: ["Low", "Moderate", "High"] },
   // Appended last and gated on SECONDARY_CONDITION_TRAINED so it is only asked
   // once the model is retrained with the feature. Appending (not inserting)
   // keeps the earlier gate/DXA step indices and FULL_QUESTION_START stable.
@@ -81,13 +96,16 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   steroids: "No",
   bloodResults: "Skip",
   weight: "24.5",
+  activity: "Moderate",
   secondaryCondition: "No",
 };
 
-// Fields the 7-question flow never asks about — photo upload (vitaminD,
-// calcium, weightBearingActivity) isn't built yet, and hormone therapy /
-// rheumatoid arthritis / alcohol aren't part of this flow. Same illustrative
-// defaults used before. Not measurements.
+// Fields the 7-question flow never asks about — hormone therapy, rheumatoid
+// arthritis, and high alcohol intake aren't part of this flow, so they still
+// use the same illustrative population-average defaults as before (not
+// measurements). vitaminD/calcium (blood-result photo) and
+// weightBearingActivity (activity chip, or watch/app screenshot) ARE
+// user-provided when given — see mapAnswersToFeatures() below.
 const FIELD_DEFAULTS = {
   onHormoneTherapy: Boolean(tScoreModel.imputationDefaults.onHormoneTherapy),
   weightBearingActivity: tScoreModel.imputationDefaults.activityLevel,
@@ -113,6 +131,24 @@ const MENOPAUSE_AGE_MIDPOINT: Record<string, number> = { "Before 40": 35, "40–
 const MENOPAUSE_STATUS = { Yes: "yes", No: "no", "Not sure": "not-sure" } as const;
 const FULL_QUESTION_START = 7;
 
+// By this age menopausal status is medically settled, so the eligibility gate
+// (the short "have your periods stopped?" triage question) is skipped and she
+// is treated as postmenopausal automatically. A one-line change if that
+// threshold ever needs revisiting. The separate "what age did you reach
+// menopause?" question later in the full questionnaire is unaffected — that's
+// a real model input (yearsSinceMenopause), not a gate.
+const MENOPAUSE_CERTAIN_AGE = 60;
+
+// Deterministic Low/Moderate/High -> weightBearingActivity (0..1) mapping for
+// the quick activity-level chip. Same illustrative-midpoint spirit as
+// AGE_MIDPOINT/MENOPAUSE_AGE_MIDPOINT above.
+const ACTIVITY_LEVEL_MAP: Record<string, number> = { Low: 0.2, Moderate: 0.5, High: 0.8 };
+
+// Shared cap for both the blood-results and activity-screenshot uploaders —
+// enforced client-side (disable adding a 4th) and re-checked server-side in
+// each route.
+const MAX_IMAGES = 3;
+
 // Free-text questions the user is allowed to skip with a button instead of
 // typing. A skipped answer is stored as "Not sure" → the model uses its
 // published population-average default and the field is NOT counted as a
@@ -126,6 +162,7 @@ const SKIPPABLE: Partial<Record<StepKey, true>> = {
   steroids: true,
   bloodResults: true,
   weight: true,
+  activity: true,
 };
 
 const LOW_RISK_GUIDANCE = [
@@ -141,6 +178,7 @@ const LOW_RISK_GUIDANCE = [
 function mapAnswersToFeatures(
   answers: Record<StepKey, string>,
   bloodResults: UploadedBloodResults | null,
+  activityResult: UploadedActivityResult | null,
 ): { features: BoneFeatures; provided: Array<keyof BoneFeatures> } {
   const parsedAge = Number(answers.age);
   const age = Number.isFinite(parsedAge) ? parsedAge : AGE_MIDPOINT[answers.age] ?? 65;
@@ -156,6 +194,14 @@ function mapAnswersToFeatures(
     answer === "Yes" ? true : answer === "No" ? false : Boolean(defaultValue);
   const parsedBmi = Number(answers.weight);
 
+  // Weight-bearing activity: a screenshot-derived estimate (already a 0..1
+  // value re-validated server-side) takes priority; otherwise the quick
+  // Low/Moderate/High chip maps deterministically via ACTIVITY_LEVEL_MAP.
+  // Neither given -> fall back to the population-average imputation default,
+  // same as every other optional field here.
+  const quickActivityValue = ACTIVITY_LEVEL_MAP[answers.activity];
+  const activityValue = activityResult?.weightBearingActivity ?? quickActivityValue ?? null;
+
   const features: BoneFeatures = {
     age,
     yearsSinceMenopause: menopauseKnown
@@ -169,6 +215,7 @@ function mapAnswersToFeatures(
     // see computeBmi()/submitWeightHeight() below.
     bmi: Number.isFinite(parsedBmi) ? parsedBmi : tScoreModel.imputationDefaults.bmi,
     ...FIELD_DEFAULTS,
+    weightBearingActivity: activityValue ?? FIELD_DEFAULTS.weightBearingActivity,
     vitaminD: bloodResults?.vitaminD ?? FIELD_DEFAULTS.vitaminD,
     calcium: bloodResults?.calcium ?? FIELD_DEFAULTS.calcium,
     // Only meaningful once SECONDARY_CONDITION_TRAINED (the question is gated on
@@ -183,6 +230,7 @@ function mapAnswersToFeatures(
   if (isYesNo(answers.smoke)) provided.push("currentSmoker");
   if (isYesNo(answers.steroids)) provided.push("glucocorticoids");
   if (Number.isFinite(parsedBmi)) provided.push("bmi");
+  if (activityValue !== null) provided.push("weightBearingActivity");
   if (bloodResults?.vitaminD != null) provided.push("vitaminD");
   if (bloodResults?.calcium != null) provided.push("calcium");
   if (SECONDARY_CONDITION_TRAINED && isYesNo(answers.secondaryCondition)) provided.push("secondaryCondition");
@@ -472,6 +520,19 @@ export default function Home() {
   const [bloodEditVitaminD, setBloodEditVitaminD] = useState("");
   const [bloodEditCalcium, setBloodEditCalcium] = useState("");
   const [bloodEditError, setBloodEditError] = useState("");
+  // Up to MAX_IMAGES blood-result photos, added before a single "Analyze"
+  // call so a multi-page report is sent to the vision model together.
+  const [bloodImageFiles, setBloodImageFiles] = useState<File[]>([]);
+
+  // Wearable/activity-screenshot upload — same confirm-before-use pattern as
+  // the blood-result flow above. weightBearingActivity is then user-provided
+  // (quick chip or confirmed screenshot estimate) instead of the imputed
+  // default; see mapAnswersToFeatures().
+  const [activityResult, setActivityResult] = useState<UploadedActivityResult | null>(null);
+  const [activityUploadBusy, setActivityUploadBusy] = useState(false);
+  const [pendingActivityResult, setPendingActivityResult] = useState<UploadedActivityResult | null>(null);
+  const [activityEditMode, setActivityEditMode] = useState(false);
+  const [activityImageFiles, setActivityImageFiles] = useState<File[]>([]);
   const [clarificationCounts, setClarificationCounts] = useState<Partial<Record<StepKey, number>>>({});
   const [unresolvedAnswerCount, setUnresolvedAnswerCount] = useState(0);
   const [uncertaintyNotes, setUncertaintyNotes] = useState<string[]>([]);
@@ -531,6 +592,11 @@ export default function Home() {
     setBloodEditVitaminD("");
     setBloodEditCalcium("");
     setBloodEditError("");
+    setBloodImageFiles([]);
+    setActivityResult(null);
+    setPendingActivityResult(null);
+    setActivityEditMode(false);
+    setActivityImageFiles([]);
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
     setWeightInput("");
@@ -541,13 +607,13 @@ export default function Home() {
     setHeightInInput("");
     setBmiError("");
     botSay(
-      "Hi, I'm BoneBot. I’ll start with four quick questions. If the model finds a higher initial probability, I’ll ask for a few more details. The model calculates the result; AI only explains it."
+      "Hi, I'm BoneBot. I’ll ask four quick questions to check your bone-health risk. If they suggest a closer look could help, I’ll ask a few more. A validated model works out your result — I only explain what it means. This is a screening check, not a diagnosis."
     );
     window.setTimeout(() => botSay(STEPS[0].q), 1400);
   }
 
   async function runModel(all: Record<StepKey, string>) {
-    const { features: full, provided } = mapAnswersToFeatures(all, bloodResults);
+    const { features: full, provided } = mapAnswersToFeatures(all, bloodResults, activityResult);
     setFeatures(full);
     const model = scoreBone(full, provided);
     setResult(model);
@@ -618,7 +684,7 @@ export default function Home() {
             : MENOPAUSE_STATUS["Not sure"],
     });
     if (!triage.proceedToFullAssessment) {
-      void finishAtGate(`Your initial screening estimate is ${triage.probabilityPercent}%, below BoneBot’s ${triage.thresholdPercent}% threshold for the full assessment.`, triage);
+      void finishAtGate(`Your initial screening estimate is ${triage.probabilityPercent}%. That's a reassuringly low result, so BoneBot doesn't recommend the longer questionnaire today.`, triage);
       return;
     }
     setStepIdx(FULL_QUESTION_START);
@@ -651,6 +717,21 @@ export default function Home() {
         void finishAtGate(
           "BoneBot’s screening estimate is built and validated for people assigned female at birth around and after menopause, so it can’t give you a reliable result here. Please talk to a clinician about your bone health.",
         );
+        return;
+      }
+    }
+
+    if (stepIdx === 1) {
+      // By MENOPAUSE_CERTAIN_AGE, menopausal status is medically settled —
+      // skip the eligibility-gate question and treat her as postmenopausal.
+      // The later "what age did you reach menopause?" question (a real model
+      // input) still gets asked in the full questionnaire.
+      const enteredAge = Number(opt);
+      if (Number.isFinite(enteredAge) && enteredAge >= MENOPAUSE_CERTAIN_AGE) {
+        setAnswers({ ...nextAnswers, menopauseStatus: "Yes" });
+        setStepIdx(3);
+        botSay("At your age, I’ll take it that your periods have stopped for good.");
+        window.setTimeout(() => botSay(STEPS[3].q), 900);
         return;
       }
     }
@@ -858,13 +939,29 @@ export default function Home() {
   // confirm/edit/skip step; only a user action calls setBloodResults(), which
   // is what mapAnswersToFeatures()/scoreBone() actually reads. ALP/RBC are
   // context-only (never scored) so they don't need confirmation.
-  async function uploadBloodResults(image: File) {
+  // Up to MAX_IMAGES photos can be queued before the user taps "Analyze" —
+  // added here rather than uploaded immediately so a multi-page report goes
+  // to the vision model together (see mergeBloodResults in the route).
+  function addBloodImages(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setBloodImageFiles((prev) => {
+      const room = MAX_IMAGES - prev.length;
+      return room > 0 ? [...prev, ...Array.from(files).slice(0, room)] : prev;
+    });
+  }
+
+  function removeBloodImage(index: number) {
+    setBloodImageFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function uploadBloodResults(images: File[]) {
+    if (images.length === 0) return;
     setUploadBusy(true);
     let message: string | null = null;
     let extractedResults: UploadedBloodResults | null = null;
     try {
       const formData = new FormData();
-      formData.append("image", image);
+      images.forEach((image) => formData.append("image", image));
       const response = await fetch("/api/blood-results", { method: "POST", body: formData });
       const body = (await response.json()) as UploadedBloodResults | { error: string };
       if (!response.ok || "error" in body) {
@@ -886,6 +983,7 @@ export default function Home() {
       message = "BoneBot could not read that image. You can still type your answer.";
     }
     setUploadBusy(false);
+    setBloodImageFiles([]);
     if (extractedResults) {
       setPendingBloodResults(extractedResults);
       setBloodEditMode(false);
@@ -958,6 +1056,93 @@ export default function Home() {
     setPendingBloodResults(null);
     setBloodEditMode(false);
     if (STEPS[stepIdx]?.key === "bloodResults") answer("Uploaded", "Edited values confirmed");
+  }
+
+  // Wearable/activity screenshot — up to MAX_IMAGES images, same queue-then-
+  // analyze pattern as addBloodImages/removeBloodImage above.
+  function addActivityImages(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setActivityImageFiles((prev) => {
+      const room = MAX_IMAGES - prev.length;
+      return room > 0 ? [...prev, ...Array.from(files).slice(0, room)] : prev;
+    });
+  }
+
+  function removeActivityImage(index: number) {
+    setActivityImageFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // Mirrors uploadBloodResults(): /api/activity-extract only PROPOSES a
+  // weightBearingActivity estimate (derived deterministically from
+  // steps/active-minutes on the server, never chosen by the model). It only
+  // reaches mapAnswersToFeatures()/scoreBone() once the user confirms.
+  async function uploadActivityImages(images: File[]) {
+    if (images.length === 0) return;
+    setActivityUploadBusy(true);
+    let message: string | null = null;
+    let extracted: UploadedActivityResult | null = null;
+    try {
+      const formData = new FormData();
+      images.forEach((image) => formData.append("image", image));
+      const response = await fetch("/api/activity-extract", { method: "POST", body: formData });
+      const body = (await response.json()) as UploadedActivityResult | { error: string };
+      if (!response.ok || "error" in body) {
+        message =
+          "error" in body ? body.error : "BoneBot could not read that image. You can still choose Low, Moderate, or High above.";
+      } else if (body.weightBearingActivity === null) {
+        message = "I could not identify step or activity-minute data in that image. You can still choose Low, Moderate, or High above.";
+      } else {
+        extracted = body;
+      }
+    } catch {
+      message = "BoneBot could not read that image. You can still choose Low, Moderate, or High above.";
+    }
+    setActivityUploadBusy(false);
+    setActivityImageFiles([]);
+    if (extracted) {
+      setPendingActivityResult(extracted);
+      setActivityEditMode(false);
+      const readParts = [
+        extracted.estimatedSteps !== null ? `~${extracted.estimatedSteps.toLocaleString()} steps/day` : null,
+        extracted.estimatedActiveMinutes !== null ? `~${extracted.estimatedActiveMinutes} active minutes/day` : null,
+      ].filter(Boolean);
+      const label = activityLabel(extracted.weightBearingActivity ?? 0.5);
+      setMessages((items) => [
+        ...items,
+        {
+          role: "bot",
+          text: `I read ${readParts.join(", ") || "your activity screenshot"} → ${label} activity. Please confirm before I include this in your estimate.`,
+        },
+      ]);
+    } else if (message) {
+      setMessages((items) => [...items, { role: "bot", text: message }]);
+    }
+  }
+
+  function useTheseActivityValues() {
+    if (!pendingActivityResult) return;
+    setActivityResult(pendingActivityResult);
+    setPendingActivityResult(null);
+    setActivityEditMode(false);
+    if (STEPS[stepIdx]?.key === "activity") answer("Uploaded", "Use this activity estimate");
+  }
+
+  function skipPendingActivityValues() {
+    setPendingActivityResult(null);
+    setActivityEditMode(false);
+    if (STEPS[stepIdx]?.key === "activity") answer("Not sure", "Skip");
+  }
+
+  function submitEditedActivityLevel(level: "Low" | "Moderate" | "High") {
+    const edited: UploadedActivityResult = {
+      weightBearingActivity: ACTIVITY_LEVEL_MAP[level],
+      estimatedSteps: pendingActivityResult?.estimatedSteps ?? null,
+      estimatedActiveMinutes: pendingActivityResult?.estimatedActiveMinutes ?? null,
+    };
+    setActivityResult(edited);
+    setPendingActivityResult(null);
+    setActivityEditMode(false);
+    if (STEPS[stepIdx]?.key === "activity") answer("Uploaded", `Edited to ${level} activity`);
   }
 
   const BMI_RANGE = { min: 12, max: 60 };
@@ -1074,6 +1259,11 @@ export default function Home() {
     setBloodEditVitaminD("");
     setBloodEditCalcium("");
     setBloodEditError("");
+    setBloodImageFiles([]);
+    setActivityResult(null);
+    setPendingActivityResult(null);
+    setActivityEditMode(false);
+    setActivityImageFiles([]);
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
     setUncertaintyNotes([]);
@@ -1244,7 +1434,7 @@ export default function Home() {
                 m.role === "bot" ? <BotBubble key={i} text={m.text} /> : <UserBubble key={i} text={m.text} />
               )}
               {typing && <TypingDots />}
-              {inFlow && step.options.length > 0 && (
+              {inFlow && step.options.length > 0 && !(step.key === "activity" && pendingActivityResult) && (
                 <div className="flex flex-wrap justify-end gap-2.5">
                   {step.options.map((opt) => (
                     <button
@@ -1438,7 +1628,148 @@ export default function Home() {
                 </div>
               )}
 
-              {inFlow && !pendingBloodResults && step.key !== "weight" && (
+              {inFlow && step.key === "activity" && pendingActivityResult && !activityEditMode && (
+                <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
+                  <div className="text-sm font-semibold text-[#15181A]">Confirm activity estimate</div>
+                  <div className="text-sm leading-[1.5] text-[#4A5452]">
+                    {pendingActivityResult.estimatedSteps !== null &&
+                      `~${pendingActivityResult.estimatedSteps.toLocaleString()} steps/day. `}
+                    {pendingActivityResult.estimatedActiveMinutes !== null &&
+                      `~${pendingActivityResult.estimatedActiveMinutes} active minutes/day. `}
+                    That reads as {activityLabel(pendingActivityResult.weightBearingActivity ?? 0.5)} activity.
+                  </div>
+                  <div className="flex flex-wrap gap-2.5">
+                    <button
+                      onClick={useTheseActivityValues}
+                      className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      Use this
+                    </button>
+                    <button
+                      onClick={() => setActivityEditMode(true)}
+                      className="rounded-full border-[1.5px] px-5 py-2.5 text-[15px] font-medium transition-colors"
+                      style={{ borderColor: ACCENT, color: ACCENT }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={skipPendingActivityValues}
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {inFlow && step.key === "activity" && pendingActivityResult && activityEditMode && (
+                <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
+                  <div className="text-sm font-semibold text-[#15181A]">Choose the level that fits best</div>
+                  <div className="flex flex-wrap gap-2.5">
+                    {(["Low", "Moderate", "High"] as const).map((level) => (
+                      <button
+                        key={level}
+                        onClick={() => submitEditedActivityLevel(level)}
+                        className="rounded-full border-[1.5px] px-5 py-2.5 text-[15px] font-medium transition-colors"
+                        style={{ borderColor: ACCENT, color: ACCENT }}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setActivityEditMode(false)}
+                    className="self-start rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+
+              {inFlow && step.key === "activity" && !pendingActivityResult && (
+                <div className="flex flex-col gap-2.5">
+                  {activityImageFiles.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {activityImageFiles.map((file, index) => (
+                        <div
+                          key={`${file.name}-${index}`}
+                          className="flex items-center gap-1.5 rounded-[10px] border border-[#D5DCDA] bg-white px-2 py-1.5 text-xs"
+                        >
+                          <img src={URL.createObjectURL(file)} alt="" className="h-7 w-7 rounded-[6px] object-cover" />
+                          <span className="max-w-[90px] truncate">{file.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeActivityImage(index)}
+                            className="text-[#9AA5A2] hover:text-[#B0442F]"
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <label
+                    className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E7C6E] hover:bg-[#E4F0ED]"
+                    aria-disabled={activityUploadBusy || activityImageFiles.length >= MAX_IMAGES}
+                  >
+                    <span
+                      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-base"
+                      style={{ backgroundColor: ACCENT_TINT, color: ACCENT }}
+                      aria-hidden
+                    >
+                      ⌚
+                    </span>
+                    <span className="flex flex-col">
+                      <span className="font-semibold text-[#15181A]">
+                        {activityImageFiles.length >= MAX_IMAGES
+                          ? "Maximum 3 photos added"
+                          : "Attach a watch / activity-app screenshot"}
+                      </span>
+                      <span className="text-[13px] text-[#5A6462]">
+                        Up to {MAX_IMAGES} images · {activityImageFiles.length}/{MAX_IMAGES} added
+                      </span>
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      className="sr-only"
+                      disabled={activityUploadBusy || activityImageFiles.length >= MAX_IMAGES}
+                      onChange={(event) => {
+                        addActivityImages(event.target.files);
+                        event.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                  <div className="flex flex-wrap gap-2.5">
+                    {activityImageFiles.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => void uploadActivityImages(activityImageFiles)}
+                        disabled={activityUploadBusy}
+                        className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors disabled:opacity-50"
+                        style={{ backgroundColor: ACCENT }}
+                      >
+                        {activityUploadBusy
+                          ? "Reading your photo(s)…"
+                          : `Analyze ${activityImageFiles.length} photo${activityImageFiles.length > 1 ? "s" : ""}`}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={skipStep}
+                      disabled={activityUploadBusy}
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E] disabled:opacity-50"
+                    >
+                      Skip — I&apos;d rather not say
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {inFlow && !pendingBloodResults && step.key !== "weight" && step.key !== "activity" && (
                 <div className="flex flex-col gap-2.5">
                   <form
                     onSubmit={(event) => {
@@ -1482,9 +1813,30 @@ export default function Home() {
 
                   {step.key === "bloodResults" && (
                     <div className="flex flex-col gap-2.5">
+                      {bloodImageFiles.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {bloodImageFiles.map((file, index) => (
+                            <div
+                              key={`${file.name}-${index}`}
+                              className="flex items-center gap-1.5 rounded-[10px] border border-[#D5DCDA] bg-white px-2 py-1.5 text-xs"
+                            >
+                              <img src={URL.createObjectURL(file)} alt="" className="h-7 w-7 rounded-[6px] object-cover" />
+                              <span className="max-w-[90px] truncate">{file.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => removeBloodImage(index)}
+                                className="text-[#9AA5A2] hover:text-[#B0442F]"
+                                aria-label={`Remove ${file.name}`}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <label
                         className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E7C6E] hover:bg-[#E4F0ED]"
-                        aria-disabled={uploadBusy}
+                        aria-disabled={uploadBusy || bloodImageFiles.length >= MAX_IMAGES}
                       >
                         <span
                           className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-base"
@@ -1495,30 +1847,48 @@ export default function Home() {
                         </span>
                         <span className="flex flex-col">
                           <span className="font-semibold text-[#15181A]">
-                            {uploadBusy ? "Reading your photo…" : "Attach a photo instead"}
+                            {bloodImageFiles.length >= MAX_IMAGES ? "Maximum 3 photos added" : "Attach a photo instead"}
                           </span>
-                          <span className="text-[13px] text-[#5A6462]">A blood-test result or lab report. JPG, PNG, or WEBP.</span>
+                          <span className="text-[13px] text-[#5A6462]">
+                            A blood-test result or lab report. Up to {MAX_IMAGES} images · {bloodImageFiles.length}/{MAX_IMAGES}{" "}
+                            added.
+                          </span>
                         </span>
                         <input
                           type="file"
                           accept="image/jpeg,image/png,image/webp"
+                          multiple
                           className="sr-only"
-                          disabled={uploadBusy}
+                          disabled={uploadBusy || bloodImageFiles.length >= MAX_IMAGES}
                           onChange={(event) => {
-                            const image = event.target.files?.[0];
-                            if (image) void uploadBloodResults(image);
+                            addBloodImages(event.target.files);
                             event.currentTarget.value = "";
                           }}
                         />
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => answer("Skip", "Skip")}
-                        disabled={uploadBusy}
-                        className="self-start rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E] disabled:opacity-50"
-                      >
-                        Skip — I don&apos;t have blood-test results
-                      </button>
+                      <div className="flex flex-wrap gap-2.5">
+                        {bloodImageFiles.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => void uploadBloodResults(bloodImageFiles)}
+                            disabled={uploadBusy}
+                            className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors disabled:opacity-50"
+                            style={{ backgroundColor: ACCENT }}
+                          >
+                            {uploadBusy
+                              ? "Reading your photo(s)…"
+                              : `Analyze ${bloodImageFiles.length} photo${bloodImageFiles.length > 1 ? "s" : ""}`}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => answer("Skip", "Skip")}
+                          disabled={uploadBusy}
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E] disabled:opacity-50"
+                        >
+                          Skip — I don&apos;t have blood-test results
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1840,6 +2210,18 @@ export default function Home() {
                       {bloodResults.alkalinePhosphatase !== null && `ALP: ${bloodResults.alkalinePhosphatase} U/L. `}
                       {bloodResults.redBloodCellCount !== null && `RBC: ${bloodResults.redBloodCellCount}. `}
                       Vitamin D and calcium are included in the current estimate; ALP and RBC are contextual only.
+                    </p>
+                  </div>
+                )}
+
+                {activityResult && (
+                  <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                    <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">Activity input</div>
+                    <p className="mt-3 text-sm leading-[1.6] text-[#4A5452]">
+                      {activityResult.estimatedSteps !== null && `~${activityResult.estimatedSteps.toLocaleString()} steps/day. `}
+                      {activityResult.estimatedActiveMinutes !== null &&
+                        `~${activityResult.estimatedActiveMinutes} active minutes/day. `}
+                      Used as {activityLabel(activityResult.weightBearingActivity ?? 0.5)} activity in your estimate.
                     </p>
                   </div>
                 )}

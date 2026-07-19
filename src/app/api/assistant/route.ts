@@ -17,7 +17,7 @@ import type { TriageOutput } from "@/lib/triage-model";
 
 export const maxDuration = 30;
 
-const MODEL = process.env.OPENAI_MODEL ?? "gpt-5-nano";
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
 
 type Body = {
   mode: "consumer" | "clinician";

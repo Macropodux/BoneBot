@@ -139,8 +139,11 @@ export function scoreBone(
   const provided = providedFeatures ? new Set(providedFeatures) : null;
   const [low, high] = predictionInterval(estimate, terms, provided, c);
 
+  // Category from the point estimate against the clinical T-score bands. (The
+  // earlier "low <= -2.5" rule over-flagged once the honest 95% band widened to
+  // ~+/-1.9; the interval is shown separately as the uncertainty.)
   let category: ModelOutput["category"];
-  if (estimate <= -2.5 || low <= -2.5) category = "elevated";
+  if (estimate <= -2.5) category = "elevated";
   else if (estimate >= -1.0) category = "lower";
   else category = "uncertain";
 
