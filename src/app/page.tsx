@@ -340,6 +340,9 @@ export default function Home() {
   const [clarificationCounts, setClarificationCounts] = useState<Partial<Record<StepKey, number>>>({});
   const [unresolvedAnswerCount, setUnresolvedAnswerCount] = useState(0);
   const [uncertaintyNotes, setUncertaintyNotes] = useState<string[]>([]);
+  const [emailAddress, setEmailAddress] = useState("");
+  const [emailSendState, setEmailSendState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [emailSendError, setEmailSendError] = useState("");
 
   const [qaMessages, setQaMessages] = useState<ChatMessage[]>([]);
   const [qaTyping, setQaTyping] = useState(false);
@@ -347,6 +350,7 @@ export default function Home() {
 
   const chatRef = useRef<HTMLDivElement>(null);
   const qaRef = useRef<HTMLDivElement>(null);
+  const emailSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
@@ -646,29 +650,51 @@ export default function Home() {
     runModel(EXAMPLE_ANSWERS);
   }
 
-  // No backend involved on purpose: this opens her own email app with the
-  // result pre-filled. No new dependency, no API key, works immediately —
-  // a server-sent email would need both and neither exists yet.
-  function emailResultHref(): string {
-    if (!result) return "";
-    const lines = [
-      `BoneBot screening result — ${catMeta.label}`,
-      "",
-      `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
-      `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
-      "",
-      "What drove this result:",
-      ...result.contributions
-        .slice(0, 5)
-        .map((f) => `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}`),
-      "",
-      "This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score — please discuss this result with your GP or clinician.",
-      "",
-      "— BoneBot, Hack-Nation 6th Global AI Hackathon",
-    ];
-    const subject = encodeURIComponent(`My BoneBot bone-health screening result — ${catMeta.label}`);
-    const body = encodeURIComponent(lines.join("\n"));
-    return `mailto:?subject=${subject}&body=${body}`;
+  function buildResultEmail(): { subject: string; text: string } {
+    const lines = result
+      ? [
+          `BoneBot screening result — ${catMeta.label}`,
+          "",
+          `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
+          `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
+          "",
+          "What drove this result:",
+          ...result.contributions
+            .slice(0, 5)
+            .map((f) => `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}`),
+          "",
+          "This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score — please discuss this result with your GP or clinician.",
+          "",
+          "— BoneBot, Hack-Nation 6th Global AI Hackathon",
+        ]
+      : [];
+    return {
+      subject: `My BoneBot bone-health screening result — ${catMeta.label}`,
+      text: lines.join("\n"),
+    };
+  }
+
+  async function sendResultEmail() {
+    if (!emailAddress.trim() || emailSendState === "sending") return;
+    setEmailSendState("sending");
+    setEmailSendError("");
+    try {
+      const { subject, text } = buildResultEmail();
+      const r = await fetch("/api/send-result", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ to: emailAddress.trim(), subject, text }),
+      });
+      if (r.ok) {
+        setEmailSendState("sent");
+      } else {
+        setEmailSendError(await r.text());
+        setEmailSendState("error");
+      }
+    } catch {
+      setEmailSendError("Couldn't send that email right now.");
+      setEmailSendState("error");
+    }
   }
 
   function restart() {
@@ -689,6 +715,9 @@ export default function Home() {
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
     setUncertaintyNotes([]);
+    setEmailAddress("");
+    setEmailSendState("idle");
+    setEmailSendError("");
   }
 
   async function qaAsk(q: string) {
@@ -1015,12 +1044,12 @@ export default function Home() {
             <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
               Screening flag — not a diagnosis
             </div>
-            <a
-              href={emailResultHref()}
+            <button
+              onClick={() => emailSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
               className="hidden items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E] sm:flex"
             >
               <span aria-hidden>✉️</span> Email this result
-            </a>
+            </button>
             <button
               onClick={restart}
               className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
@@ -1262,22 +1291,52 @@ export default function Home() {
                   </div>
                 )}
 
-                <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-[#E3E9E7] bg-white px-7 py-6 sm:flex-row sm:items-center sm:px-8">
-                  <div>
-                    <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
-                      Keep a copy of this result
-                    </div>
-                    <div className="mt-0.5 text-[13px] text-[#5A6462]">
-                      Email it to yourself, or bring it to your GP appointment.
-                    </div>
+                <div ref={emailSectionRef} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-6 sm:px-8">
+                  <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
+                    Keep a copy of this result
                   </div>
-                  <a
-                    href={emailResultHref()}
-                    className="flex items-center gap-2 whitespace-nowrap rounded-[9px] px-5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white"
-                    style={{ backgroundColor: ACCENT }}
-                  >
-                    <span aria-hidden>✉️</span> Email this result
-                  </a>
+                  <div className="mt-0.5 text-[13px] text-[#5A6462]">
+                    We&apos;ll email it to you — bring it to your GP appointment.
+                  </div>
+
+                  {emailSendState === "sent" ? (
+                    <p className="mt-4 flex items-center gap-2 text-sm font-semibold" style={{ color: ACCENT }}>
+                      <span aria-hidden>✓</span> Sent to {emailAddress}.
+                    </p>
+                  ) : (
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void sendResultEmail();
+                      }}
+                      className="mt-4 flex flex-col gap-2 sm:flex-row"
+                    >
+                      <input
+                        type="email"
+                        required
+                        value={emailAddress}
+                        onChange={(event) => {
+                          setEmailAddress(event.target.value);
+                          if (emailSendState === "error") setEmailSendState("idle");
+                        }}
+                        placeholder="you@example.com"
+                        aria-label="Your email address"
+                        disabled={emailSendState === "sending"}
+                        className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E] disabled:opacity-50"
+                      />
+                      <button
+                        type="submit"
+                        disabled={emailSendState === "sending" || !emailAddress.trim()}
+                        className="flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] px-5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-50"
+                        style={{ backgroundColor: ACCENT }}
+                      >
+                        <span aria-hidden>✉️</span> {emailSendState === "sending" ? "Sending…" : "Email this result"}
+                      </button>
+                    </form>
+                  )}
+                  {emailSendState === "error" && (
+                    <p className="mt-2 text-sm text-[#B0442F]">{emailSendError || "Couldn't send that email right now."}</p>
+                  )}
                 </div>
 
                 <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
