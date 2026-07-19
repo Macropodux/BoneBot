@@ -121,17 +121,17 @@ const EXAMPLE_PATIENTS: { id: string; label: string; blurb: string; name: string
   {
     id: "low",
     label: "Low risk",
-    blurb: "55, active, no major risk factors",
+    blurb: "42, active, no major risk factors",
     name: "Alice",
     answers: {
       assignedFemale: "Yes",
-      age: "55",
+      age: "42",
       menopauseStatus: "Yes",
       existingCare: "No",
       knowsDxa: "No",
       dxaScore: "",
       dxaYear: "",
-      menopause: "50",
+      menopause: "38",
       fracture: "No",
       smoke: "No",
       steroids: "No",
@@ -646,6 +646,10 @@ function AnimatedNumber({
 export default function Home() {
   const [screen, setScreen] = useState<"landing" | "chat" | "results">("landing");
   const [showExampleMenu, setShowExampleMenu] = useState(false);
+  // Which demo patient is currently loading (runModel's score/implications/
+  // summary calls take a beat) — drives the spinner on that one chip so
+  // clicking an example doesn't feel like it did nothing.
+  const [loadingExampleId, setLoadingExampleId] = useState<string | null>(null);
   const [stepIdx, setStepIdx] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typing, setTyping] = useState(false);
@@ -725,6 +729,7 @@ export default function Home() {
   const chatRef = useRef<HTMLDivElement>(null);
   const qaRef = useRef<HTMLDivElement>(null);
   const emailSectionRef = useRef<HTMLDivElement>(null);
+  const freeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // stepIdx (not just messages/typing) because the chip row now renders
@@ -732,6 +737,19 @@ export default function Home() {
     // changes the pane's content height without changing messages/typing.
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [messages, typing, stepIdx]);
+
+  useEffect(() => {
+    // The free-text input is the same DOM node across consecutive free-text
+    // questions (age -> dxaScore -> dxaYear -> ...), so a plain autoFocus
+    // prop only fires once on first mount. Re-focus it explicitly whenever
+    // she lands on a new question, so she never has to click into it herself.
+    // (step/chatReady aren't declared yet at this point in the component, so
+    // the same condition is recomputed inline here.)
+    const currentStep = STEPS[stepIdx];
+    if (screen === "chat" && !typing && currentStep && currentStep.options.length === 0) {
+      freeInputRef.current?.focus();
+    }
+  }, [stepIdx, screen, typing]);
   useEffect(() => {
     if (qaRef.current) qaRef.current.scrollTop = qaRef.current.scrollHeight;
   }, [qaMessages, qaTyping]);
@@ -797,7 +815,7 @@ export default function Home() {
     setBmiError("");
     const greetingName = name ? `, ${name}` : "";
     botSay(
-      `Nice to meet you${greetingName}. I'll begin with four short questions. If your answers are above BoneBot's threshold for a closer look, I'll ask some follow-up questions. The model calculates the screening estimate; AI only explains it. This is not a diagnosis.`
+      `Nice to meet you${greetingName}. I'll begin with four short questions. If your answers indicate we should take closer look, I'll ask some follow-up questions. Remember: this is a screening estimate, not a diagnosis.`
     );
     window.setTimeout(() => botSay(STEPS[0].q), 1400);
   }
@@ -1211,9 +1229,14 @@ export default function Home() {
   // to the vision model together (see mergeBloodResults in the route).
   function addBloodImages(files: FileList | null) {
     if (!files || files.length === 0) return;
+    // Snapshot to a plain array now — the caller resets the <input>'s value
+    // right after this call, which also clears the live FileList. If the
+    // setState updater ran after that reset (state updaters aren't
+    // guaranteed synchronous), Array.from(files) would see an empty list.
+    const selected = Array.from(files);
     setBloodImageFiles((prev) => {
       const room = MAX_IMAGES - prev.length;
-      return room > 0 ? [...prev, ...Array.from(files).slice(0, room)] : prev;
+      return room > 0 ? [...prev, ...selected.slice(0, room)] : prev;
     });
   }
 
@@ -1366,9 +1389,11 @@ export default function Home() {
   // analyze pattern as addBloodImages/removeBloodImage above.
   function addActivityImages(files: FileList | null) {
     if (!files || files.length === 0) return;
+    // See addBloodImages — snapshot before the caller resets input.value.
+    const selected = Array.from(files);
     setActivityImageFiles((prev) => {
       const room = MAX_IMAGES - prev.length;
-      return room > 0 ? [...prev, ...Array.from(files).slice(0, room)] : prev;
+      return room > 0 ? [...prev, ...selected.slice(0, room)] : prev;
     });
   }
 
@@ -1521,36 +1546,117 @@ export default function Home() {
     answer(bmi.toFixed(1), `${weightInput} ${weightUnit}, ${heightDisplay} (BMI ${bmi.toFixed(1)})`);
   }
 
-  function tryExample(answers: Record<StepKey, string>, name: string) {
-    setShowExampleMenu(false);
+  async function tryExample(patientId: string, answers: Record<StepKey, string>, name: string) {
+    if (loadingExampleId) return;
+    setLoadingExampleId(patientId);
     setUserName(name);
-    runModel(answers, name);
+    await runModel(answers, name);
+    setLoadingExampleId(null);
+    setShowExampleMenu(false);
   }
 
-  function buildResultEmail(): { subject: string; text: string } {
-    const lines = result
-      ? [
-          `BoneBot screening result: ${catMeta.label}`,
-          ...(userName ? [`For ${userName}`] : []),
-          "",
-          `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
-          `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
-          "",
-          "What drove this result:",
-          ...result.contributions.map((f) => {
-            const detail = features ? factorDetail(f.factor, features) : { value: "" };
-            const valueNote = detail.value ? ` (${detail.value})` : "";
-            return `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}${valueNote}`;
-          }),
-          "",
-          "This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score, so please discuss this result with your GP or clinician.",
-          "",
-          "BoneBot, Hack-Nation 6th Global AI Hackathon",
-        ]
-      : [];
+  function escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // Only shown factors — same "rounds to 0.0 isn't a driver" rule as the
+  // on-screen "What drove this result" card, so the email matches what she
+  // actually saw.
+  function shownEmailContributions() {
+    return (result?.contributions ?? []).filter((f) => Math.round(Math.abs(f.contribution) * 10) / 10 !== 0);
+  }
+
+  function buildResultEmail(): { subject: string; text: string; html: string } {
+    if (!result) return { subject: "", text: "", html: "" };
+    const contributions = shownEmailContributions();
+    const lines = [
+      `BoneBot screening result: ${catMeta.label}`,
+      ...(userName ? [`For ${userName}`] : []),
+      "",
+      `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
+      `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
+      "",
+      "What drove this result:",
+      ...contributions.map((f) => {
+        const detail = features ? factorDetail(f.factor, features) : { value: "" };
+        const valueNote = detail.value ? ` (${detail.value})` : "";
+        return `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}${valueNote}`;
+      }),
+      "",
+      "This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score, so please discuss this result with your GP or clinician.",
+      "",
+      "BoneBot, Hack-Nation 6th Global AI Hackathon",
+    ];
+
+    const heading = userName ? `${escapeHtml(userName)}&rsquo;s screening result` : "Your screening result";
+    const rangeText = T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range;
+    const rows = contributions
+      .map((f) => {
+        const detail = features ? factorDetail(f.factor, features) : { value: "" };
+        const isPositive = f.direction === "raises";
+        const rowColor = isPositive ? "#0E7C6E" : "#B0442F";
+        const sign = f.contribution > 0 ? "+" : "";
+        return `<tr>
+          <td style="padding:6px 0;font-size:13px;color:#15181A;">${escapeHtml(f.factor)}${
+            detail.value ? `<br><span style="font-size:11px;color:#9AA5A2;">${escapeHtml(detail.value)}</span>` : ""
+          }</td>
+          <td style="padding:6px 0;font-size:13px;font-weight:700;color:${rowColor};text-align:right;white-space:nowrap;">${sign}${f.contribution.toFixed(1)}</td>
+        </tr>`;
+      })
+      .join("");
+
+    const html = `<!DOCTYPE html>
+<html>
+  <body style="margin:0;padding:0;background-color:#F5F7F6;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F7F6;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" style="max-width:560px;background-color:#ffffff;border-radius:16px;border:1px solid #E3E9E7;" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="padding:20px 32px;border-bottom:1px solid #E3E9E7;">
+                <span style="font-size:19px;font-weight:700;color:#15181A;">Bone<span style="color:#0E7C6E;">Bot</span></span>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px;">
+                <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5A6462;">${heading}</div>
+                <div style="margin-top:10px;font-size:34px;font-weight:700;color:${catMeta.color};">${escapeHtml(catMeta.label)}</div>
+                <div style="margin-top:14px;font-size:15px;line-height:1.6;color:#4A5452;">
+                  Estimated T-score: <strong>${result.estimatedTScore}</strong> (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]}) &mdash; ${escapeHtml(rangeText)} range.
+                </div>
+                ${
+                  rows
+                    ? `<div style="margin-top:28px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5A6462;">What drove this result</div>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;border-top:1px solid #E3E9E7;">
+                  ${rows}
+                </table>`
+                    : ""
+                }
+                <div style="margin-top:28px;padding:16px;background-color:#F5F7F6;border-radius:12px;font-size:13px;line-height:1.6;color:#5A6462;">
+                  This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score, so please discuss this result with your GP or clinician.
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px;border-top:1px solid #E3E9E7;font-size:12px;color:#9AA5A2;">
+                BoneBot &middot; Hack-Nation 6th Global AI Hackathon &middot; Screening flag, not a diagnosis
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+
     return {
       subject: `My BoneBot bone-health screening result: ${catMeta.label}`,
       text: lines.join("\n"),
+      html,
     };
   }
 
@@ -1559,11 +1665,11 @@ export default function Home() {
     setEmailSendState("sending");
     setEmailSendError("");
     try {
-      const { subject, text } = buildResultEmail();
+      const { subject, text, html } = buildResultEmail();
       const r = await fetch("/api/send-result", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ to: emailAddress.trim(), subject, text }),
+        body: JSON.stringify({ to: emailAddress.trim(), subject, text, html }),
       });
       if (r.ok) {
         setEmailSendState("sent");
@@ -1594,6 +1700,8 @@ export default function Home() {
     setPendingMenopauseAge(null);
     setPendingExistingCareConfirm(false);
     setPendingRecentDxaAnswers(null);
+    setShowExampleMenu(false);
+    setLoadingExampleId(null);
     setFreeInput("");
     setBloodResults(null);
     setPendingBloodResults(null);
@@ -1766,20 +1874,39 @@ export default function Home() {
               </button>
             </div>
             {showExampleMenu && (
-              <div className="mt-4 flex flex-wrap justify-center gap-2.5">
-                {EXAMPLE_PATIENTS.map((patient) => (
-                  <button
-                    key={patient.id}
-                    onClick={() => tryExample(patient.answers, patient.name)}
-                    className="flex flex-col items-start gap-0.5 rounded-[10px] border-[1.5px] border-[#C6CFCC] bg-white px-4 py-2.5 text-left transition-colors hover:border-[#0E7C6E]"
-                  >
-                    <span className="font-[family-name:var(--font-heading)] text-[14px] font-bold text-[#15181A]">
-                      {patient.label}
-                    </span>
-                    <span className="text-[12px] text-[#5A6462]">{patient.blurb}</span>
-                  </button>
-                ))}
-              </div>
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, ease: EASE_OUT }}
+                className="mt-4 flex flex-wrap justify-center gap-2.5"
+              >
+                {EXAMPLE_PATIENTS.map((patient) => {
+                  const isLoading = loadingExampleId === patient.id;
+                  return (
+                    <motion.button
+                      key={patient.id}
+                      whileHover={loadingExampleId ? {} : { scale: 1.03 }}
+                      whileTap={loadingExampleId ? {} : { scale: 0.96 }}
+                      transition={{ duration: 0.15 }}
+                      onClick={() => void tryExample(patient.id, patient.answers, patient.name)}
+                      disabled={loadingExampleId !== null}
+                      className="flex flex-col items-start gap-0.5 rounded-[10px] border-[1.5px] border-[#C6CFCC] bg-white px-4 py-2.5 text-left transition-colors hover:border-[#0E7C6E] disabled:cursor-default disabled:opacity-60"
+                    >
+                      <span className="flex items-center gap-1.5 font-[family-name:var(--font-heading)] text-[14px] font-bold text-[#15181A]">
+                        {isLoading && (
+                          <span
+                            aria-hidden
+                            className="h-3 w-3 animate-spin rounded-full border-2 border-[#C6CFCC]"
+                            style={{ borderTopColor: ACCENT }}
+                          />
+                        )}
+                        {patient.label}
+                      </span>
+                      <span className="text-[12px] text-[#5A6462]">{isLoading ? "Loading…" : patient.blurb}</span>
+                    </motion.button>
+                  );
+                })}
+              </motion.div>
             )}
             <div className="mt-16 grid max-w-[920px] grid-cols-1 gap-4 sm:grid-cols-3">
               {[
@@ -2298,6 +2425,7 @@ export default function Home() {
                       className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E7C6E]"
                     >
                       <input
+                        ref={freeInputRef}
                         // Age has no valid non-numeric answer (unlike dxaScore/
                         // dxaYear/menopause, which also accept a typed "not
                         // sure"/"unknown"), so it's the one free-text step
@@ -2769,8 +2897,14 @@ export default function Home() {
                     </div>
                     <div className="flex flex-col gap-3.5">
                       {(() => {
-                        const maxAbs = Math.max(...result.contributions.map((f) => Math.abs(f.contribution)), 0.1);
-                        return result.contributions.map((f, index) => {
+                        // Anything that rounds to 0.0 at the displayed precision
+                        // isn't a driver of the result — drop it instead of
+                        // showing a meaningless "+0.0"/"-0.0" bar.
+                        const shownContributions = result.contributions.filter(
+                          (f) => Math.round(Math.abs(f.contribution) * 10) / 10 !== 0,
+                        );
+                        const maxAbs = Math.max(...shownContributions.map((f) => Math.abs(f.contribution)), 0.1);
+                        return shownContributions.map((f, index) => {
                           const isPositive = f.direction === "raises";
                           // A near-zero contribution isn't meaningfully raising or
                           // lowering the estimate — color it neutral grey instead of
