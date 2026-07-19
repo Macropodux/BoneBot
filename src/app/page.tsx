@@ -19,14 +19,14 @@ import { useEffect, useRef, useState } from "react";
 import { resolveAmbiguousAnswer } from "@/lib/ambiguity";
 import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model";
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
-import { tScoreModel } from "../../model/model-parameters";
+import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-parameters";
 
 const ACCENT = "#0E7C6E";
 const ACCENT_HOVER = "#0A5A50";
 const ACCENT_TINT = "#E4F0ED";
 const FRACTURE = "#B0442F";
 
-type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "bloodResults" | "weight";
+type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "bloodResults" | "weight" | "secondaryCondition";
 
 type Step = { key: StepKey; q: string; options: string[] };
 
@@ -52,6 +52,18 @@ const STEPS: Step[] = [
   { key: "steroids", q: "Have you ever taken corticosteroids (like prednisone) for 3 months or more?", options: [] },
   { key: "bloodResults", q: "If you have blood-test results, upload an image now, or tap Skip to continue without one.", options: [] },
   { key: "weight", q: "What's your weight and height? BoneBot uses these to calculate your BMI.", options: [] },
+  // Appended last and gated on SECONDARY_CONDITION_TRAINED so it is only asked
+  // once the model is retrained with the feature. Appending (not inserting)
+  // keeps the earlier gate/DXA step indices and FULL_QUESTION_START stable.
+  ...(SECONDARY_CONDITION_TRAINED
+    ? [
+        {
+          key: "secondaryCondition" as StepKey,
+          q: "Have you been diagnosed with thyroid disease, coeliac disease, or chronic kidney disease?",
+          options: ["Yes", "No", "Not sure"],
+        },
+      ]
+    : []),
 ];
 
 const EXAMPLE_ANSWERS: Record<StepKey, string> = {
@@ -69,6 +81,7 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   steroids: "No",
   bloodResults: "Skip",
   weight: "24.5",
+  secondaryCondition: "No",
 };
 
 // Fields the 7-question flow never asks about — photo upload (vitaminD,
@@ -158,6 +171,9 @@ function mapAnswersToFeatures(
     ...FIELD_DEFAULTS,
     vitaminD: bloodResults?.vitaminD ?? FIELD_DEFAULTS.vitaminD,
     calcium: bloodResults?.calcium ?? FIELD_DEFAULTS.calcium,
+    // Only meaningful once SECONDARY_CONDITION_TRAINED (the question is gated on
+    // it); otherwise the coefficient is 0 and this has no effect.
+    secondaryCondition: answerOrDefault(answers.secondaryCondition, tScoreModel.imputationDefaults.secondaryCondition),
   };
 
   const provided: Array<keyof BoneFeatures> = ["age"];
@@ -169,6 +185,7 @@ function mapAnswersToFeatures(
   if (Number.isFinite(parsedBmi)) provided.push("bmi");
   if (bloodResults?.vitaminD != null) provided.push("vitaminD");
   if (bloodResults?.calcium != null) provided.push("calcium");
+  if (SECONDARY_CONDITION_TRAINED && isYesNo(answers.secondaryCondition)) provided.push("secondaryCondition");
 
   return { features, provided };
 }
