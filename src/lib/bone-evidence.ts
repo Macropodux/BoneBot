@@ -199,6 +199,13 @@ export const EVIDENCE_SOURCES: EvidenceSource[] = [
     type: "systematic-review",
   },
   {
+    id: "dxa-role-review-2025",
+    title: "Updates on the Role of DXA in the Evaluation and Monitoring of Osteoporosis",
+    publisher: "Current Rheumatology Reports (Shahane, Lim & Bolster, 2025)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC12578744/",
+    type: "review",
+  },
+  {
     id: "bhof-clinicians-guide-2022",
     title: "The clinician's guide to prevention and treatment of osteoporosis",
     publisher: "Osteoporosis International (Bone Health and Osteoporosis Foundation)",
@@ -256,7 +263,7 @@ export const EVIDENCE_CARDS: EvidenceCard[] = [
     approvedWording:
       "A DXA scan measures bone density, but clinicians interpret it alongside fracture-risk factors and the wider health picture.",
     limits: "Do not call this estimated T-score a DXA result, diagnosis, or fracture-risk calculation.",
-    sourceIds: ["nhs-dxa", "nogg-2024", "bhof-clinicians-guide-2022"],
+    sourceIds: ["nhs-dxa", "nogg-2024", "bhof-clinicians-guide-2022", "dxa-role-review-2025"],
   },
   {
     id: "age",
