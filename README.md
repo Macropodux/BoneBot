@@ -7,7 +7,7 @@ driving it, and a clear prompt to confirm with a DXA scan when warranted. It is 
 **screening flag, never a diagnosis**: an NHANES-trained model makes every
 prediction, and the LLM only explains it in plain language.
 
-**Live demo (no login needed):** https://hacknation-scaffold.vercel.app/
+**Live demo (no login needed):** https://bonebot.vercel.app/
 
 Built in 24 hours for the **Hack-Nation 6th Global AI Hackathon — Challenge 05,
 Women's Hormonal Health**.

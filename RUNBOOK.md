@@ -124,7 +124,8 @@ Renaming changes the `.vercel.app` URL and **the old one stops resolving**. Judg
 link for a week (19–25 Jul). Rename before you submit, or don't rename at all.
 
 ### The scaffold — *deployed and clicked-through, or it doesn't count*
-Live: **https://hacknation-scaffold.vercel.app/** — the status board there reports which
+Live: **https://bonebot.vercel.app/** (moved with the BoneBot rename — the old
+`hacknation-scaffold.vercel.app` URL now 404s) — the status board there reports which
 commit is deployed and lights each row below as it gets wired.
 
 - [x] Next.js app live at a Vercel URL
