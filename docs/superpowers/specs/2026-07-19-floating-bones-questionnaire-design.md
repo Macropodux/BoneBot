@@ -23,6 +23,11 @@ Extend the landing page's floating-bone visual identity through the conversation
   1. “Over the past 7 days, about how many steps did you average per day?”
   2. “Over the past 7 days, about how many active or exercise minutes did you average per day?”
 - Keep activity language explicit that steps and active minutes are practical proxies, not equivalent to the MIMS measure used in training.
+- Use these approved homepage messages verbatim:
+  - Headline: **Know your bone fracture risk before you break something.** Render as two deliberate lines.
+  - Supporting message: **Three minutes. An NHANES-trained model does the maths. AI turns the result into plain English.** Render as two deliberate lines.
+  - Menopause message: **Designed around bone changes after menopause. A bone-health tool built with women in mind.**
+- The adaptive card uses stat **4** and text **quick written questions to start. We only ask more if your answers suggest a closer look.**
 - Do not broadly edit results-page copy. A narrow downstream label correction is allowed when required to keep a revised question faithful to the trained model.
 
 ## Accessibility and Interaction
