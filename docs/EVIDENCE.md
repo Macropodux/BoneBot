@@ -46,6 +46,12 @@ substitute for a measured DXA T-score. Source: `bhof-clinicians-guide-2022`.
   contextual full-blood-count cards only. They are not current model features
   and must not be weighted into a T-score or fracture-risk estimate without a
   separately validated modelling and clinical-review decision.
+- Thyroid disease, coeliac disease, and chronic kidney disease are contextual,
+  chat-only cards answering "does this affect my bones?" style questions. They
+  are not `BoneFeatures` inputs, are not collected anywhere in the
+  questionnaire, and must not be weighted into a T-score or fracture-risk
+  estimate without a separately validated modelling and clinical-review
+  decision.
 
 ## Curation rules
 
@@ -86,6 +92,12 @@ substitute for a measured DXA T-score. Source: `bhof-clinicians-guide-2022`.
 | `osteolaus-blood-counts-2022` | Population-based postmenopausal cohort with two assessments; differential counts did not consistently predict BMD or microarchitecture. | [Biver et al., 2022 (PubMed)](https://pubmed.ncbi.nlm.nih.gov/36111204/) |
 | `ra-frax-ipd-2025` | Individual-person meta-analysis of 29 prospective cohorts (~2M participants) commissioned to update FRAX: RA raised fracture risk (HR 1.49 any clinical fracture, HR 2.23 hip fracture) independent of glucocorticoid exposure and femoral-neck BMD. | [Kanis et al., 2025 (PubMed)](https://pubmed.ncbi.nlm.nih.gov/39955689/) |
 | `ra-fracture-meta-2017` | Meta-analysis of 13 studies: pooled fracture risk ratio 2.25 [1.76–2.87] in RA vs non-RA, 1.99 [1.58–2.50] in the female subgroup. | [Xue et al., 2017 (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC6393106/) |
+| `thyroid-osteoporosis-review-2021` | Review of thyroid hormone disease mechanisms and effects on bone remodelling and fracture risk. | [Thyroid Hormone Diseases and Osteoporosis (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC7230461/) |
+| `hyperthyroidism-fracture-meta-2003` | Meta-analysis: endogenous hyperthyroidism is associated with increased osteoporosis and fracture risk via increased bone resorption. | [Vestergaard & Mosekilde, 2003 (Thyroid)](https://journals.sagepub.com/doi/abs/10.1089/105072503322238854) |
+| `coeliac-osteoporosis-review-2007` | Review: bone mineral density is reduced in treated adult coeliac disease, including in postmenopausal patients. | [Osteoporosis in treated adult coeliac disease (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC1382674/) |
+| `coeliac-osteoporosis-cohort-2018` | Prospective cohort of newly diagnosed adult coeliac patients: bone mineral density alterations in 60.3%, with osteoporosis in roughly half of affected patients. | [Risk factors associated with osteoporosis in a cohort of prospectively diagnosed adult coeliac patients (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC6169042/) |
+| `ckd-fracture-review-2025` | Review: fracture risk is markedly elevated in chronic kidney disease, particularly stages G3–G5D, and is an overlooked complication. | [Fracture Risk in Chronic Kidney Disease (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC12298187/) |
+| `ckd-osteoporosis-systematic-review-2020` | Systematic review: 18–32% of CKD patients also have osteoporosis, with fracture risk over 2.5x that of people without CKD. | [Osteoporosis in Patients with Chronic Kidney Diseases (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC7555655/) |
 
 ## Source use and limits
 
@@ -141,3 +153,38 @@ risk factor alongside, not instead of, glucocorticoid use. It supports the
 *direction* of the model's existing `rheumatoidArthritis` coefficient in
 `bone-model.ts`; the coefficient's magnitude remains a placeholder pending
 NHANES training, per that file's own validation note.
+
+### Secondary-cause cards: thyroid disease, coeliac disease, chronic kidney disease
+
+NOGG (already registered as `nogg-2024`) and NICE list thyroid disease
+(particularly hyperthyroidism and long-term thyroid-hormone treatment),
+coeliac disease and other malabsorption, and chronic kidney disease among the
+recognised secondary causes of osteoporosis, alongside age and menopause.
+These three were added as **chat-only evidence cards** answering
+condition-specific questions in BoneBot's "ask about your result" flow — they
+are not `BoneFeatures` inputs and carry no model coefficient.
+
+- **Thyroid disease.** Vestergaard & Mosekilde's 2003 meta-analysis found
+  endogenous hyperthyroidism raises osteoporosis and fracture risk through
+  increased bone resorption; a 2021 mechanistic review situates
+  thyroid-hormone disease (including post-thyroidectomy TSH-suppression
+  therapy) as a recognised bone-remodelling risk. The card must not comment on
+  medication dosing or TSH-suppression targets — those are prescribing
+  decisions for the clinician managing the person's thyroid treatment.
+- **Coeliac disease.** A 2018 prospective cohort found bone mineral density
+  alterations in 60.3% of newly diagnosed adult coeliac patients (osteopenia
+  or osteoporosis), and a review of treated adult coeliac disease found reduced
+  BMD persists even after treatment, including in postmenopausal patients. The
+  card must not diagnose coeliac disease or malabsorption, or give dietary or
+  gluten-free treatment advice.
+- **Chronic kidney disease.** A 2020 systematic review found 18–32% of CKD
+  patients also have osteoporosis with over 2.5x the fracture risk of the
+  general population, rising to roughly 4x in advanced disease; a 2025 review
+  describes CKD-related fracture risk as an overlooked complication. The card
+  must not diagnose CKD, estimate kidney function, or give kidney-related bone
+  treatment advice.
+
+All three follow the same clinical-boundary rule as ALP/ALC/RBC: BoneBot may
+explain the recognised association and redirect the person to the clinician
+managing that condition, never diagnose it, estimate its severity, or advise
+on its treatment.

@@ -22,6 +22,9 @@ export type EvidenceTopic =
   | "alkaline-phosphatase"
   | "absolute-lymphocyte-count"
   | "red-blood-cell-count"
+  | "thyroid-disease"
+  | "coeliac-disease"
+  | "chronic-kidney-disease"
   | "dxa-and-fracture-risk";
 
 export type EvidenceSource = {
@@ -202,6 +205,48 @@ export const EVIDENCE_SOURCES: EvidenceSource[] = [
     url: "https://link.springer.com/article/10.1007/s00198-021-05900-y",
     type: "guideline",
   },
+  {
+    id: "thyroid-osteoporosis-review-2021",
+    title: "Thyroid Hormone Diseases and Osteoporosis",
+    publisher: "PMC (NIH)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC7230461/",
+    type: "review",
+  },
+  {
+    id: "hyperthyroidism-fracture-meta-2003",
+    title: "Hyperthyroidism, Bone Mineral, and Fracture Risk—A Meta-Analysis",
+    publisher: "Thyroid (Vestergaard & Mosekilde, 2003)",
+    url: "https://journals.sagepub.com/doi/abs/10.1089/105072503322238854",
+    type: "systematic-review",
+  },
+  {
+    id: "coeliac-osteoporosis-review-2007",
+    title: "Osteoporosis in treated adult coeliac disease",
+    publisher: "PMC (NIH)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC1382674/",
+    type: "review",
+  },
+  {
+    id: "coeliac-osteoporosis-cohort-2018",
+    title: "Risk factors associated with osteoporosis in a cohort of prospectively diagnosed adult coeliac patients",
+    publisher: "PMC (NIH)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC6169042/",
+    type: "cohort",
+  },
+  {
+    id: "ckd-fracture-review-2025",
+    title: "Fracture Risk in Chronic Kidney Disease: Addressing an Overlooked Complication",
+    publisher: "PMC (NIH)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC12298187/",
+    type: "review",
+  },
+  {
+    id: "ckd-osteoporosis-systematic-review-2020",
+    title: "Osteoporosis in Patients with Chronic Kidney Diseases: A Systemic Review",
+    publisher: "PMC (NIH)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC7555655/",
+    type: "systematic-review",
+  },
 ];
 
 export const EVIDENCE_CARDS: EvidenceCard[] = [
@@ -351,6 +396,33 @@ export const EVIDENCE_CARDS: EvidenceCard[] = [
       "mros-cbc-2017",
     ],
   },
+  {
+    id: "thyroid-disease",
+    topic: "thyroid-disease",
+    approvedWording:
+      "Thyroid conditions — including an overactive thyroid and long-term thyroid-hormone treatment after thyroid surgery — are a recognised cause of bone loss separate from age and menopause.",
+    limits:
+      "Do not diagnose a thyroid condition, comment on thyroid-hormone dosing, or advise changing thyroid medication. Direct an existing thyroid diagnosis or treatment concern back to the prescribing clinician.",
+    sourceIds: ["nogg-2024", "thyroid-osteoporosis-review-2021", "hyperthyroidism-fracture-meta-2003"],
+  },
+  {
+    id: "coeliac-disease",
+    topic: "coeliac-disease",
+    approvedWording:
+      "Coeliac disease and other causes of poor nutrient absorption are a recognised cause of lower bone density, separate from age and menopause.",
+    limits:
+      "Do not diagnose coeliac disease or malabsorption, or give dietary or gluten-free treatment advice. Direct concerns to the clinician managing the condition.",
+    sourceIds: ["nogg-2024", "coeliac-osteoporosis-review-2007", "coeliac-osteoporosis-cohort-2018"],
+  },
+  {
+    id: "chronic-kidney-disease",
+    topic: "chronic-kidney-disease",
+    approvedWording:
+      "Chronic kidney disease is a recognised cause of increased fracture risk and bone changes, separate from age and menopause.",
+    limits:
+      "Do not diagnose chronic kidney disease, estimate kidney function, or give kidney-related bone treatment advice. Direct results to the clinician managing kidney health.",
+    sourceIds: ["nogg-2024", "ckd-fracture-review-2025", "ckd-osteoporosis-systematic-review-2020"],
+  },
 ];
 
 const FACTOR_TO_CARD: Record<string, string> = {
@@ -390,6 +462,9 @@ const QUESTION_EVIDENCE: [string, RegExp][] = [
   ["alcohol", /\b(alcohol|drink)\b/i],
   ["vitamin-d", /\b(vitamin d|vitamin-d)\b/i],
   ["calcium", /\bcalcium\b/i],
+  ["thyroid-disease", /\b(thyroid|thyroidectomy|hyperthyroid)\w*\b/i],
+  ["coeliac-disease", /\b(coeliac|celiac|malabsorption)\b/i],
+  ["chronic-kidney-disease", /\b(kidney|renal|dialysis|ckd)\b/i],
 ];
 
 const GENERAL_BONE_HEALTH = /\b(bone|osteoporosis|osteopenia|prevent|protect|keep healthy|what can i do)\b/i;
