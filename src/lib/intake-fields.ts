@@ -26,9 +26,6 @@ export type FieldKey =
   | "age"
   | "menopauseStatus"
   | "hasExistingBoneCare"
-  | "knowsDxaTScore"
-  | "dxaTScore"
-  | "dxaYear"
   | "menopauseAge"
   | "priorFragilityFracture"
   | "currentSmoker"
@@ -83,8 +80,6 @@ export const BMI_RANGE = { min: 12, max: 60 } as const;
 // (VITAMIN_D_RANGE / CALCIUM_RANGE).
 const VITAMIN_D_RANGE = { min: 10, max: 250 } as const;
 const CALCIUM_RANGE = { min: 1.5, max: 3.5 } as const;
-
-const CURRENT_YEAR = new Date().getFullYear();
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
 
@@ -188,40 +183,6 @@ export const FIELDS: FieldDef[] = [
     required: true,
     skippable: false,
     parse: parseBoolean,
-  },
-
-  // ---------- DXA diversion branch (stage: triage) ----------
-  // Only reachable when hasExistingBoneCare === true — see isApplicable()
-  // below. Mirrors the existing app's knowsDxa -> dxaScore -> dxaYear detour.
-  {
-    key: "knowsDxaTScore",
-    question: "Do you know the T-score from your most recent DXA bone-density scan?",
-    inputType: "boolean",
-    options: ["Yes", "No"],
-    stage: "triage",
-    required: true,
-    skippable: false,
-    parse: parseBoolean,
-  },
-  {
-    key: "dxaTScore",
-    question: "What was the T-score on that scan?",
-    inputType: "number",
-    stage: "triage",
-    required: true,
-    skippable: false,
-    hint: "A DXA T-score, typically between -5 and 3, e.g. -2.1.",
-    parse: parseNumber(-5, 3),
-  },
-  {
-    key: "dxaYear",
-    question: "What year was that scan performed?",
-    inputType: "number",
-    stage: "triage",
-    required: true,
-    skippable: true,
-    hint: `A calendar year between 1900 and ${CURRENT_YEAR}, or "not sure".`,
-    parse: parseNumber(1900, CURRENT_YEAR, { integer: true }, true),
   },
 
   // ---------------- DEEP (required, "next uncollected" order) ----------------
@@ -362,21 +323,12 @@ export function getField(key: string): FieldDef | undefined {
 
 const DEEP_REQUIRED_KEYS = FIELDS.filter((f) => f.stage === "deep" && f.required).map((f) => f.key);
 
-function isApplicable(field: FieldDef, collected: Collected): boolean {
-  if (field.key === "knowsDxaTScore" || field.key === "dxaTScore" || field.key === "dxaYear") {
-    if (collected.hasExistingBoneCare !== true) return false;
-    if (field.key !== "knowsDxaTScore" && collected.knowsDxaTScore !== true) return false;
-  }
-  return true;
-}
-
-// All fields that are (a) relevant given the current branch and (b) not yet
-// collected — offered to the extraction LLM as its candidate set so one
-// reply can fill in several fields at once. Never includes a field the
-// current branch has already made moot (e.g. dxaTScore when
-// hasExistingBoneCare is false).
+// All fields not yet collected — offered to the extraction LLM as its
+// candidate set so one reply can fill in several fields at once. The
+// existing-care routing choice ("Continue / Head home") is NOT a field here;
+// it is a deterministic routing marker handled entirely in api/converse.
 export function outstandingApplicableFields(collected: Collected): FieldDef[] {
-  return FIELDS.filter((f) => isApplicable(f, collected) && collected[f.key] === undefined);
+  return FIELDS.filter((f) => collected[f.key] === undefined);
 }
 
 // Silent, deterministic inferences applied after merging any new extracted
@@ -419,19 +371,17 @@ export const SEX_INELIGIBLE_MESSAGE =
 export const NOT_POSTMENOPAUSAL_MESSAGE =
   "BoneBot is calibrated for use around and after menopause, so this screening tool isn't the right fit for you right now. If you have any bone-health concerns in the meantime, please speak with your GP.";
 
-function describeDxaResult(tScore: number, year: number | null): string {
-  const band =
-    tScore <= -2.5 ? "the osteoporosis range" : tScore < -1 ? "the low bone density (osteopenia) range" : "the normal range";
-  const yearNote = year ? ` from ${year}` : "";
-  return (
-    `The T-score you reported (${tScore.toFixed(1)}${yearNote}) falls in ${band} on the DXA scale. ` +
-    "This is an explanation of your reported scan result, not a BoneBot estimate — please discuss it, " +
-    "and your wider fracture risk, with your GP or the clinician managing your bone health."
-  );
-}
+// Existing-care routing gate (see decide() and api/converse). Deterministic,
+// server-owned copy — the LLM never phrases these.
+export const EXISTING_CARE_GP_MESSAGE =
+  "Since you've already been diagnosed or scanned, it's best to discuss any bone-health questions with your GP. Would you like to continue the questionnaire anyway, or head back home?";
+
+export const EXISTING_CARE_HOME_MESSAGE =
+  "No problem — since you've already been diagnosed or scanned, your GP is the best person to talk to about your bone health. Take care.";
 
 export type Decision =
   | { kind: "gateExit"; message: string }
+  | { kind: "gateChoice"; message: string; field: string; options: string[] }
   | { kind: "triageStop"; message: string; triage: TriageOutput }
   | { kind: "ask"; field: FieldDef }
   | { kind: "ready" };
@@ -456,20 +406,25 @@ export function decide(collected: Collected): Decision {
   if (hasExistingBoneCare === undefined) return { kind: "ask", field: getField("hasExistingBoneCare")! };
 
   if (hasExistingBoneCare === true) {
-    const knowsDxaTScore = collected.knowsDxaTScore;
-    if (knowsDxaTScore === undefined) return { kind: "ask", field: getField("knowsDxaTScore")! };
-    if (knowsDxaTScore === true) {
-      const dxaTScore = collected.dxaTScore;
-      if (typeof dxaTScore !== "number") return { kind: "ask", field: getField("dxaTScore")! };
-      const dxaYear = collected.dxaYear;
-      if (dxaYear === undefined) return { kind: "ask", field: getField("dxaYear")! };
+    // Already diagnosed / scanned / on bone medication: we don't run our own
+    // screening on top of existing care. Recommend the GP and offer a
+    // deterministic routing choice — continue the questionnaire anyway, or
+    // head home. The reply is captured and parsed in api/converse; this gate
+    // never asks for a T-score or scan year.
+    const continueOrHome = collected.continueOrHome;
+    if (continueOrHome === undefined) {
       return {
-        kind: "gateExit",
-        message: describeDxaResult(dxaTScore, typeof dxaYear === "number" ? dxaYear : null),
+        kind: "gateChoice",
+        message: EXISTING_CARE_GP_MESSAGE,
+        field: "continueOrHome",
+        options: ["Continue", "Head home"],
       };
     }
-    // knowsDxaTScore === false -> fall through to ordinary triage scoring,
-    // exactly like today's flow (continueAfterTriage after knowsDxa "No").
+    if (continueOrHome === "head-home") {
+      return { kind: "gateExit", message: EXISTING_CARE_HOME_MESSAGE };
+    }
+    // continueOrHome === "continue" -> fall through to ordinary triage +
+    // deep questionnaire, exactly as if there were no existing diagnosis.
   }
 
   const triage = scoreTriage({ age, menopauseStatus: menopauseStatus as MenopauseStatus });
