@@ -313,12 +313,14 @@ everything else is done and Josh green-lights it; consumer mode only, never clin
 
 ---
 
-## The "not yet validated" banner (temporary state)
+## The "not yet validated" banner (historical — resolved 2026-07-19)
 
-While `MODEL_IS_VALIDATED = false` in `bone-model.ts`, a visible strip reads:
-*"Illustrative — coefficients not yet trained on NHANES."* It disappears the moment
-Emre exports the real regression coefficients. **Never demo placeholder numbers
-without this banner.**
+`MODEL_IS_VALIDATED` is now `true` (real NHANES-trained coefficients, see
+`model/model-parameters.ts`, `model/README.md`), so this banner no longer
+shows. It remains in the code as a dead path for if the model is ever
+unvalidated again: while `MODEL_IS_VALIDATED = false` in `bone-model.ts`, a
+visible strip reads *"Illustrative — coefficients not yet trained on NHANES."*
+**Never demo placeholder numbers without this banner.**
 
 ---
 

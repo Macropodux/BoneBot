@@ -65,11 +65,11 @@ Stay in your own files. Say out loud what you're editing (AGENTS.md).
 
 The brief scores three things: Women's Health Impact, Technical Excellence, and
 **Foundation Value** (a *reusable scientific asset*, not just an app). We're strong on
-impact + honesty; the risk is Foundation Value — **a polished app with placeholder
+impact + honesty; the risk was Foundation Value — **a polished app with placeholder
 coefficients is exactly the brief's weak-submission trap.** Close it, in order:
 
-1. **Train the model on NHANES for real** → replace placeholder coefficients → flip
-   `MODEL_IS_VALIDATED`. Unlocks Technical Excellence *and* Foundation Value. Top priority.
+1. ✅ **Done — Train the model on NHANES for real** → replace placeholder coefficients →
+   flip `MODEL_IS_VALIDATED`. See `model/model-parameters.ts`, `model/README.md`.
 2. **Publish the benchmark as the reusable asset:** features → estimated-T-score task,
    a grouped/held-out split, error (MAE) + interval coverage, the evaluation script,
    and a short dataset card.
@@ -102,9 +102,10 @@ cycle is 2013–2014 before merging** — merging files that don't share respond
 classic silent failure. (Hip accelerometer + DXA also co-occur in 2005–2006 as a
 fallback if activity intensity matters more than a wrist device.)
 
-**Output:** trained **regression** coefficients (+ the interval half-width) exported
-into `bone-model.ts`; then flip `MODEL_IS_VALIDATED = true`. Until then the UI shows the
-"not yet validated" banner — never demo placeholder numbers as real.
+**Output:** ✅ trained **regression** coefficients (+ the interval half-width) exported
+into `model/model-parameters.ts`; `MODEL_IS_VALIDATED = true`. (If this were ever
+false, the UI shows the "not yet validated" banner — never demo placeholder
+numbers as real.)
 
 **Reusable asset (Foundation Value):** publish model + benchmark (features → low BMD,
 grouped split, calibration report) openly.
