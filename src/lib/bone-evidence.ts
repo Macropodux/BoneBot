@@ -24,7 +24,14 @@ export type EvidenceTopic =
   | "thyroid-disease"
   | "coeliac-disease"
   | "chronic-kidney-disease"
-  | "dxa-and-fracture-risk";
+  | "dxa-and-fracture-risk"
+  | "care-gap"
+  | "screening-tool-comparison"
+  | "wearable-activity-evidence"
+  | "wearable-data-bias"
+  | "fall-risk"
+  | "treatment-adherence"
+  | "economic-burden";
 
 export type EvidenceSource = {
   id: string;
@@ -253,6 +260,174 @@ export const EVIDENCE_SOURCES: EvidenceSource[] = [
     url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC7555655/",
     type: "systematic-review",
   },
+  {
+    id: "glow-care-gaps-2022",
+    title: "Osteoporosis in 2022: care gaps to screening and personalised medicine",
+    publisher: "PMC (NIH)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC7614114/",
+    type: "review",
+  },
+  {
+    id: "eu-primary-care-gap-2020",
+    title: "Osteoporosis treatment gap in European primary care",
+    publisher: "Osteoporosis International",
+    url: "https://link.springer.com/article/10.1007/s00198-020-05557-z",
+    type: "cohort",
+  },
+  {
+    id: "intl-fracture-care-gap",
+    title: "Fragility fractures and the osteoporosis care gap: an international phenomenon",
+    publisher: "ScienceDirect",
+    url: "https://www.sciencedirect.com/science/article/abs/pii/S0049017205002143",
+    type: "review",
+  },
+  {
+    id: "frax-sensitivity-2015",
+    title: "Risk assessment tools for screening",
+    publisher: "Current Osteoporosis Reports",
+    url: "https://link.springer.com/article/10.1007/s11914-015-0282-z",
+    type: "review",
+  },
+  {
+    id: "screening-tools-network-meta-2025",
+    title: "Comparative accuracy of screening tools for osteoporosis: a network meta-analysis",
+    publisher: "International Journal of Nursing Studies",
+    url: "https://www.sciencedirect.com/science/article/abs/pii/S0020748925000380",
+    type: "systematic-review",
+  },
+  {
+    id: "ost-performance-review",
+    title: "OST performance review (age + weight tool)",
+    publisher: "PMC (NIH)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC6068473/",
+    type: "review",
+  },
+  {
+    id: "screening-tools-meta-2015",
+    title: "Systematic review and meta-analysis of clinical risk-assessment instruments",
+    publisher: "Osteoporosis International",
+    url: "https://link.springer.com/article/10.1007/s00198-015-3025-1",
+    type: "systematic-review",
+  },
+  {
+    id: "nhanes-ml-karaismailoglu-2025",
+    title: "Risk prediction of low bone density with machine learning",
+    publisher: "Balkan Medical Journal (Karaismailoglu & Karaismailoglu, 2025)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC12576511/",
+    type: "observational-study",
+  },
+  {
+    id: "accelerometry-bmd-nhanes-2019",
+    title: "Accelerometry, BMD and trabecular bone score, NHANES 2005-2006",
+    publisher: "Archives of Osteoporosis",
+    url: "https://link.springer.com/article/10.1007/s11657-019-0583-4",
+    type: "observational-study",
+  },
+  {
+    id: "activity-spine-bmd-nhanes-2023",
+    title: "Physical activity and spine BMD in post-menopausal women, NHANES 2007-2018",
+    publisher: "Journal of Orthopaedic Surgery and Research",
+    url: "https://link.springer.com/article/10.1186/s13018-023-03976-2",
+    type: "observational-study",
+  },
+  {
+    id: "ukb-brief-activity-bone-2017",
+    title: "Brief high-intensity activity and bone health, UK Biobank",
+    publisher: "International Journal of Epidemiology",
+    url: "https://academic.oup.com/ije/article/46/6/1847/3902973",
+    type: "cohort",
+  },
+  {
+    id: "wearable-ownership-bias-2025",
+    title: "Demographic and socioeconomic factors in Fitbit ownership",
+    publisher: "International Journal of Environmental Research and Public Health",
+    url: "https://doi.org/10.3390/ijerph23070839",
+    type: "observational-study",
+  },
+  {
+    id: "wearable-surveillance-representativeness-2019",
+    title: "Physical activity surveillance via apps/wearables: representativeness in the UK",
+    publisher: "JMIR (PMC)",
+    url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6371078/",
+    type: "observational-study",
+  },
+  {
+    id: "wearable-social-determinant-2019",
+    title: "Access to wearables as a social determinant of health",
+    publisher: "Healthcare IT News",
+    url: "https://www.healthcareitnews.com/news/access-wearables-could-become-social-determinant-health-researchers-warn",
+    type: "review",
+  },
+  {
+    id: "health-literacy-digital-divide-2016",
+    title: "Health literacy and health-IT adoption (digital divide)",
+    publisher: "PMC (NIH)",
+    url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5069402/",
+    type: "review",
+  },
+  {
+    id: "fall-risk-ml-comparison-2025",
+    title: "Predicting fall risk in older adults: ML comparison of accelerometric vs non-accelerometric factors",
+    publisher: "Digital Health (PMC)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC11951886/",
+    type: "observational-study",
+  },
+  {
+    id: "fall-risk-wearable-2021",
+    title: "Prediction of fall risk in community-dwelling older adults using a wearable system",
+    publisher: "PMC (NIH)",
+    url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8545936/",
+    type: "observational-study",
+  },
+  {
+    id: "looker-tscore-reference-1998",
+    title: "Updated data on proximal femur bone mineral levels of US adults",
+    publisher: "Osteoporosis International (Looker et al., 1998)",
+    url: "https://link.springer.com/article/10.1007/s001980050034",
+    type: "observational-study",
+  },
+  {
+    id: "adherence-mayo-2011",
+    title: "A New Look at Osteoporosis Outcomes: The Influence of Treatment, Compliance, Persistence, and Adherence",
+    publisher: "Mayo Clinic Proceedings",
+    url: "https://www.mayoclinicproceedings.org/article/S0025-6196(11)61200-7/fulltext",
+    type: "review",
+  },
+  {
+    id: "adherence-economics-2011",
+    title: "The Economics of Improving Medication Adherence in Osteoporosis",
+    publisher: "PMC (NIH)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC3167669/",
+    type: "review",
+  },
+  {
+    id: "exercise-adherence-older-women-2010",
+    title: "Predictors of Long-term Exercise Adherence in a Community-Based Sample of Older Women",
+    publisher: "PMC (NIH)",
+    url: "https://pmc.ncbi.nlm.nih.gov/articles/PMC2828261/",
+    type: "cohort",
+  },
+  {
+    id: "resistance-app-adherence-2023",
+    title: "Predictors of long-term resistance exercise adherence among beginners: evidence from mobile app users",
+    publisher: "SportRxiv",
+    url: "https://sportrxiv.org/index.php/server/preprint/view/709",
+    type: "observational-study",
+  },
+  {
+    id: "osteoporosis-cost-policy-2019",
+    title: "Healthcare Policy Changes in Osteoporosis Can Improve Outcomes and Reduce Costs in the United States",
+    publisher: "JBMR Plus (PMC)",
+    url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6808223/",
+    type: "review",
+  },
+  {
+    id: "fracture-economic-burden-2020",
+    title: "Long-term direct and indirect economic burden associated with osteoporotic fracture in US postmenopausal women",
+    publisher: "Osteoporosis International",
+    url: "https://link.springer.com/article/10.1007/s00198-020-05769-3",
+    type: "observational-study",
+  },
 ];
 
 export const EVIDENCE_CARDS: EvidenceCard[] = [
@@ -262,7 +437,7 @@ export const EVIDENCE_CARDS: EvidenceCard[] = [
     approvedWording:
       "A DXA scan measures bone density, but clinicians interpret it alongside fracture-risk factors and the wider health picture.",
     limits: "Do not call this estimated T-score a DXA result, diagnosis, or fracture-risk calculation.",
-    sourceIds: ["nhs-dxa", "nogg-2024", "bhof-clinicians-guide-2022", "dxa-role-review-2025"],
+    sourceIds: ["nhs-dxa", "nogg-2024", "bhof-clinicians-guide-2022", "dxa-role-review-2025", "looker-tscore-reference-1998"],
   },
   {
     id: "age",
@@ -421,6 +596,85 @@ export const EVIDENCE_CARDS: EvidenceCard[] = [
       "Do not diagnose chronic kidney disease, estimate kidney function, or give kidney-related bone treatment advice. Direct results to the clinician managing kidney health.",
     sourceIds: ["nogg-2024", "ckd-fracture-review-2025", "ckd-osteoporosis-systematic-review-2020"],
   },
+  {
+    id: "care-gap",
+    topic: "care-gap",
+    approvedWording:
+      "Even after a fragility fracture — the clearest possible warning sign — most women are never started on osteoporosis treatment, and under-diagnosis is a major driver of that gap. This is why widening who gets screened matters.",
+    limits:
+      "General epidemiological context only. Do not use this to claim that a specific person has been under-treated, or to comment on any individual's treatment history.",
+    sourceIds: ["glow-care-gaps-2022", "eu-primary-care-gap-2020", "intl-fracture-care-gap"],
+  },
+  {
+    id: "screening-tool-comparison",
+    topic: "screening-tool-comparison",
+    approvedWording:
+      "Established clinical screening tools (OST, ORAI, SCORE, OSIRIS, FRAX) trade sensitivity against specificity and mostly rely on a handful of static inputs like age and weight; a recent NHANES machine-learning model shows a similar pattern for women. BoneBot is a research screening tool exploring whether menopause status and objective activity add value beyond that.",
+    limits:
+      "Do not claim BoneBot outperforms these validated clinical tools or that it replaces them for individual clinical decision-making; it is a research benchmark, not a validated clinical calculator.",
+    sourceIds: [
+      "frax-sensitivity-2015",
+      "screening-tools-network-meta-2025",
+      "ost-performance-review",
+      "screening-tools-meta-2015",
+      "nhanes-ml-karaismailoglu-2025",
+    ],
+  },
+  {
+    id: "wearable-activity-evidence",
+    topic: "wearable-activity-evidence",
+    approvedWording:
+      "Objectively measured activity (from a wrist accelerometer, not a step count someone reports) has been linked to higher bone density and better bone measures in older and post-menopausal women, including from brief bouts of higher-intensity movement.",
+    limits:
+      "Supports why BoneBot asks about activity; do not promise that changing activity will change a person's estimated score, and do not prescribe an exercise programme from this card alone.",
+    sourceIds: ["accelerometry-bmd-nhanes-2019", "activity-spine-bmd-nhanes-2023", "ukb-brief-activity-bone-2017"],
+  },
+  {
+    id: "wearable-data-bias",
+    topic: "wearable-data-bias",
+    approvedWording:
+      "Consumer wearable and fitness-app data tends to over-represent people who are younger, more active and more affluent, so BoneBot trains on NHANES's research-grade, provisioned accelerometer data instead of app- or device-volunteered activity data.",
+    limits:
+      "Explains a design choice about the training data; not a statement about any individual person's own device, app, or data.",
+    sourceIds: [
+      "wearable-ownership-bias-2025",
+      "wearable-surveillance-representativeness-2019",
+      "wearable-social-determinant-2019",
+      "health-literacy-digital-divide-2016",
+    ],
+  },
+  {
+    id: "fall-risk",
+    topic: "fall-risk",
+    approvedWording:
+      "A fall is what typically turns low bone density into a fracture, and research has used wearable-measured gait and movement patterns to help identify people at higher risk of falling.",
+    limits:
+      "BoneBot does not assess fall risk or gait today. Do not estimate an individual's fall risk from this card; direct fall concerns to a clinician or a falls-prevention service.",
+    sourceIds: ["fall-risk-ml-comparison-2025", "fall-risk-wearable-2021"],
+  },
+  {
+    id: "treatment-adherence",
+    topic: "treatment-adherence",
+    approvedWording:
+      "Even once diagnosed and prescribed medication or an exercise programme, real-world adherence is often poor — many people stop osteoporosis medication within the first year, and structured exercise programmes see high drop-off, especially among older, less active women.",
+    limits:
+      "General context on a well-documented gap, not personalised adherence coaching, a treatment plan, or medication advice.",
+    sourceIds: [
+      "adherence-mayo-2011",
+      "adherence-economics-2011",
+      "exercise-adherence-older-women-2010",
+      "resistance-app-adherence-2023",
+    ],
+  },
+  {
+    id: "economic-burden",
+    topic: "economic-burden",
+    approvedWording:
+      "Osteoporotic fractures carry a large and rising healthcare cost, with a single fracture linked to roughly $30,000 in care costs in the following year — part of why earlier identification matters.",
+    limits:
+      "Population-level context only. Do not give individual cost, insurance, or billing advice.",
+    sourceIds: ["osteoporosis-cost-policy-2019", "fracture-economic-burden-2020"],
+  },
 ];
 
 const FACTOR_TO_CARD: Record<string, string> = {
@@ -461,6 +715,13 @@ const QUESTION_EVIDENCE: [string, RegExp][] = [
   ["thyroid-disease", /\b(thyroid|thyroidectomy|hyperthyroid)\w*\b/i],
   ["coeliac-disease", /\b(coeliac|celiac|malabsorption)\b/i],
   ["chronic-kidney-disease", /\b(kidney|renal|dialysis|ckd)\b/i],
+  ["care-gap", /\b(untreated|treatment gap|under[- ]?diagnos|undiagnosed|care gap|no treatment)\b/i],
+  ["screening-tool-comparison", /\b(frax|\bost\b|orai|osiris|other (risk )?(tools|calculators)|how (accurate|good|reliable) is this|compare[sd]?)\b/i],
+  ["wearable-activity-evidence", /\b(accelerometer|wearable|wrist monitor|activity tracker)\b/i],
+  ["wearable-data-bias", /\b(fitness app|fitness tracker|who (wears|owns) a wearable|representative(ness)?|selection bias)\b/i],
+  ["fall-risk", /\b(fall|falls|falling|gait|balance)\b/i],
+  ["treatment-adherence", /\b(adherence|stick (to|with)|stop(ped)? taking|compliance|keep up (with )?(my )?exercise|drop ?out)\b/i],
+  ["economic-burden", /\b(cost|expensive|afford|healthcare spending|economic burden)\b/i],
 ];
 
 const GENERAL_BONE_HEALTH = /\b(bone|osteoporosis|osteopenia|prevent|protect|keep healthy|what can i do)\b/i;

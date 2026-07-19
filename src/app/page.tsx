@@ -38,9 +38,9 @@ import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
 import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-parameters";
 import FloatingBones from "./FloatingBones";
 
-const ACCENT = "#0E7C6E";
-const ACCENT_HOVER = "#0A5A50";
-const ACCENT_TINT = "#E4F0ED";
+const ACCENT = "#E11D74";
+const ACCENT_HOVER = "#B0165E";
+const ACCENT_TINT = "#FCE7F1";
 const FRACTURE = "#B0442F";
 
 type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "smoke" | "steroids" | "bloodResults" | "weight" | "averageDailySteps" | "averageDailyActiveMinutes" | "secondaryCondition";
@@ -478,7 +478,7 @@ function TrustedResources({ small }: { small?: boolean }) {
     <ul className={`flex flex-col ${small ? "gap-3" : "gap-4"}`}>
       {RESOURCES.map((r) => (
         <li key={r.url} className={small ? "" : "border-b border-[#E3E9E7] pb-4 last:border-0 last:pb-0"}>
-          <div className={`font-semibold text-[#15181A] ${small ? "text-sm" : "text-[15px]"}`}>{r.name}</div>
+          <div className={`font-semibold text-[#241436] ${small ? "text-sm" : "text-[15px]"}`}>{r.name}</div>
           <p className={`mt-1 leading-[1.5] text-[#4A5452] ${small ? "text-[12.5px]" : "text-[13.5px]"}`}>{r.brief}</p>
           <a
             href={r.url}
@@ -853,7 +853,7 @@ export default function Home() {
     const model = scoreBone(full, provided);
     setResult(model);
 
-    const scoreFallback = `Your estimated T-score is ${model.estimatedTScore}, with an uncertainty range of ${model.tScoreRange[0]} to ${model.tScoreRange[1]}. This is a screening estimate, not a DXA measurement or diagnosis.`;
+    const scoreFallback = `Your estimated T-score is ${model.estimatedTScore}. This is a screening estimate, not a DXA measurement or diagnosis.`;
     const implicationsFallback =
       model.category === "lower"
         ? "This result is reassuring, but it cannot decide on its own whether a scan is appropriate. Keep supporting your bone health and discuss screening at a routine GP visit if that is relevant to you."
@@ -1610,7 +1610,7 @@ export default function Home() {
       "",
       `BoneBot screening result: ${catMeta.label}`,
       "",
-      `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
+      `Estimated T-score: ${result.estimatedTScore}`,
       `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
       "",
       "What drove this result:",
@@ -1640,7 +1640,7 @@ export default function Home() {
         const rowColor = isPositive ? "#0E7C6E" : "#B0442F";
         const sign = f.contribution > 0 ? "+" : "";
         return `<tr>
-          <td style="padding:6px 0;font-size:13px;color:#15181A;">${escapeHtml(f.factor)}${
+          <td style="padding:6px 0;font-size:13px;color:#241436;">${escapeHtml(f.factor)}${
             detail.value ? `<br><span style="font-size:11px;color:#9AA5A2;">${escapeHtml(detail.value)}</span>` : ""
           }</td>
           <td style="padding:6px 0;font-size:13px;font-weight:700;color:${rowColor};text-align:right;white-space:nowrap;">${sign}${f.contribution.toFixed(1)}</td>
@@ -1657,18 +1657,18 @@ export default function Home() {
           <table role="presentation" width="100%" style="max-width:560px;background-color:#ffffff;border-radius:16px;border:1px solid #E3E9E7;" cellpadding="0" cellspacing="0">
             <tr>
               <td style="padding:20px 32px;border-bottom:1px solid #E3E9E7;">
-                <span style="font-size:19px;font-weight:700;color:#15181A;">Bone<span style="color:#0E7C6E;">Bot</span></span>
+                <span style="font-size:19px;font-weight:700;color:#241436;">Bone<span style="color:#E11D74;">Bot</span></span>
               </td>
             </tr>
             <tr>
               <td style="padding:32px;">
-                <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#15181A;">
+                <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#241436;">
                   Dear ${escapeHtml(userName || "there")},<br>Here are the results from your predicted T-score.
                 </p>
                 <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5A6462;">${heading}</div>
                 <div style="margin-top:10px;font-size:34px;font-weight:700;color:${catMeta.color};">${escapeHtml(catMeta.label)}</div>
                 <div style="margin-top:14px;font-size:15px;line-height:1.6;color:#4A5452;">
-                  Estimated T-score: <strong>${result.estimatedTScore}</strong> (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]}) &mdash; ${escapeHtml(rangeText)} range.
+                  Estimated T-score: <strong>${result.estimatedTScore}</strong> &mdash; ${escapeHtml(rangeText)} range.
                 </div>
                 ${
                   rows
@@ -1687,7 +1687,7 @@ export default function Home() {
                 </div>
                 <div style="margin-top:20px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5A6462;">Learn more about osteoporosis and menopause</div>
                 <ul style="margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.8;">
-                  ${RESOURCES.map((r) => `<li><a href="${r.url}" style="color:#0E7C6E;">${escapeHtml(r.name)}</a></li>`).join("")}
+                  ${RESOURCES.map((r) => `<li><a href="${r.url}" style="color:#E11D74;">${escapeHtml(r.name)}</a></li>`).join("")}
                 </ul>
               </td>
             </tr>
@@ -1855,20 +1855,18 @@ export default function Home() {
   const cat = result ? CATEGORY_MAP[result.category] : "low";
   const catMeta = CAT_META[cat];
   const marker = result ? markerPercent(result.estimatedTScore) : 50;
-  const rangeLeftPct = result ? markerPercent(result.tScoreRange[0]) : 50;
-  const rangeRightPct = result ? markerPercent(result.tScoreRange[1]) : 50;
   const reportedActivitySteps = parseDailyActivity(answers.averageDailySteps ?? "", 100_000);
   const reportedActivityMinutes = parseDailyActivity(answers.averageDailyActiveMinutes ?? "", 1_440);
 
   return (
     <div
-      className="flex h-full flex-col bg-[#F5F7F6] text-[#15181A] font-[family-name:var(--font-body)]"
+      className="flex h-full flex-col bg-[#F5F7F6] text-[#241436] font-[family-name:var(--font-body)]"
       style={{ ["--bw-accent" as string]: ACCENT }}
     >
       <style>{`@keyframes bw-blink { 0%,80%,100% { opacity: .25; } 40% { opacity: 1; } }`}</style>
 
       {screen === "landing" && (
-        <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
+        <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
           <FloatingBones />
           <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-12">
             <div className="font-[family-name:var(--font-heading)] text-[22px] font-bold tracking-[-0.02em]">
@@ -1918,7 +1916,7 @@ export default function Home() {
               </button>
               <button
                 onClick={() => setShowExampleMenu((v) => !v)}
-                className="rounded-[10px] border-[1.5px] border-[#C6CFCC] px-8 py-4 font-[family-name:var(--font-heading)] text-[17px] font-bold text-[#15181A] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                className="rounded-[10px] border-[1.5px] border-[#C6CFCC] px-8 py-4 font-[family-name:var(--font-heading)] text-[17px] font-bold text-[#241436] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
               >
                 Try an example
               </button>
@@ -1940,9 +1938,9 @@ export default function Home() {
                       transition={{ duration: 0.15 }}
                       onClick={() => void tryExample(patient.id, patient.answers, patient.name)}
                       disabled={loadingExampleId !== null}
-                      className="flex flex-col items-start gap-0.5 rounded-[10px] border-[1.5px] border-[#C6CFCC] bg-white px-4 py-2.5 text-left transition-colors hover:border-[#0E7C6E] disabled:cursor-default disabled:opacity-60"
+                      className="flex flex-col items-start gap-0.5 rounded-[10px] border-[1.5px] border-[#C6CFCC] bg-white px-4 py-2.5 text-left transition-colors hover:border-[#E11D74] disabled:cursor-default disabled:opacity-60"
                     >
-                      <span className="flex items-center gap-1.5 font-[family-name:var(--font-heading)] text-[14px] font-bold text-[#15181A]">
+                      <span className="flex items-center gap-1.5 font-[family-name:var(--font-heading)] text-[14px] font-bold text-[#241436]">
                         {isLoading && (
                           <span
                             aria-hidden
@@ -1980,7 +1978,7 @@ export default function Home() {
       )}
 
       {screen === "chat" && (
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
           <FloatingBones />
           <header className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12">
             <button
@@ -2008,7 +2006,7 @@ export default function Home() {
                 onClick={() => {
                   if (messages.length <= 1 || window.confirm("Start over? This clears your answers so far.")) restart();
                 }}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
               >
                 Start over
               </button>
@@ -2053,7 +2051,7 @@ export default function Home() {
                     event.preventDefault();
                     submitName();
                   }}
-                  className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E7C6E]"
+                  className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#E11D74]"
                 >
                   <input
                     autoFocus
@@ -2076,7 +2074,7 @@ export default function Home() {
 
               {chatReady && step?.key === "bloodResults" && pendingBloodResults && !bloodEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#15181A]">Confirm blood values</div>
+                  <div className="text-sm font-semibold text-[#241436]">Confirm blood values</div>
                   <div className="text-sm leading-[1.5] text-[#4A5452]">
                     {pendingBloodResults.vitaminD !== null && `Vitamin D: ${pendingBloodResults.vitaminD} nmol/L. `}
                     {pendingBloodResults.calcium !== null && `Calcium: ${pendingBloodResults.calcium} mmol/L. `}
@@ -2099,7 +2097,7 @@ export default function Home() {
                     </button>
                     <button
                       onClick={skipPendingBloodValues}
-                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
                     >
                       Skip
                     </button>
@@ -2109,7 +2107,7 @@ export default function Home() {
 
               {chatReady && step?.key === "bloodResults" && pendingBloodResults && bloodEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#15181A]">Edit blood values</div>
+                  <div className="text-sm font-semibold text-[#241436]">Edit blood values</div>
                   <div className="flex flex-wrap gap-3">
                     <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
                       Vitamin D (nmol/L)
@@ -2119,7 +2117,7 @@ export default function Home() {
                         value={bloodEditVitaminD}
                         onChange={(event) => setBloodEditVitaminD(event.target.value)}
                         placeholder="e.g. 55"
-                        className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                        className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
                       />
                     </label>
                     <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
@@ -2131,7 +2129,7 @@ export default function Home() {
                         value={bloodEditCalcium}
                         onChange={(event) => setBloodEditCalcium(event.target.value)}
                         placeholder="e.g. 2.3"
-                        className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                        className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
                       />
                     </label>
                   </div>
@@ -2146,13 +2144,13 @@ export default function Home() {
                     </button>
                     <button
                       onClick={() => setBloodEditMode(false)}
-                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={skipPendingBloodValues}
-                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
                     >
                       Skip
                     </button>
@@ -2162,7 +2160,7 @@ export default function Home() {
 
               {inFlow && step.key === "weight" && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#15181A]">Weight & height</div>
+                  <div className="text-sm font-semibold text-[#241436]">Weight & height</div>
                   <div className="flex flex-wrap gap-4">
                     <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
                       Weight
@@ -2173,12 +2171,12 @@ export default function Home() {
                           value={weightInput}
                           onChange={(event) => setWeightInput(event.target.value)}
                           placeholder="e.g. 65"
-                          className="w-24 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                          className="w-24 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
                         />
                         <select
                           value={weightUnit}
                           onChange={(event) => setWeightUnit(event.target.value as "kg" | "lb")}
-                          className="rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                          className="rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#E11D74]"
                         >
                           <option value="kg">kg</option>
                           <option value="lb">lb</option>
@@ -2195,7 +2193,7 @@ export default function Home() {
                             value={heightCmInput}
                             onChange={(event) => setHeightCmInput(event.target.value)}
                             placeholder="e.g. 162"
-                            className="w-24 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                            className="w-24 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
                           />
                         ) : (
                           <>
@@ -2205,7 +2203,7 @@ export default function Home() {
                               value={heightFtInput}
                               onChange={(event) => setHeightFtInput(event.target.value)}
                               placeholder="ft"
-                              className="w-16 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                              className="w-16 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
                             />
                             <input
                               type="number"
@@ -2213,14 +2211,14 @@ export default function Home() {
                               value={heightInInput}
                               onChange={(event) => setHeightInInput(event.target.value)}
                               placeholder="in"
-                              className="w-16 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                              className="w-16 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
                             />
                           </>
                         )}
                         <select
                           value={heightUnit}
                           onChange={(event) => setHeightUnit(event.target.value as "cm" | "ftin")}
-                          className="rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                          className="rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2 py-1.5 text-sm outline-none focus:border-[#E11D74]"
                         >
                           <option value="cm">cm</option>
                           <option value="ftin">ft / in</option>
@@ -2243,7 +2241,7 @@ export default function Home() {
 
               {chatReady && step && isActivityStep(step.key) && pendingActivityResult && !activityEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#15181A]">Confirm activity averages</div>
+                  <div className="text-sm font-semibold text-[#241436]">Confirm activity averages</div>
                   <div className="text-sm leading-[1.5] text-[#4A5452]">
                     {pendingActivityResult.estimatedSteps !== null &&
                       `~${pendingActivityResult.estimatedSteps.toLocaleString()} steps/day. `}
@@ -2268,7 +2266,7 @@ export default function Home() {
                     </button>
                     <button
                       onClick={skipPendingActivityValues}
-                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
                     >
                       Skip
                     </button>
@@ -2278,7 +2276,7 @@ export default function Home() {
 
               {chatReady && step && isActivityStep(step.key) && pendingActivityResult && activityEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#15181A]">Edit activity averages</div>
+                  <div className="text-sm font-semibold text-[#241436]">Edit activity averages</div>
                   <div className="flex flex-wrap gap-3">
                     <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
                       Steps per day
@@ -2288,7 +2286,7 @@ export default function Home() {
                         value={activityEditSteps}
                         onChange={(event) => setActivityEditSteps(event.target.value)}
                         placeholder="e.g. 6500"
-                        className="w-36 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                        className="w-36 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
                       />
                     </label>
                     <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
@@ -2299,7 +2297,7 @@ export default function Home() {
                         value={activityEditMinutes}
                         onChange={(event) => setActivityEditMinutes(event.target.value)}
                         placeholder="e.g. 30"
-                        className="w-36 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                        className="w-36 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
                       />
                     </label>
                   </div>
@@ -2314,7 +2312,7 @@ export default function Home() {
                     </button>
                     <button
                       onClick={() => setActivityEditMode(false)}
-                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
                     >
                       Cancel
                     </button>
@@ -2351,7 +2349,7 @@ export default function Home() {
                     </div>
                   )}
                   <label
-                    className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E7C6E] hover:bg-[#E4F0ED]"
+                    className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#E11D74] hover:bg-[#FCE7F1]"
                     aria-disabled={activityUploadBusy || activityImageFiles.length >= MAX_IMAGES}
                   >
                     <span
@@ -2362,7 +2360,7 @@ export default function Home() {
                       ⌚
                     </span>
                     <span className="flex flex-col">
-                      <span className="font-semibold text-[#15181A]">
+                      <span className="font-semibold text-[#241436]">
                         {activityImageFiles.length >= MAX_IMAGES
                           ? "Maximum 3 photos added"
                           : "Upload a weekly Apple Health, Watch, or activity-app summary"}
@@ -2412,7 +2410,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={rejectMenopauseAge}
-                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
                   >
                     No, let me re-enter
                   </button>
@@ -2430,7 +2428,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={confirmExistingCareReturnHome}
-                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
                   >
                     Return home
                   </button>
@@ -2448,7 +2446,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={confirmRecentDxaSeeExplanation}
-                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
                   >
                     See my score explanation
                   </button>
@@ -2472,7 +2470,7 @@ export default function Home() {
                         event.preventDefault();
                         void submitFreeInput();
                       }}
-                      className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E7C6E]"
+                      className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#E11D74]"
                     >
                       <input
                         ref={freeInputRef}
@@ -2513,7 +2511,7 @@ export default function Home() {
                       type="button"
                       onClick={skipStep}
                       disabled={flowQuestionBusy}
-                      className="self-end rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E] disabled:opacity-50"
+                      className="self-end rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74] disabled:opacity-50"
                     >
                       Skip this question
                     </button>
@@ -2543,7 +2541,7 @@ export default function Home() {
                         </div>
                       )}
                       <label
-                        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E7C6E] hover:bg-[#E4F0ED]"
+                        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#E11D74] hover:bg-[#FCE7F1]"
                         aria-disabled={uploadBusy || bloodImageFiles.length >= MAX_IMAGES}
                       >
                         <span
@@ -2554,7 +2552,7 @@ export default function Home() {
                           📎
                         </span>
                         <span className="flex flex-col">
-                          <span className="font-semibold text-[#15181A]">
+                          <span className="font-semibold text-[#241436]">
                             {bloodImageFiles.length >= MAX_IMAGES ? "Maximum 3 photos added" : "Attach a photo instead"}
                           </span>
                           <span className="text-[13px] text-[#5A6462]">
@@ -2592,7 +2590,7 @@ export default function Home() {
                           type="button"
                           onClick={() => answer("Skip", "Skip")}
                           disabled={uploadBusy}
-                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E] disabled:opacity-50"
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74] disabled:opacity-50"
                         >
                           Skip — I don&apos;t have blood-test results
                         </button>
@@ -2611,7 +2609,7 @@ export default function Home() {
 
       {screen === "results" && !result && (
         <MotionConfig reducedMotion="user">
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
             <FloatingBones />
             <motion.header
               initial={{ opacity: 0, y: -10 }}
@@ -2636,7 +2634,7 @@ export default function Home() {
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.15 }}
                   onClick={restart}
-                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
                 >
                   Start over
                 </motion.button>
@@ -2655,7 +2653,7 @@ export default function Home() {
                   </div>
                   {triageResult && (
                     <>
-                      <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#15181A]">
+                      <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#241436]">
                         Very low initial risk
                       </h1>
                       <p
@@ -2668,7 +2666,7 @@ export default function Home() {
                   )}
                   {reportedDxa && (
                     <>
-                      <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#15181A]">
+                      <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#241436]">
                         Reported T-score{" "}
                         <AnimatedNumber value={reportedDxa.score} decimals={1} reduceMotion={reduceMotion} />
                       </h1>
@@ -2690,7 +2688,7 @@ export default function Home() {
                   )}
                   {triageResult && (
                     <div className="mt-4 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">
-                      <h2 className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
+                      <h2 className="font-[family-name:var(--font-heading)] text-base font-bold text-[#241436]">
                         Keep it that way
                       </h2>
                       <ul className="mt-3 list-disc space-y-2 pl-5">
@@ -2729,7 +2727,7 @@ export default function Home() {
 
       {screen === "results" && result && (
         <MotionConfig reducedMotion="user">
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
             <FloatingBones />
             <motion.header
               initial={{ opacity: 0, y: -10 }}
@@ -2754,7 +2752,7 @@ export default function Home() {
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.15 }}
                   onClick={() => emailSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
-                  className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                  className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
                 >
                   <span aria-hidden>✉️</span> Email this result
                 </motion.button>
@@ -2763,7 +2761,7 @@ export default function Home() {
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.15 }}
                   onClick={restart}
-                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
                 >
                   Start over
                 </motion.button>
@@ -2823,24 +2821,12 @@ export default function Home() {
                             <div className="w-1/3" style={{ backgroundColor: "#F0DFAE" }} />
                             <div className="w-1/3" style={{ backgroundColor: "#BFDDD3" }} />
                           </div>
-                          {/* Uncertainty range — the box, not just the point estimate. Draws in
-                              from the centre so the meter visibly resolves to your result. */}
-                          <motion.div
-                            initial={reduceMotion ? false : { left: "50%", width: 0, opacity: 0 }}
-                            animate={{
-                              left: `${rangeLeftPct}%`,
-                              width: `${Math.max(3, rangeRightPct - rangeLeftPct)}%`,
-                              opacity: 1,
-                            }}
-                            transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute top-0 h-3.5 rounded-full border-2 border-dashed border-[#4A5452]"
-                          />
                           <motion.div
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
                             className="absolute -top-[26px] -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
-                            style={{ backgroundColor: "#15181A" }}
+                            style={{ backgroundColor: "#7C3AED" }}
                           >
                             you
                           </motion.div>
@@ -2848,7 +2834,7 @@ export default function Home() {
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute top-0 h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#15181A]"
+                            className="absolute top-0 h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#7C3AED]"
                           />
                         </div>
                         <div className="mt-3.5 flex justify-between gap-2 text-xs font-semibold">
@@ -2860,15 +2846,14 @@ export default function Home() {
                           ))}
                         </div>
                         <p className="mt-4 text-sm leading-[1.6] text-[#4A5452]">
-                          The dashed box is the uncertainty range — your true score most likely sits inside it. A
-                          T-score compares your bone density to a healthy young adult: 0 is average, and lower (more
-                          negative) means less dense bone.
+                          A T-score compares your bone density to a healthy young adult: 0 is average, and lower
+                          (more negative) means less dense bone.
                         </p>
                       </div>
                   </motion.div>
 
                   <motion.div variants={reveal} ref={emailSectionRef} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-6 sm:px-8">
-                    <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
+                    <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#241436]">
                       Keep a copy of this result
                     </div>
                     <div className="mt-0.5 text-[13px] text-[#5A6462]">
@@ -2904,7 +2889,7 @@ export default function Home() {
                           placeholder="you@example.com"
                           aria-label="Your email address"
                           disabled={emailSendState === "sending"}
-                          className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E] disabled:opacity-50"
+                          className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#E11D74] disabled:opacity-50"
                         />
                         <motion.button
                           whileHover={emailSendState === "sending" ? {} : { scale: 1.02 }}
@@ -2975,7 +2960,7 @@ export default function Home() {
                               className="flex items-center gap-3"
                             >
                               <div className="w-[110px] flex-shrink-0 sm:w-[150px]">
-                                <div className="truncate text-[13px] text-[#15181A]" title={f.factor}>
+                                <div className="truncate text-[13px] text-[#241436]" title={f.factor}>
                                   {f.factor}
                                 </div>
                                 {detail.value && (
@@ -3083,7 +3068,7 @@ export default function Home() {
                         whileTap={{ scale: 0.97 }}
                         transition={{ duration: 0.15 }}
                         onClick={() => qaAsk("What's a DXA scan?")}
-                        className="whitespace-nowrap rounded-[9px] bg-white px-5 py-3 font-[family-name:var(--font-heading)] text-sm font-bold hover:bg-[#E4F0ED]"
+                        className="whitespace-nowrap rounded-[9px] bg-white px-5 py-3 font-[family-name:var(--font-heading)] text-sm font-bold hover:bg-[#FCE7F1]"
                         style={{ color: ACCENT }}
                       >
                         What&apos;s a DXA scan?
@@ -3222,7 +3207,7 @@ export default function Home() {
                         onKeyDown={(e) => e.key === "Enter" && qaInput.trim() && qaAsk(qaInput.trim())}
                         placeholder="Type a question…"
                         aria-label="Ask about your result"
-                        className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E]"
+                        className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#E11D74]"
                       />
                       <motion.button
                         whileHover={{ scale: 1.03 }}
