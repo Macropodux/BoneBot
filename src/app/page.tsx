@@ -337,9 +337,20 @@ export default function Home() {
   const [flowQuestionBusy, setFlowQuestionBusy] = useState(false);
   const [bloodResults, setBloodResults] = useState<UploadedBloodResults | null>(null);
   const [uploadBusy, setUploadBusy] = useState(false);
+  // Feature 1 — extracted-but-unconfirmed values from the blood-result image.
+  // Nothing here reaches mapAnswersToFeatures()/scoreBone() until the user
+  // hits "Use these" or edits + confirms; "Skip" discards it entirely.
+  const [pendingBloodResults, setPendingBloodResults] = useState<UploadedBloodResults | null>(null);
+  const [bloodEditMode, setBloodEditMode] = useState(false);
+  const [bloodEditVitaminD, setBloodEditVitaminD] = useState("");
+  const [bloodEditCalcium, setBloodEditCalcium] = useState("");
+  const [bloodEditError, setBloodEditError] = useState("");
   const [clarificationCounts, setClarificationCounts] = useState<Partial<Record<StepKey, number>>>({});
   const [unresolvedAnswerCount, setUnresolvedAnswerCount] = useState(0);
   const [uncertaintyNotes, setUncertaintyNotes] = useState<string[]>([]);
+  // Feature 2 — busy flag while /api/extract is proposing a candidate value
+  // for an otherwise-unparseable free-text answer.
+  const [extracting, setExtracting] = useState(false);
 
   const [qaMessages, setQaMessages] = useState<ChatMessage[]>([]);
   const [qaTyping, setQaTyping] = useState(false);
@@ -371,6 +382,11 @@ export default function Home() {
     setReportedDxa(null);
     setFreeInput("");
     setBloodResults(null);
+    setPendingBloodResults(null);
+    setBloodEditMode(false);
+    setBloodEditVitaminD("");
+    setBloodEditCalcium("");
+    setBloodEditError("");
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
     botSay(
@@ -470,6 +486,15 @@ export default function Home() {
     setFreeInput("");
     setClarificationCounts((counts) => ({ ...counts, [step.key]: 0 }));
 
+    if (stepIdx === 0) {
+      if (opt !== "Yes") {
+        void finishAtGate(
+          "BoneBot’s screening estimate is built and validated for people assigned female at birth around and after menopause, so it can’t give you a reliable result here. Please talk to a clinician about your bone health.",
+        );
+        return;
+      }
+    }
+
     if (stepIdx === 3) {
       if (nextAnswers.assignedFemale !== "Yes") {
         void finishAtGate("BoneBot is currently calibrated for people assigned female at birth. A clinician can help you find the right bone-health assessment.");
@@ -556,10 +581,34 @@ export default function Home() {
     return null;
   }
 
+  // Feature 2 — LLM fallback for an otherwise-unparseable free-text answer.
+  // Proposes a single candidate value via /api/extract, then re-validates it
+  // through the SAME deterministic normaliseFreeAnswer() before it's ever
+  // used. Never bypasses validation; falls through to the existing
+  // clarify -> unknown flow on any null/invalid/failed result.
+  async function tryExtractCandidate(key: StepKey, question: string, rawText: string): Promise<string | null> {
+    setExtracting(true);
+    try {
+      const response = await fetch("/api/extract", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ fieldKey: key, question, rawText }),
+      });
+      if (!response.ok) return null;
+      const body = (await response.json()) as { value: string | null; confidence: number } | { error: string };
+      if ("error" in body || !body.value) return null;
+      return normaliseFreeAnswer(key, body.value);
+    } catch {
+      return null;
+    } finally {
+      setExtracting(false);
+    }
+  }
+
   async function submitFreeInput() {
     const raw = freeInput.trim();
     const step = STEPS[stepIdx];
-    if (!raw || !step || flowQuestionBusy) return;
+    if (!raw || !step || flowQuestionBusy || extracting) return;
     const value = normaliseFreeAnswer(step.key, raw);
     if (value && value !== "Not sure" && value !== "Unknown") {
       answer(value, raw);
@@ -567,6 +616,13 @@ export default function Home() {
     }
     const looksLikeQuestion = /\?|^(what|why|how|can|is|are|does|do)\b/i.test(raw);
     if (!looksLikeQuestion) {
+      if (value === null) {
+        const candidate = await tryExtractCandidate(step.key, step.q, raw);
+        if (candidate !== null) {
+          answer(candidate, raw);
+          return;
+        }
+      }
       const attempts = clarificationCounts[step.key] ?? 0;
       const resolution = resolveAmbiguousAnswer(step.key, attempts);
       if (resolution.action === "clarify") {
@@ -612,34 +668,111 @@ export default function Home() {
     setMessages((items) => [...items, { role: "bot", text }]);
   }
 
+  // Feature 1 — the image extraction only ever PROPOSES vitaminD/calcium.
+  // When either is present, hold them in pendingBloodResults and show a
+  // confirm/edit/skip step; only a user action calls setBloodResults(), which
+  // is what mapAnswersToFeatures()/scoreBone() actually reads. ALP/RBC are
+  // context-only (never scored) so they don't need confirmation.
   async function uploadBloodResults(image: File) {
     setUploadBusy(true);
-    let message = "BoneBot could not read that image. You can still type your answer.";
+    let message: string | null = null;
+    let extractedResults: UploadedBloodResults | null = null;
     try {
       const formData = new FormData();
       formData.append("image", image);
       const response = await fetch("/api/blood-results", { method: "POST", body: formData });
       const body = (await response.json()) as UploadedBloodResults | { error: string };
       if (!response.ok || "error" in body) {
-        message = "error" in body ? body.error : message;
-      } else {
-        setBloodResults(body);
+        message = "error" in body ? body.error : "BoneBot could not read that image. You can still type your answer.";
+      } else if (body.vitaminD === null && body.calcium === null) {
         const extracted = [
-          body.vitaminD !== null ? `vitamin D ${body.vitaminD} nmol/L` : null,
-          body.calcium !== null ? `calcium ${body.calcium} mmol/L` : null,
           body.alkalinePhosphatase !== null ? `ALP ${body.alkalinePhosphatase} U/L` : null,
           body.redBloodCellCount !== null ? `RBC ${body.redBloodCellCount}` : null,
         ].filter(Boolean);
         message = extracted.length
-          ? `I read: ${extracted.join(", ")}. Vitamin D and calcium are included in the current estimate; ALP and RBC are shown only as context.`
+          ? `I read: ${extracted.join(", ")}. That's shown as context only — no vitamin D or calcium value was found to include in your estimate.`
           : "I could not identify a supported blood-result value in that image. You can still type your answer.";
+        setBloodResults(body);
         if (STEPS[stepIdx]?.key === "bloodResults") answer("Uploaded", "Blood-result image uploaded");
+      } else {
+        extractedResults = body;
       }
     } catch {
-      /* Keep the fixed fallback visible. */
+      message = "BoneBot could not read that image. You can still type your answer.";
     }
     setUploadBusy(false);
-    setMessages((items) => [...items, { role: "bot", text: message }]);
+    if (extractedResults) {
+      setPendingBloodResults(extractedResults);
+      setBloodEditMode(false);
+      setBloodEditVitaminD(extractedResults.vitaminD !== null ? String(extractedResults.vitaminD) : "");
+      setBloodEditCalcium(extractedResults.calcium !== null ? String(extractedResults.calcium) : "");
+      setBloodEditError("");
+      const contextParts = [
+        extractedResults.alkalinePhosphatase !== null ? `ALP ${extractedResults.alkalinePhosphatase} U/L` : null,
+        extractedResults.redBloodCellCount !== null ? `RBC ${extractedResults.redBloodCellCount}` : null,
+      ].filter(Boolean);
+      const readText = [
+        extractedResults.vitaminD !== null ? `vitamin D ${extractedResults.vitaminD} nmol/L` : null,
+        extractedResults.calcium !== null ? `calcium ${extractedResults.calcium} mmol/L` : null,
+      ]
+        .filter(Boolean)
+        .join(", ");
+      setMessages((items) => [
+        ...items,
+        {
+          role: "bot",
+          text:
+            `I read ${readText}.` +
+            (contextParts.length ? ` Also ${contextParts.join(", ")} (context only, not scored).` : "") +
+            " Please confirm before I include this in your estimate.",
+        },
+      ]);
+    } else if (message) {
+      setMessages((items) => [...items, { role: "bot", text: message }]);
+    }
+  }
+
+  const VITAMIN_D_RANGE = { min: 10, max: 250 };
+  const CALCIUM_RANGE = { min: 1.5, max: 3.5 };
+
+  function useTheseBloodValues() {
+    if (!pendingBloodResults) return;
+    setBloodResults(pendingBloodResults);
+    setPendingBloodResults(null);
+    setBloodEditMode(false);
+    if (STEPS[stepIdx]?.key === "bloodResults") answer("Uploaded", "Use these values");
+  }
+
+  function skipPendingBloodValues() {
+    setPendingBloodResults(null);
+    setBloodEditMode(false);
+    if (STEPS[stepIdx]?.key === "bloodResults") answer("Skip", "Skip");
+  }
+
+  function submitEditedBloodValues() {
+    const vitDText = bloodEditVitaminD.trim();
+    const calciumText = bloodEditCalcium.trim();
+    const vitD = vitDText === "" ? null : Number(vitDText);
+    const calcium = calciumText === "" ? null : Number(calciumText);
+    if (vitD !== null && (!Number.isFinite(vitD) || vitD < VITAMIN_D_RANGE.min || vitD > VITAMIN_D_RANGE.max)) {
+      setBloodEditError(`Vitamin D must be between ${VITAMIN_D_RANGE.min} and ${VITAMIN_D_RANGE.max} nmol/L, or left blank.`);
+      return;
+    }
+    if (calcium !== null && (!Number.isFinite(calcium) || calcium < CALCIUM_RANGE.min || calcium > CALCIUM_RANGE.max)) {
+      setBloodEditError(`Calcium must be between ${CALCIUM_RANGE.min} and ${CALCIUM_RANGE.max} mmol/L, or left blank.`);
+      return;
+    }
+    setBloodEditError("");
+    const edited: UploadedBloodResults = {
+      vitaminD: vitD,
+      calcium,
+      alkalinePhosphatase: pendingBloodResults?.alkalinePhosphatase ?? null,
+      redBloodCellCount: pendingBloodResults?.redBloodCellCount ?? null,
+    };
+    setBloodResults(edited);
+    setPendingBloodResults(null);
+    setBloodEditMode(false);
+    if (STEPS[stepIdx]?.key === "bloodResults") answer("Uploaded", "Edited values confirmed");
   }
 
   function tryExample() {
@@ -661,6 +794,11 @@ export default function Home() {
     setImplicationsExplanation("");
     setFreeInput("");
     setBloodResults(null);
+    setPendingBloodResults(null);
+    setBloodEditMode(false);
+    setBloodEditVitaminD("");
+    setBloodEditCalcium("");
+    setBloodEditError("");
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
     setUncertaintyNotes([]);
@@ -818,7 +956,93 @@ export default function Home() {
                 </div>
               )}
 
-              {inFlow && step.options.length === 0 && (
+              {inFlow && step.key === "bloodResults" && pendingBloodResults && !bloodEditMode && (
+                <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
+                  <div className="text-sm font-semibold text-[#15181A]">Confirm blood values</div>
+                  <div className="text-sm leading-[1.5] text-[#4A5452]">
+                    {pendingBloodResults.vitaminD !== null && `Vitamin D: ${pendingBloodResults.vitaminD} nmol/L. `}
+                    {pendingBloodResults.calcium !== null && `Calcium: ${pendingBloodResults.calcium} mmol/L. `}
+                    Only these two are used in your estimate.
+                  </div>
+                  <div className="flex flex-wrap gap-2.5">
+                    <button
+                      onClick={useTheseBloodValues}
+                      className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      Use these
+                    </button>
+                    <button
+                      onClick={() => setBloodEditMode(true)}
+                      className="rounded-full border-[1.5px] px-5 py-2.5 text-[15px] font-medium transition-colors"
+                      style={{ borderColor: ACCENT, color: ACCENT }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={skipPendingBloodValues}
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {inFlow && step.key === "bloodResults" && pendingBloodResults && bloodEditMode && (
+                <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
+                  <div className="text-sm font-semibold text-[#15181A]">Edit blood values</div>
+                  <div className="flex flex-wrap gap-3">
+                    <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
+                      Vitamin D (nmol/L)
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={bloodEditVitaminD}
+                        onChange={(event) => setBloodEditVitaminD(event.target.value)}
+                        placeholder="e.g. 55"
+                        className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
+                      Calcium (mmol/L)
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        value={bloodEditCalcium}
+                        onChange={(event) => setBloodEditCalcium(event.target.value)}
+                        placeholder="e.g. 2.3"
+                        className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                      />
+                    </label>
+                  </div>
+                  {bloodEditError && <div className="text-[13px] text-[#B0442F]">{bloodEditError}</div>}
+                  <div className="flex flex-wrap gap-2.5">
+                    <button
+                      onClick={submitEditedBloodValues}
+                      className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      Save & continue
+                    </button>
+                    <button
+                      onClick={() => setBloodEditMode(false)}
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={skipPendingBloodValues}
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {inFlow && step.options.length === 0 && !pendingBloodResults && (
                 <div className="flex flex-col gap-2.5">
                   <form
                     onSubmit={(event) => {
@@ -832,12 +1056,12 @@ export default function Home() {
                       onChange={(event) => setFreeInput(event.target.value)}
                       placeholder="Type your answer, or ask a bone-health question"
                       aria-label="Answer or ask a bone-health question"
-                      disabled={flowQuestionBusy}
+                      disabled={flowQuestionBusy || extracting}
                       className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
                     />
                     <button
                       type="submit"
-                      disabled={flowQuestionBusy || !freeInput.trim()}
+                      disabled={flowQuestionBusy || extracting || !freeInput.trim()}
                       className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
                       style={{ backgroundColor: ACCENT }}
                     >
@@ -880,6 +1104,7 @@ export default function Home() {
               )}
 
               {flowQuestionBusy && <p className="text-right text-sm text-[#5A6462]">Checking the approved evidence…</p>}
+              {extracting && <p className="text-right text-sm text-[#5A6462]">Reading your answer…</p>}
             </div>
           </div>
         </div>
@@ -918,10 +1143,6 @@ export default function Home() {
                       style={{ color: ACCENT }}
                     >
                       {triageResult.probabilityPercent}%
-                    </p>
-                    <p className="mt-2 text-sm text-[#5A6462]">
-                      Below the {triageResult.thresholdPercent}% threshold BoneBot uses to move to the full
-                      assessment.
                     </p>
                   </>
                 )}
