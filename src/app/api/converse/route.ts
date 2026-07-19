@@ -133,15 +133,29 @@ const ExtractionSchema = z.object({
 // across every yes/no candidate. All fields still stay candidates so a reply
 // that also volunteers other answers is captured too; the current field is
 // only the priority for a bare answer.
-async function runExtraction(candidates: FieldDef[], lastUserText: string, currentField?: FieldDef | null) {
+async function runExtraction(
+  candidates: FieldDef[],
+  lastUserText: string,
+  currentField?: FieldDef | null,
+  opts?: { answeredKeys?: Set<string>; currentAge?: number },
+) {
   if (candidates.length === 0 || !lastUserText.trim()) return [];
+  const answeredKeys = opts?.answeredKeys ?? new Set<string>();
+  const currentAge = opts?.currentAge;
 
   const guidance = candidates
     .map((f) => {
-      const opts = f.options ? ` Options: ${f.options.join(" / ")}.` : "";
+      const optsText = f.options ? ` Options: ${f.options.join(" / ")}.` : "";
       const hint = f.hint ? ` (${f.hint})` : "";
-      const marker = currentField && f.key === currentField.key ? " [THE QUESTION JUST ASKED]" : "";
-      return `- ${f.key}: "${f.question}"${opts}${hint}${marker}`;
+      const currentMark = currentField && f.key === currentField.key ? " [THE QUESTION JUST ASKED]" : "";
+      const answeredMark = answeredKeys.has(f.key)
+        ? " [ALREADY ANSWERED — only extract if she explicitly changes or corrects it in this reply]"
+        : "";
+      const menoMark =
+        f.key === "menopauseAge" && typeof currentAge === "number"
+          ? ` [if she gives this relative to now — e.g. "10 years ago" — extract (${currentAge} minus that number of years)]`
+          : "";
+      return `- ${f.key}: "${f.question}"${optsText}${hint}${currentMark}${answeredMark}${menoMark}`;
     })
     .join("\n");
 
@@ -161,7 +175,13 @@ async function runExtraction(candidates: FieldDef[], lastUserText: string, curre
         "You extract candidate answers to a bone-health screening intake from a user's free-text reply. " +
         "Only extract a field if the reply plainly answers it — never infer, guess, calculate, or add outside " +
         "knowledge, and never invent a field that isn't in the candidate list. A single reply may plainly answer " +
-        "more than one candidate field; extract all that apply. A short or direct reply (\"yes\", \"no\", a bare " +
+        "more than one candidate field; extract all that apply. Some candidate fields are marked [ALREADY ANSWERED] " +
+        "— do NOT re-extract those unless this reply explicitly changes or corrects them (e.g. \"no, I'm 59\", " +
+        "\"actually menopause was at 48\"); if it does, extract the corrected value for that field. One calculation IS " +
+        "allowed: for menopauseAge, if the reply gives her age at menopause relative to now (e.g. \"10 years ago\", " +
+        "\"stopped 8 years back\") and her current age is shown in that field's candidate note, extract her age at " +
+        "menopause as (current age minus that number of years). " +
+        "A short or direct reply (\"yes\", \"no\", a bare " +
         "number, or one of the listed options) is the answer to the question that was just asked — attribute it to " +
         "that field. Return plain values only (e.g. \"Yes\"/\"No\", a " +
         'bare number, or "yes"/"no"/"not sure" for status-style fields) — never a sentence or explanation. If the ' +
@@ -196,7 +216,7 @@ async function runPhrase(field: FieldDef, lastUserText: string, isFirstTurn: boo
     "You are BoneBot, a warm, plain-spoken bone-health screening assistant running a short conversational intake. " +
     "Write ONE reply of 1-2 short sentences, similar in length to a normal chat message. " +
     (isFirstTurn
-      ? "Open with a brief, friendly greeting, then ask the required question below. "
+      ? "Open with a brief, friendly greeting of up to three short sentences. In it, mention once — warmly and briefly — that she can either type or talk to you, can share several details in one message, and that if you ever mishear or get something wrong she can just tell you and you'll fix it (she can change anything she's told you at any point). Then ask the required question below. "
       : extractedSomething
         ? "Briefly and naturally acknowledge what the user just said (do not just repeat it back), then ask the required question below. "
         : "Her last reply didn't clearly answer the previous question — gently note that and ask the required question below again, without sounding repetitive or frustrated. ") +
@@ -377,7 +397,15 @@ export async function POST(req: Request) {
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const incomingCollected: Collected =
     body.collected && typeof body.collected === "object" ? body.collected : {};
-  const confirmMode = body.confirmMode === true;
+  // Per Josh (2026-07-19): the per-turn "is that right?" read-back is removed —
+  // it nagged on every voice/text answer (and voice flips the whole session
+  // into confirmMode, so text replies inherited it too). Replaced by: acknowledge
+  // inline and let the user freely correct any earlier answer at any time (see the
+  // correction handling below). We intentionally IGNORE the client's confirmMode
+  // flag rather than delete the (now-inert) read-back plumbing. `false as boolean`
+  // keeps the downstream confirmMode branches type-reachable so nothing else needs
+  // touching and no constant-condition lint fires.
+  const confirmMode = false as boolean;
   // Only meaningful (and only ever set) when confirmMode is also on — an
   // awaitingConfirm echoed from a confirmMode-off past is simply ignored.
   const awaitingConfirmIn = confirmMode && body.awaitingConfirm === true;
@@ -476,9 +504,18 @@ export async function POST(req: Request) {
   // pick the NEXT field below), given to the extractor so a bare "Yes"/"No"/
   // number reply is attributed to that field instead of being lost as
   // ambiguous across every yes/no candidate — which was making the intake loop.
-  const candidates = outstandingApplicableFields(incomingCollected);
+  // Candidates = every not-yet-answered field (so one reply can fill several)
+  // PLUS every already-answered field, offered as correctable. currentField is
+  // the field just asked, so a bare "Yes"/"No"/number is attributed to it.
+  const outstanding = outstandingApplicableFields(incomingCollected);
+  const answered = Object.keys(incomingCollected)
+    .map((k) => getField(k))
+    .filter((f): f is FieldDef => !!f);
+  const answeredKeys = new Set(answered.map((f) => f.key));
+  const candidates = [...outstanding, ...answered];
   const currentField = currentAskedField(incomingCollected);
-  const proposals = await runExtraction(candidates, lastUserText, currentField);
+  const currentAge = typeof incomingCollected.age === "number" ? incomingCollected.age : undefined;
+  const proposals = await runExtraction(candidates, lastUserText, currentField, { answeredKeys, currentAge });
 
   const collected: Collected = { ...incomingCollected };
   let extractedSomething = false;
@@ -486,9 +523,20 @@ export async function POST(req: Request) {
   for (const proposal of proposals) {
     const field = candidates.find((f) => f.key === proposal.key);
     if (!field) continue; // LLM must only propose from the candidate list
-    if (collected[field.key] !== undefined) continue; // never let extraction clobber an already-collected value
     const result = field.parse(proposal.value);
-    if (result.ok) {
+    if (!result.ok) continue;
+    if (answeredKeys.has(field.key)) {
+      // She is correcting a field she already answered ("no, I'm 59"). Overwrite,
+      // but only when the value actually changed — this is what makes "just tell
+      // me if it's wrong / go back and change it" work without a confirm step.
+      if (collected[field.key] !== result.value) {
+        collected[field.key] = result.value;
+        extractedSomething = true;
+        capturedThisTurn.push({ field, value: result.value });
+      }
+    } else {
+      // Normal fill of a not-yet-answered field (one reply may fill several).
+      if (collected[field.key] !== undefined) continue;
       collected[field.key] = result.value;
       extractedSomething = true;
       capturedThisTurn.push({ field, value: result.value });
