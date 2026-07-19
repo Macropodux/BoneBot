@@ -5,14 +5,28 @@ raw: "SCREEN.md"
 ingested: 2026-07-18
 tags: [spec, bonebot]
 created: 2026-07-18
-updated: 2026-07-18
+updated: 2026-07-19
 ---
 
 # SCREEN.md — Product and Interface Spec
 
 `SCREEN.md` defines the exact user flows, input modalities, feature mappings, and reporting templates for the **BoneBot** assistant.
 
-## The Core Product: BoneBot (`/assistant`)
+> **2026-07-19 update note.** `SCREEN.md` was rewritten twice overnight (the
+> front-gate went from a hard eligibility cutoff to a soft probability
+> triage, then had its questions/routing refined again) and the product's
+> actual route moved: **`/assistant` no longer exists — the whole landing →
+> chat → results flow now lives at `/`**, in `src/app/page.tsx` (a single
+> page with internal screen state, not separate routes). Photo/blood-test
+> extraction, described below as "not yet built," **is now built** —
+> `/api/blood-results` — and a separate `/api/document` route extracts a
+> T-score from an uploaded DXA report PDF. For the current authoritative
+> architecture (front-gate model shape, the 9 agreed v1 features, the
+> cheap-vs-capable LLM split), see `[[ai-handover-md]]` — it postdates this
+> section of `SCREEN.md` and should win on disagreement. The output-card
+> layout and category bands described below are still accurate.
+
+## The Core Product: BoneBot (originally documented at `/assistant`, now `/`)
 
 BoneBot is an interactive voice and image-enabled assistant. The plain form interface at `/screen` acts as a zero-dependency fallback for the demo.
 - **Input Processing:**

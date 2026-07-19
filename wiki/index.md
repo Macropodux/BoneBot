@@ -17,6 +17,8 @@ When this file exceeds ~300 lines or the wiki passes ~150 pages, shard into `wik
 - [[screen-md-spec]] — SCREEN.md: Front-end layouts, input OCR specs, target variables, output reporting, and ElevenLabs speech synthesis constraints.
 - [[challenge-05-brief]] — Challenge 05 PDF: Official Hack-Nation guidelines, criteria (Impact, Tech, Foundation), recommended datasets, and deliverables.
 - [[clinical-evidence-library]] — Local, versioned evidence cards and source register that constrain BoneBot's clinical explanations.
+- [[ai-handover-md]] — AI_HANDOVER.md: the most current agreed architecture (front-gate + triage, 9 v1 model features, cheap-vs-capable LLM split, evidence-driven explanations). Supersedes SCREEN.md on architecture specifics.
+- [[input-spec-md]] — docs/INPUT_SPEC.md: canonical units, required/optional status, and valid ranges for every BoneBot input.
 
 ## Entities
 
