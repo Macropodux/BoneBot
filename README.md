@@ -30,6 +30,9 @@ needs a scan earlier, from data women already have.
    vitamin D, calcium, rheumatoid arthritis, and hormone therapy) produces an
    estimated T-score with an uncertainty range and
    per-factor contributions in T-score units.
+   Activity can be entered as seven-day average steps and active minutes or
+   confirmed from an activity-app screenshot; these are disclosed proxies for
+   the wrist-movement measure used during training.
 3. **Explanation** — the LLM (via the Vercel AI SDK) explains the model's
    output. It never sets or adjusts the risk itself. Ambiguous answers are
    clarified once, then treated as *unknown* — never as a positive risk factor —

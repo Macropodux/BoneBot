@@ -10,7 +10,7 @@
 // (via /api/assistant) only explains it — same architecture as before, now
 // behind this UI. Screening flag, never a diagnosis.
 //
-// The design's 7 questions don't cover all 13 BoneFeatures fields. Blood-test
+// The short conversational flow doesn't cover all BoneFeatures fields. Blood-test
 // values (vitaminD, calcium) and activity (weightBearingActivity) are
 // user-provided via photo upload / a quick chip when given; the remaining
 // history fields this short flow never asks (hormone therapy, rheumatoid
@@ -20,6 +20,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { resolveAmbiguousAnswer } from "@/lib/ambiguity";
+import {
+  ACTIVITY_QUESTIONS,
+  activityLevelFromDailyAverages,
+  parseDailyActivity,
+} from "@/lib/activity-input";
 import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model";
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
 import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-parameters";
@@ -30,7 +35,7 @@ const ACCENT_HOVER = "#0A5A50";
 const ACCENT_TINT = "#E4F0ED";
 const FRACTURE = "#B0442F";
 
-type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "smoke" | "steroids" | "bloodResults" | "weight" | "activity" | "secondaryCondition";
+type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "smoke" | "steroids" | "bloodResults" | "weight" | "averageDailySteps" | "averageDailyActiveMinutes" | "secondaryCondition";
 
 type Step = { key: StepKey; q: string; options: string[] };
 
@@ -66,7 +71,8 @@ const STEPS: Step[] = [
   { key: "steroids", q: "Have you ever taken corticosteroids (like prednisone) for 3 months or more?", options: [] },
   { key: "bloodResults", q: "If you have blood-test results, upload an image now, or tap Skip to continue without one.", options: [] },
   { key: "weight", q: "What's your weight and height? BoneBot uses these to calculate your BMI.", options: [] },
-  { key: "activity", q: "How active are you day-to-day, with weight-bearing activity like walking, jogging, or strength training? You can also upload a screenshot from your watch or activity app instead.", options: ["Low", "Moderate", "High"] },
+  { key: "averageDailySteps", q: ACTIVITY_QUESTIONS.steps.question, options: [] },
+  { key: "averageDailyActiveMinutes", q: ACTIVITY_QUESTIONS.minutes.question, options: [] },
   // Appended last and gated on SECONDARY_CONDITION_TRAINED so it is only asked
   // once the model is retrained with the feature. Appending (not inserting)
   // keeps the earlier gate/DXA step indices and FULL_QUESTION_START stable.
@@ -95,15 +101,16 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   steroids: "No",
   bloodResults: "Skip",
   weight: "24.5",
-  activity: "Moderate",
+  averageDailySteps: "6500",
+  averageDailyActiveMinutes: "30",
   secondaryCondition: "No",
 };
 
-// Fields the 7-question flow never asks about — hormone therapy, rheumatoid
+// Fields the short flow never asks about — hormone therapy, rheumatoid
 // arthritis, and high alcohol intake aren't part of this flow, so they still
 // use the same illustrative population-average defaults as before (not
 // measurements). vitaminD/calcium (blood-result photo) and
-// weightBearingActivity (activity chip, or watch/app screenshot) ARE
+// weightBearingActivity (daily averages, or watch/app screenshot) ARE
 // user-provided when given — see mapAnswersToFeatures() below.
 const FIELD_DEFAULTS = {
   onHormoneTherapy: Boolean(tScoreModel.imputationDefaults.onHormoneTherapy),
@@ -138,11 +145,6 @@ const FULL_QUESTION_START = 7;
 // a real model input (yearsSinceMenopause), not a gate.
 const MENOPAUSE_CERTAIN_AGE = 60;
 
-// Deterministic Low/Moderate/High -> weightBearingActivity (0..1) mapping for
-// the quick activity-level chip. Same illustrative-midpoint spirit as
-// AGE_MIDPOINT/MENOPAUSE_AGE_MIDPOINT above.
-const ACTIVITY_LEVEL_MAP: Record<string, number> = { Low: 0.2, Moderate: 0.5, High: 0.8 };
-
 // Shared cap for both the blood-results and activity-screenshot uploaders —
 // enforced client-side (disable adding a 4th) and re-checked server-side in
 // each route.
@@ -160,8 +162,12 @@ const SKIPPABLE: Partial<Record<StepKey, true>> = {
   steroids: true,
   bloodResults: true,
   weight: true,
-  activity: true,
+  averageDailySteps: true,
+  averageDailyActiveMinutes: true,
 };
+
+const isActivityStep = (key: StepKey) =>
+  key === "averageDailySteps" || key === "averageDailyActiveMinutes";
 
 const LOW_RISK_GUIDANCE = [
   "Keep active with weight-bearing and muscle-strengthening activity that feels safe and suitable for you.",
@@ -176,7 +182,6 @@ const LOW_RISK_GUIDANCE = [
 function mapAnswersToFeatures(
   answers: Record<StepKey, string>,
   bloodResults: UploadedBloodResults | null,
-  activityResult: UploadedActivityResult | null,
 ): { features: BoneFeatures; provided: Array<keyof BoneFeatures> } {
   const parsedAge = Number(answers.age);
   const age = Number.isFinite(parsedAge) ? parsedAge : AGE_MIDPOINT[answers.age] ?? 65;
@@ -192,13 +197,9 @@ function mapAnswersToFeatures(
     answer === "Yes" ? true : answer === "No" ? false : Boolean(defaultValue);
   const parsedBmi = Number(answers.weight);
 
-  // Weight-bearing activity: a screenshot-derived estimate (already a 0..1
-  // value re-validated server-side) takes priority; otherwise the quick
-  // Low/Moderate/High chip maps deterministically via ACTIVITY_LEVEL_MAP.
-  // Neither given -> fall back to the population-average imputation default,
-  // same as every other optional field here.
-  const quickActivityValue = ACTIVITY_LEVEL_MAP[answers.activity];
-  const activityValue = activityResult?.weightBearingActivity ?? quickActivityValue ?? null;
+  const averageDailySteps = parseDailyActivity(answers.averageDailySteps, 100_000);
+  const averageDailyActiveMinutes = parseDailyActivity(answers.averageDailyActiveMinutes, 1_440);
+  const activityValue = activityLevelFromDailyAverages(averageDailySteps, averageDailyActiveMinutes);
 
   const features: BoneFeatures = {
     age,
@@ -521,14 +522,14 @@ export default function Home() {
   // call so a multi-page report is sent to the vision model together.
   const [bloodImageFiles, setBloodImageFiles] = useState<File[]>([]);
 
-  // Wearable/activity-screenshot upload — same confirm-before-use pattern as
-  // the blood-result flow above. weightBearingActivity is then user-provided
-  // (quick chip or confirmed screenshot estimate) instead of the imputed
-  // default; see mapAnswersToFeatures().
-  const [activityResult, setActivityResult] = useState<UploadedActivityResult | null>(null);
+  // Wearable/activity-screenshot upload — extracted values remain proposals
+  // until the user confirms them, then they populate the two numeric answers.
   const [activityUploadBusy, setActivityUploadBusy] = useState(false);
   const [pendingActivityResult, setPendingActivityResult] = useState<UploadedActivityResult | null>(null);
   const [activityEditMode, setActivityEditMode] = useState(false);
+  const [activityEditSteps, setActivityEditSteps] = useState("");
+  const [activityEditMinutes, setActivityEditMinutes] = useState("");
+  const [activityEditError, setActivityEditError] = useState("");
   const [activityImageFiles, setActivityImageFiles] = useState<File[]>([]);
   const [clarificationCounts, setClarificationCounts] = useState<Partial<Record<StepKey, number>>>({});
   const [unresolvedAnswerCount, setUnresolvedAnswerCount] = useState(0);
@@ -612,9 +613,11 @@ export default function Home() {
     setBloodEditCalcium("");
     setBloodEditError("");
     setBloodImageFiles([]);
-    setActivityResult(null);
     setPendingActivityResult(null);
     setActivityEditMode(false);
+    setActivityEditSteps("");
+    setActivityEditMinutes("");
+    setActivityEditError("");
     setActivityImageFiles([]);
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
@@ -633,7 +636,7 @@ export default function Home() {
   }
 
   async function runModel(all: Record<StepKey, string>) {
-    const { features: full, provided } = mapAnswersToFeatures(all, bloodResults, activityResult);
+    const { features: full, provided } = mapAnswersToFeatures(all, bloodResults);
     setFeatures(full);
     const model = scoreBone(full, provided);
     setResult(model);
@@ -836,6 +839,14 @@ export default function Home() {
       // that still arrives as free text.
       const value = Number(text.replace(/[^0-9.]/g, ""));
       return Number.isFinite(value) && value >= 12 && value <= 60 ? String(value) : null;
+    }
+    if (key === "averageDailySteps") {
+      const value = parseDailyActivity(text, 100_000);
+      return value !== null && Number.isInteger(value) ? String(value) : null;
+    }
+    if (key === "averageDailyActiveMinutes") {
+      const value = parseDailyActivity(text, 1_440);
+      return value !== null ? String(value) : null;
     }
     if (/(not sure|don't know|do not know)/.test(lower)) return "Not sure";
     if (key === "fracture" && /\b(broke|broken|fracture)\b/.test(lower)) return "Yes";
@@ -1108,20 +1119,23 @@ export default function Home() {
       const body = (await response.json()) as UploadedActivityResult | { error: string };
       if (!response.ok || "error" in body) {
         message =
-          "error" in body ? body.error : "BoneBot could not read that image. You can still choose Low, Moderate, or High above.";
+          "error" in body ? body.error : "BoneBot could not read that image. You can still enter your daily average manually.";
       } else if (body.weightBearingActivity === null) {
-        message = "I could not identify step or activity-minute data in that image. You can still choose Low, Moderate, or High above.";
+        message = "I could not identify steps or active minutes in that image. You can still enter either daily average manually.";
       } else {
         extracted = body;
       }
     } catch {
-      message = "BoneBot could not read that image. You can still choose Low, Moderate, or High above.";
+      message = "BoneBot could not read that image. You can still enter either daily average manually.";
     }
     setActivityUploadBusy(false);
     setActivityImageFiles([]);
     if (extracted) {
       setPendingActivityResult(extracted);
       setActivityEditMode(false);
+      setActivityEditSteps(extracted.estimatedSteps?.toString() ?? "");
+      setActivityEditMinutes(extracted.estimatedActiveMinutes?.toString() ?? "");
+      setActivityEditError("");
       const readParts = [
         extracted.estimatedSteps !== null ? `~${extracted.estimatedSteps.toLocaleString()} steps/day` : null,
         extracted.estimatedActiveMinutes !== null ? `~${extracted.estimatedActiveMinutes} active minutes/day` : null,
@@ -1139,30 +1153,58 @@ export default function Home() {
     }
   }
 
-  function useTheseActivityValues() {
-    if (!pendingActivityResult) return;
-    setActivityResult(pendingActivityResult);
+  function commitActivityValues(result: UploadedActivityResult, display: string) {
+    const existingSteps = parseDailyActivity(answers.averageDailySteps ?? "", 100_000);
+    const existingMinutes = parseDailyActivity(answers.averageDailyActiveMinutes ?? "", 1_440);
+    const steps = result.estimatedSteps ?? existingSteps;
+    const minutes = result.estimatedActiveMinutes ?? existingMinutes;
+    const nextAnswers = {
+      ...answers,
+      averageDailySteps: steps !== null ? String(steps) : "Not sure",
+      averageDailyActiveMinutes: minutes !== null ? String(minutes) : "Not sure",
+    };
+
+    setAnswers(nextAnswers);
+    setMessages((items) => [...items, { role: "user", text: display }]);
     setPendingActivityResult(null);
     setActivityEditMode(false);
-    if (STEPS[stepIdx]?.key === "activity") answer("Uploaded", "Use this activity estimate");
+    setActivityEditError("");
+
+    const finalActivityIdx = STEPS.findIndex((item) => item.key === "averageDailyActiveMinutes");
+    const nextIdx = finalActivityIdx + 1;
+    setStepIdx(nextIdx);
+    if (nextIdx < STEPS.length) {
+      botSay(STEPS[nextIdx].q);
+    } else {
+      botSay("That's everything. Running your answers through the risk model…");
+      void runModel(nextAnswers as Record<StepKey, string>);
+    }
+  }
+
+  function useTheseActivityValues() {
+    if (!pendingActivityResult) return;
+    commitActivityValues(pendingActivityResult, "Use these activity averages");
   }
 
   function skipPendingActivityValues() {
     setPendingActivityResult(null);
     setActivityEditMode(false);
-    if (STEPS[stepIdx]?.key === "activity") answer("Not sure", "Skip");
+    setActivityEditError("");
   }
 
-  function submitEditedActivityLevel(level: "Low" | "Moderate" | "High") {
+  function submitEditedActivityValues() {
+    const steps = activityEditSteps.trim() ? parseDailyActivity(activityEditSteps, 100_000) : null;
+    const minutes = activityEditMinutes.trim() ? parseDailyActivity(activityEditMinutes, 1_440) : null;
+    if ((activityEditSteps.trim() && steps === null) || (activityEditMinutes.trim() && minutes === null)) {
+      setActivityEditError("Enter 0–100,000 steps and 0–1,440 active minutes, or leave either field blank.");
+      return;
+    }
     const edited: UploadedActivityResult = {
-      weightBearingActivity: ACTIVITY_LEVEL_MAP[level],
-      estimatedSteps: pendingActivityResult?.estimatedSteps ?? null,
-      estimatedActiveMinutes: pendingActivityResult?.estimatedActiveMinutes ?? null,
+      weightBearingActivity: activityLevelFromDailyAverages(steps, minutes),
+      estimatedSteps: steps,
+      estimatedActiveMinutes: minutes,
     };
-    setActivityResult(edited);
-    setPendingActivityResult(null);
-    setActivityEditMode(false);
-    if (STEPS[stepIdx]?.key === "activity") answer("Uploaded", `Edited to ${level} activity`);
+    commitActivityValues(edited, "Use these edited activity averages");
   }
 
   const BMI_RANGE = { min: 12, max: 60 };
@@ -1281,9 +1323,11 @@ export default function Home() {
     setBloodEditCalcium("");
     setBloodEditError("");
     setBloodImageFiles([]);
-    setActivityResult(null);
     setPendingActivityResult(null);
     setActivityEditMode(false);
+    setActivityEditSteps("");
+    setActivityEditMinutes("");
+    setActivityEditError("");
     setActivityImageFiles([]);
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
@@ -1361,6 +1405,8 @@ export default function Home() {
   const marker = result ? markerPercent(result.estimatedTScore) : 50;
   const rangeLeftPct = result ? markerPercent(result.tScoreRange[0]) : 50;
   const rangeRightPct = result ? markerPercent(result.tScoreRange[1]) : 50;
+  const reportedActivitySteps = parseDailyActivity(answers.averageDailySteps ?? "", 100_000);
+  const reportedActivityMinutes = parseDailyActivity(answers.averageDailyActiveMinutes ?? "", 1_440);
 
   return (
     <div
@@ -1479,7 +1525,7 @@ export default function Home() {
                 m.role === "bot" ? <BotBubble key={i} text={m.text} /> : <UserBubble key={i} text={m.text} />
               )}
               {typing && <TypingDots />}
-              {inFlow && step.options.length > 0 && !(step.key === "activity" && pendingActivityResult) && (
+              {inFlow && step.options.length > 0 && (
                 <div className="flex flex-wrap justify-end gap-2.5">
                   {step.options.map((opt) => (
                     <button
@@ -1700,15 +1746,15 @@ export default function Home() {
                 </div>
               )}
 
-              {inFlow && step.key === "activity" && pendingActivityResult && !activityEditMode && (
+              {inFlow && isActivityStep(step.key) && pendingActivityResult && !activityEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#15181A]">Confirm activity estimate</div>
+                  <div className="text-sm font-semibold text-[#15181A]">Confirm activity averages</div>
                   <div className="text-sm leading-[1.5] text-[#4A5452]">
                     {pendingActivityResult.estimatedSteps !== null &&
                       `~${pendingActivityResult.estimatedSteps.toLocaleString()} steps/day. `}
                     {pendingActivityResult.estimatedActiveMinutes !== null &&
                       `~${pendingActivityResult.estimatedActiveMinutes} active minutes/day. `}
-                    That reads as {activityLabel(pendingActivityResult.weightBearingActivity ?? 0.5)} activity.
+                    These values are an approximate proxy for the daily wrist-movement measure used in model training.
                   </div>
                   <div className="flex flex-wrap gap-2.5">
                     <button
@@ -1716,7 +1762,7 @@ export default function Home() {
                       className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
                       style={{ backgroundColor: ACCENT }}
                     >
-                      Use this
+                      Use these
                     </button>
                     <button
                       onClick={() => setActivityEditMode(true)}
@@ -1735,32 +1781,59 @@ export default function Home() {
                 </div>
               )}
 
-              {inFlow && step.key === "activity" && pendingActivityResult && activityEditMode && (
+              {inFlow && isActivityStep(step.key) && pendingActivityResult && activityEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                  <div className="text-sm font-semibold text-[#15181A]">Choose the level that fits best</div>
-                  <div className="flex flex-wrap gap-2.5">
-                    {(["Low", "Moderate", "High"] as const).map((level) => (
-                      <button
-                        key={level}
-                        onClick={() => submitEditedActivityLevel(level)}
-                        className="rounded-full border-[1.5px] px-5 py-2.5 text-[15px] font-medium transition-colors"
-                        style={{ borderColor: ACCENT, color: ACCENT }}
-                      >
-                        {level}
-                      </button>
-                    ))}
+                  <div className="text-sm font-semibold text-[#15181A]">Edit activity averages</div>
+                  <div className="flex flex-wrap gap-3">
+                    <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
+                      Steps per day
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={activityEditSteps}
+                        onChange={(event) => setActivityEditSteps(event.target.value)}
+                        placeholder="e.g. 6500"
+                        className="w-36 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
+                      Active minutes per day
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={activityEditMinutes}
+                        onChange={(event) => setActivityEditMinutes(event.target.value)}
+                        placeholder="e.g. 30"
+                        className="w-36 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E7C6E]"
+                      />
+                    </label>
                   </div>
-                  <button
-                    onClick={() => setActivityEditMode(false)}
-                    className="self-start rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
-                  >
-                    Cancel
-                  </button>
+                  {activityEditError && <div className="text-[13px] text-[#B0442F]">{activityEditError}</div>}
+                  <div className="flex flex-wrap gap-2.5">
+                    <button
+                      onClick={submitEditedActivityValues}
+                      className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      Save & continue
+                    </button>
+                    <button
+                      onClick={() => setActivityEditMode(false)}
+                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {inFlow && step.key === "activity" && !pendingActivityResult && (
+              {inFlow && isActivityStep(step.key) && !pendingActivityResult && (
                 <div className="flex flex-col gap-2.5">
+                  <p className="text-[13px] leading-[1.5] text-[#5A6462]">
+                    {step.key === "averageDailySteps"
+                      ? ACTIVITY_QUESTIONS.steps.helper
+                      : ACTIVITY_QUESTIONS.minutes.helper}
+                  </p>
                   {activityImageFiles.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2">
                       {activityImageFiles.map((file, index) => (
@@ -1797,7 +1870,7 @@ export default function Home() {
                       <span className="font-semibold text-[#15181A]">
                         {activityImageFiles.length >= MAX_IMAGES
                           ? "Maximum 3 photos added"
-                          : "Attach a watch / activity-app screenshot"}
+                          : "Upload a weekly Apple Health, Watch, or activity-app summary"}
                       </span>
                       <span className="text-[13px] text-[#5A6462]">
                         Up to {MAX_IMAGES} images · {activityImageFiles.length}/{MAX_IMAGES} added
@@ -1829,19 +1902,11 @@ export default function Home() {
                           : `Analyze ${activityImageFiles.length} photo${activityImageFiles.length > 1 ? "s" : ""}`}
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={skipStep}
-                      disabled={activityUploadBusy}
-                      className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E] disabled:opacity-50"
-                    >
-                      Skip — I&apos;d rather not say
-                    </button>
                   </div>
                 </div>
               )}
 
-              {inFlow && !pendingBloodResults && step.key !== "weight" && step.key !== "activity" && (
+              {inFlow && !pendingBloodResults && !pendingActivityResult && step.key !== "weight" && (
                 <div className="flex flex-col gap-2.5">
                   {/* Questions with chip options (Yes/No, etc.) are answered
                       by tapping a chip only — free typing is reserved for
@@ -1859,14 +1924,18 @@ export default function Home() {
                         // dxaYear/menopause, which also accept a typed "not
                         // sure"/"unknown"), so it's the one free-text step
                         // that can safely be restricted to digits only.
-                        type={step.key === "age" ? "number" : "text"}
-                        inputMode={step.key === "age" ? "numeric" : undefined}
+                        type={step.key === "age" || isActivityStep(step.key) ? "number" : "text"}
+                        inputMode={step.key === "age" || isActivityStep(step.key) ? "numeric" : undefined}
                         value={freeInput}
                         onChange={(event) => setFreeInput(event.target.value)}
                         placeholder={
                           step.key === "age"
                             ? "Type your age in years"
-                            : "Type your answer, or ask a bone-health question"
+                            : step.key === "averageDailySteps"
+                              ? "Average steps per day"
+                              : step.key === "averageDailyActiveMinutes"
+                                ? "Average active minutes per day"
+                                : "Type your answer, or ask a bone-health question"
                         }
                         aria-label="Answer or ask a bone-health question"
                         disabled={flowQuestionBusy || extracting}
@@ -2305,14 +2374,13 @@ export default function Home() {
                   </div>
                 )}
 
-                {activityResult && (
+                {(reportedActivitySteps !== null || reportedActivityMinutes !== null) && (
                   <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
                     <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">Activity input</div>
                     <p className="mt-3 text-sm leading-[1.6] text-[#4A5452]">
-                      {activityResult.estimatedSteps !== null && `~${activityResult.estimatedSteps.toLocaleString()} steps/day. `}
-                      {activityResult.estimatedActiveMinutes !== null &&
-                        `~${activityResult.estimatedActiveMinutes} active minutes/day. `}
-                      Used as {activityLabel(activityResult.weightBearingActivity ?? 0.5)} activity in your estimate.
+                      {reportedActivitySteps !== null && `~${reportedActivitySteps.toLocaleString()} steps/day. `}
+                      {reportedActivityMinutes !== null && `~${reportedActivityMinutes} active minutes/day. `}
+                      Used as an approximate proxy for the daily wrist-movement measure in the training data.
                     </p>
                   </div>
                 )}

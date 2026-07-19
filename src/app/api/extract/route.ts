@@ -42,7 +42,15 @@ const YES_NO_FIELDS = new Set([
 
 // Numeric fields. normaliseFreeAnswer() expects a plain number (or year) as
 // text for these.
-const NUMERIC_FIELDS = new Set(["age", "dxaScore", "dxaYear", "menopause", "weight"]);
+const NUMERIC_FIELDS = new Set([
+  "age",
+  "dxaScore",
+  "dxaYear",
+  "menopause",
+  "weight",
+  "averageDailySteps",
+  "averageDailyActiveMinutes",
+]);
 
 function fieldGuidance(fieldKey: string): string {
   // Prior-fragility-fracture field: only a LOW-trauma fracture (fall from

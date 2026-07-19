@@ -2,7 +2,7 @@
 // blood-results/route.ts: the vision model only extracts what's plainly
 // visible (steps, active minutes) per image; it never decides the
 // weightBearingActivity score. That mapping is a small deterministic
-// function below (mapToActivityLevel) — plain arithmetic, not a model call —
+// function in activity-input.ts — plain arithmetic, not a model call —
 // and the client re-validates/confirms before the value ever reaches
 // mapAnswersToFeatures()/scoreBone(). See AGENTS.md: the model predicts, the
 // LLM only extracts or explains.
@@ -10,6 +10,7 @@
 import { openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { z } from "zod";
+import { activityLevelFromDailyAverages } from "@/lib/activity-input";
 
 export const maxDuration = 30;
 
@@ -39,7 +40,7 @@ type ActivityImageExtraction = {
 export type ActivityExtractResult = {
   estimatedSteps: number | null;
   estimatedActiveMinutes: number | null;
-  // 0..1 — deterministic mapping, see mapToActivityLevel(). Not model-decided.
+  // 0..1 — deterministic mapping, see activity-input.ts. Not model-decided.
   weightBearingActivity: number | null;
 };
 
@@ -50,27 +51,13 @@ function boundedOrNull(value: number | null, min: number, max: number): number |
 
 function sanitize(raw: RawActivity): ActivityImageExtraction {
   return {
-    estimatedSteps: boundedOrNull(raw.estimatedSteps, 0, 60000),
+    estimatedSteps: boundedOrNull(raw.estimatedSteps, 0, 100000),
     estimatedActiveMinutes: boundedOrNull(raw.estimatedActiveMinutes, 0, 1440),
   };
 }
 
-// Deterministic, illustrative mapping from raw daily activity signals to the
-// model's 0..1 weightBearingActivity input — same spirit as page.tsx's
-// ACTIVITY_LEVEL_MAP for the Low/Moderate/High chip. 10,000 steps/day and 45
-// active minutes/day are treated as saturating ("High") signals; when both
-// are present they're averaged.
-function mapToActivityLevel(steps: number | null, minutes: number | null): number | null {
-  const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
-  const stepsScore = steps !== null ? clamp01(steps / 10000) : null;
-  const minutesScore = minutes !== null ? clamp01(minutes / 45) : null;
-  const scores = [stepsScore, minutesScore].filter((s): s is number => s !== null);
-  if (!scores.length) return null;
-  return Math.round((scores.reduce((sum, s) => sum + s, 0) / scores.length) * 100) / 100;
-}
-
-// Deterministic aggregate across up to MAX_IMAGES screenshots (e.g. today's
-// summary plus a weekly-average screen): average of whichever signal is
+// Deterministic aggregate across up to MAX_IMAGES screenshots (e.g. separate
+// weekly-average screens): average of whichever signal is
 // present across images. The vision model only extracts per-image; merging
 // is plain code, never model-decided.
 function mergeActivityExtractions(results: ActivityImageExtraction[]): ActivityImageExtraction {
@@ -112,14 +99,14 @@ export async function POST(req: Request) {
             model: openai(VISION_MODEL),
             schema: RawActivitySchema,
             system:
-              "You extract a single day's activity summary from a screenshot of a fitness tracker, smartwatch, or activity app (e.g. Apple Health, Fitbit, Garmin, Google Fit). Extract only values clearly visible. Do not estimate, interpret, diagnose, or give advice. Return null for a missing or unclear value.",
+              "You extract average daily activity values from a weekly summary screenshot of a fitness tracker, smartwatch, or activity app (e.g. Apple Health, Fitbit, Garmin, Google Fit). Extract only averages clearly visible. Do not estimate, calculate from totals, interpret, diagnose, or give advice. Return null for a missing or unclear value.",
             messages: [
               {
                 role: "user",
                 content: [
                   {
                     type: "text",
-                    text: "Extract only: total steps for the day, and total active/exercise minutes for the day. Return null for anything not clearly shown.",
+                    text: "Extract only: average steps per day, and average active/exercise minutes per day for the displayed period. Return null for anything not clearly shown as an average.",
                   },
                   { type: "file", data: new Uint8Array(buffer), mediaType: image.type },
                 ],
@@ -136,7 +123,7 @@ export async function POST(req: Request) {
 
     if (successful.length === 0) {
       return Response.json(
-        { error: "BoneBot could not read those images. You can still choose Low, Moderate, or High." },
+        { error: "BoneBot could not read those images. You can still enter your daily averages manually." },
         { status: 422 },
       );
     }
@@ -144,13 +131,13 @@ export async function POST(req: Request) {
     const merged = mergeActivityExtractions(successful);
     const result: ActivityExtractResult = {
       ...merged,
-      weightBearingActivity: mapToActivityLevel(merged.estimatedSteps, merged.estimatedActiveMinutes),
+      weightBearingActivity: activityLevelFromDailyAverages(merged.estimatedSteps, merged.estimatedActiveMinutes),
     };
     return Response.json(result);
   } catch (error) {
     console.error("activity extraction failed:", error);
     return Response.json(
-      { error: "BoneBot could not read those images. You can still choose Low, Moderate, or High." },
+      { error: "BoneBot could not read those images. You can still enter your daily averages manually." },
       { status: 422 },
     );
   }
