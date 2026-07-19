@@ -16,7 +16,7 @@ updated: 2026-07-18
 
 The product is built around the **BoneBot** voice and photo assistant:
 - A user talks to BoneBot and uploads photos (blood test for vitamin D and calcium, and a watch/activity screenshot for step count and active minutes).
-- BoneBot asks targeted follow-up questions to collect key medical and reproductive history (years since menopause, prior fractures, hormone therapy, smoking, parental hip fracture).
+- BoneBot asks targeted follow-up questions to collect key medical and reproductive history (years since menopause, prior fractures, hormone therapy, and smoking).
 - BoneBot outputs an **estimated T-score with an uncertainty range** (e.g. "≈ −2.1, likely −2.8 to −1.4"), identifies top contributing factors, and offers actionable, non-diagnostic guidance (see GP for a DXA scan, lifestyle modifications like weight-bearing exercise).
 
 ## Architecture

@@ -25,7 +25,6 @@ export const IntakeAnswersSchema = z.object({
   weightKg: z.number().min(30).max(250).optional(),
   averageDailySteps: z.number().min(0).max(100000).optional(),
   currentSmoker: z.boolean().optional(),
-  parentalHipFracture: z.boolean().optional(),
 });
 
 export type IntakeAnswers = z.infer<typeof IntakeAnswersSchema>;
@@ -232,7 +231,6 @@ function fullAssessmentStep(answers: IntakeAnswers, triage: TriageOutput): Intak
     question("weightKg", "What is your weight in kilograms?", "number", undefined, "For example: 62 kg."),
     question("averageDailySteps", "About how many steps do you average each day?", "number", undefined, "Use your watch or phone average if you have it. A rough estimate is fine."),
     question("currentSmoker", "Do you currently smoke?", "choice", yesNo),
-    question("parentalHipFracture", "Has either of your parents had a hip fracture?", "choice", yesNo),
   ];
 
   const next = questions.find((item) => answers[item.id] === undefined);
@@ -263,7 +261,6 @@ function requiredFeatureLabels(answers: IntakeAnswers): string[] {
     ["weightKg", "weight"],
     ["averageDailySteps", "average daily steps"],
     ["currentSmoker", "current smoking"],
-    ["parentalHipFracture", "parental hip fracture"],
   ];
   return labels.filter(([key]) => answers[key] === undefined).map(([, label]) => label);
 }
@@ -278,7 +275,6 @@ function toBoneFeatures(answers: IntakeAnswers): BoneFeatures {
     bmi: round1(answers.weightKg! / (heightMetres * heightMetres)),
     weightBearingActivity: activityFromSteps(answers.averageDailySteps!),
     currentSmoker: answers.currentSmoker!,
-    parentalHipFracture: answers.parentalHipFracture!,
     glucocorticoids: Boolean(tScoreModel.imputationDefaults.glucocorticoids),
     rheumatoidArthritis: Boolean(tScoreModel.imputationDefaults.rheumatoidArthritis),
     highAlcohol: Boolean(tScoreModel.imputationDefaults.highAlcohol),

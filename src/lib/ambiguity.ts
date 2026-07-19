@@ -4,7 +4,6 @@ export type AmbiguityResolution =
 
 const clarificationByQuestion: Record<string, string> = {
   fracture: "Was the break from a minor fall or low-impact injury, rather than a major accident?",
-  parent: "Do you know whether either parent had a hip fracture? If you are not sure, that is okay.",
   smoke: "Do you currently smoke tobacco or use nicotine products regularly?",
   steroids: "Have you taken steroid tablets, such as prednisolone, for three months or more?",
   menopauseStatus: "Have your periods stopped permanently, rather than temporarily?",
@@ -16,7 +15,6 @@ const clarificationByQuestion: Record<string, string> = {
 
 const labelByQuestion: Record<string, string> = {
   fracture: "a possible previous fragility fracture",
-  parent: "parental hip-fracture history",
   smoke: "current smoking",
   steroids: "long-term steroid use",
   menopauseStatus: "menopause status",
