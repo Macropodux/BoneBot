@@ -2429,7 +2429,7 @@ export default function Home() {
               </select>
             </label>
             <button
-              onClick={startClassic}
+              onClick={startConversation}
               className={`${LANDING_HEADING_FONT} inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
               style={{ backgroundColor: LANDING_ACCENT }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
@@ -2464,7 +2464,7 @@ export default function Home() {
               </p>
               <div className="mt-2 flex flex-wrap gap-3.5">
                 <button
-                  onClick={startClassic}
+                  onClick={startConversation}
                   className={`${LANDING_HEADING_FONT} inline-flex min-h-[56px] items-center justify-center rounded-full px-[34px] text-[18px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
                   style={{ backgroundColor: LANDING_ACCENT }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
@@ -3364,13 +3364,6 @@ export default function Home() {
                 className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
               >
                 <span aria-hidden>{voiceEnabled ? "🔊" : "🔇"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={startClassic}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
-              >
-                Classic mode
               </button>
               <button
                 onClick={() => {

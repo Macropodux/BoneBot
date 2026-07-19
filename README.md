@@ -23,8 +23,9 @@ needs a scan earlier, from data women already have.
 
 1. **Triage gate** — a lightweight model (age, BMI, postmenopausal status)
    decides whether the fuller questionnaire is worth the user's time. Its
-   threshold was chosen for safety (validation sensitivity ≥ 95%); see
-   `docs/TRIAGE_THRESHOLD_AUDIT.md` for the held-out audit.
+   threshold is set at a 1% predicted-risk cutoff, chosen for safety
+   (validation sensitivity ≥ 99%); see `docs/TRIAGE_THRESHOLD_AUDIT.md` for the
+   held-out audit.
 2. **T-score estimate** — a fuller model (age, BMI, years since menopause,
    activity, prior fragility fracture, glucocorticoids, smoking, alcohol,
    vitamin D, calcium, rheumatoid arthritis, and hormone therapy) produces an
@@ -71,9 +72,11 @@ today's simple tools, on the same held-out split (osteoporosis classification):
 | OST reference tool (age + weight) | 0.779 | — |
 | **Full model** (+ menopause, wearable activity, risk factors, labs) | **0.789** | **0.350** |
 
-**Triage gate** (age + BMI + postmenopausal status): AUC 0.867, threshold chosen
-so validation sensitivity stays ≥ 95% while excluding ~49% of women from the
-longer questionnaire. Full held-out audit in `docs/TRIAGE_THRESHOLD_AUDIT.md`.
+**Triage gate** (age + BMI + postmenopausal status): AUC 0.867. The referral
+threshold is set at a **1% predicted-risk cutoff**, chosen so validation
+sensitivity stays ≥ 99% — the safety priority for a screen (missing a case is
+worse than an extra questionnaire). Full held-out audit in
+`docs/TRIAGE_THRESHOLD_AUDIT.md`.
 
 The benchmark task, split, and reproduction steps are documented in
 `model/README.md`.
