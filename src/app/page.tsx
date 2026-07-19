@@ -3930,7 +3930,6 @@ export default function Home() {
                           </motion.div>
                         </div>
                         <Markdown text={summaryExplanation || catMeta.desc} className="text-pretty text-base leading-[1.6] text-[#4A5452]" />
-                        <EvidenceSources sources={summarySources} />
                       </>
 
                     <div className="mt-8 mb-2">
@@ -3975,11 +3974,6 @@ export default function Home() {
                             </span>
                           ))}
                         </div>
-                        <p className="mt-4 text-sm leading-[1.6] text-[#4A5452]">
-                          The shaded area is the uncertainty range — your true score most likely sits inside it. A
-                          T-score compares your bone density to a healthy young adult: 0 is average, and lower
-                          (more negative) means less dense bone.
-                        </p>
                       </div>
                   </motion.div>
 
@@ -4143,7 +4137,6 @@ export default function Home() {
                       <AIWrittenBadge />
                     </div>
                     <Markdown text={scoreExplanation} className="mt-4 text-[15px] leading-[1.65] text-[#4A5452]" />
-                    <EvidenceSources sources={scoreSources} />
                   </motion.div>
 
                   <motion.div variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
@@ -4154,7 +4147,6 @@ export default function Home() {
                       <AIWrittenBadge />
                     </div>
                     <Markdown text={implicationsExplanation} className="mt-4 text-[15px] leading-[1.65] text-[#4A5452]" />
-                    <EvidenceSources sources={implicationsSources} />
                   </motion.div>
 
                   {bloodResults && (
