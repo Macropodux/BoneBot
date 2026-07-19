@@ -2357,7 +2357,7 @@ export default function Home() {
               Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
             </div>
             <button
-              onClick={startConversation}
+              onClick={startClassic}
               className={`${LANDING_HEADING_FONT} ml-auto inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
               style={{ backgroundColor: LANDING_ACCENT }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
@@ -2392,7 +2392,7 @@ export default function Home() {
               </p>
               <div className="mt-2 flex flex-wrap gap-3.5">
                 <button
-                  onClick={startConversation}
+                  onClick={startClassic}
                   className={`${LANDING_HEADING_FONT} inline-flex min-h-[56px] items-center justify-center rounded-full px-[34px] text-[18px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
                   style={{ backgroundColor: LANDING_ACCENT }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
@@ -2642,19 +2642,13 @@ export default function Home() {
               </div>
               <button
                 type="button"
-                onClick={() => setVoiceEnabled((v) => !v)}
-                aria-label={voiceEnabled ? "Mute BoneBot's voice" : "Unmute BoneBot's voice"}
-                aria-pressed={voiceEnabled}
-                title={voiceEnabled ? "Voice on" : "Voice off"}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
-              >
-                <span aria-hidden>{voiceEnabled ? "🔊" : "🔇"}</span>
-              </button>
-              <button
                 onClick={() => {
                   if (messages.length <= 1 || window.confirm("Start over? This clears your answers so far.")) restart();
                 }}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                className={`${LANDING_HEADING_FONT} inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
+                style={{ backgroundColor: LANDING_ACCENT }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT)}
               >
                 Start over
               </button>
@@ -2662,6 +2656,18 @@ export default function Home() {
           </header>
           <div ref={chatRef} className="relative z-10 flex-1 overflow-y-auto px-6 py-8">
             <div className="mx-auto flex max-w-[680px] flex-col gap-3.5">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setVoiceEnabled((v) => !v)}
+                  aria-label={voiceEnabled ? "Mute BoneBot's voice" : "Unmute BoneBot's voice"}
+                  aria-pressed={voiceEnabled}
+                  title={voiceEnabled ? "Voice on" : "Voice off"}
+                  className="rounded-lg border-[1.5px] border-[#C6CFCC] bg-white px-3 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                >
+                  <span aria-hidden>{voiceEnabled ? "🔊" : "🔇"}</span>
+                </button>
+              </div>
               {messages.map((m, i) =>
                 m.role === "bot" ? <BotBubble key={i} text={m.text} /> : <UserBubble key={i} text={m.text} />
               )}
@@ -3609,7 +3615,10 @@ export default function Home() {
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.15 }}
                   onClick={restart}
-                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                  className={`${LANDING_HEADING_FONT} inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
+                  style={{ backgroundColor: LANDING_ACCENT }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT)}
                 >
                   Start over
                 </motion.button>
@@ -3738,7 +3747,10 @@ export default function Home() {
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.15 }}
                   onClick={restart}
-                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                  className={`${LANDING_HEADING_FONT} inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
+                  style={{ backgroundColor: LANDING_ACCENT }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT)}
                 >
                   Start over
                 </motion.button>
