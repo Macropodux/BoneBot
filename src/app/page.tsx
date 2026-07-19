@@ -198,6 +198,45 @@ function bandColor(tScore: number): string {
   return "#A06D14"; // uncertain
 }
 
+const activityLabel = (level: number) => (level < 0.34 ? "Low" : level < 0.67 ? "Moderate" : "High");
+
+// The actual value BoneBot used for each factor, plus — where docs/
+// INPUT_SPEC.md defines one — the reference range, so "+2.3" isn't just an
+// abstract number: you can see whether your own value is high, low, or
+// typical before you see how it moved the estimate.
+function factorDetail(factorLabel: string, f: BoneFeatures): { value: string; reference?: string } {
+  switch (factorLabel) {
+    case "Age":
+      return { value: `${f.age} years` };
+    case "Years since menopause":
+      return { value: `${f.yearsSinceMenopause} years` };
+    case "Hormone therapy":
+      return { value: f.onHormoneTherapy ? "Currently on hormone therapy" : "Not on hormone therapy" };
+    case "Prior fragility fracture":
+      return { value: f.priorFragilityFracture ? "Yes, since age 50" : "None reported" };
+    case "Body mass index":
+      return { value: `BMI ${f.bmi}`, reference: "normal range 18.5–25" };
+    case "Weight-bearing activity":
+      return { value: `${activityLabel(f.weightBearingActivity)} activity`, reference: "higher is more protective" };
+    case "Current smoker":
+      return { value: f.currentSmoker ? "Yes" : "No" };
+    case "Parental hip fracture":
+      return { value: f.parentalHipFracture ? "Yes" : "No" };
+    case "Glucocorticoid use":
+      return { value: f.glucocorticoids ? "Yes, 3+ months" : "None reported" };
+    case "Rheumatoid arthritis":
+      return { value: f.rheumatoidArthritis ? "Yes" : "No" };
+    case "High alcohol intake":
+      return { value: f.highAlcohol ? "3+ units/day" : "Below 3 units/day" };
+    case "Vitamin D":
+      return { value: `${f.vitaminD} nmol/L`, reference: "sufficient 50–125, deficient below 30" };
+    case "Serum calcium":
+      return { value: `${f.calcium} mmol/L`, reference: "normal range 2.2–2.6" };
+    default:
+      return { value: "" };
+  }
+}
+
 // Five reputable, evidence-based patient resources — shown as a brief plus a
 // clearly separate link out, never routed through the LLM (no risk of a
 // hallucinated URL, no risk of the LLM paraphrasing a source incorrectly).
@@ -792,9 +831,11 @@ export default function Home() {
           `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
           "",
           "What drove this result:",
-          ...result.contributions
-            .slice(0, 5)
-            .map((f) => `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}`),
+          ...result.contributions.slice(0, 5).map((f) => {
+            const detail = features ? factorDetail(f.factor, features) : { value: "" };
+            const valueNote = detail.value ? ` (${detail.value})` : "";
+            return `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}${valueNote}`;
+          }),
           "",
           "This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score — please discuss this result with your GP or clinician.",
           "",
@@ -1387,15 +1428,16 @@ export default function Home() {
                   <p className="mb-5 text-[13px] leading-[1.5] text-[#5A6462]">
                     Each bar is how much that factor pushed your estimate — <span style={{ color: ACCENT }}>green pushes it up (better)</span>, <span style={{ color: "#B0442F" }}>red pushes it down</span>. Longer bar, bigger effect.
                   </p>
-                  <div className="flex flex-col gap-3.5">
+                  <div className="flex flex-col gap-4">
                     {(() => {
                       const maxAbs = Math.max(...result.contributions.map((f) => Math.abs(f.contribution)), 0.1);
                       return result.contributions.map((f) => {
                         const isPositive = f.direction === "raises";
                         const widthPct = Math.max(4, Math.round((Math.abs(f.contribution) / maxAbs) * 100));
+                        const detail = features ? factorDetail(f.factor, features) : { value: "" };
                         return (
                           <div key={f.factor}>
-                            <div className="mb-1 flex items-baseline justify-between gap-3 text-[13.5px]">
+                            <div className="flex items-baseline justify-between gap-3 text-[13.5px]">
                               <span className="text-[#15181A]">{f.factor}</span>
                               <span
                                 className="font-[family-name:var(--font-heading)] font-bold"
@@ -1405,6 +1447,12 @@ export default function Home() {
                                 {f.contribution.toFixed(1)}
                               </span>
                             </div>
+                            {detail.value && (
+                              <div className="mb-1.5 text-[12.5px]">
+                                <span className="font-medium text-[#4A5452]">{detail.value}</span>
+                                {detail.reference && <span className="text-[#9AA5A2]"> · {detail.reference}</span>}
+                              </div>
+                            )}
                             <div className="h-2 overflow-hidden rounded-full bg-[#F0F2F1]">
                               <div
                                 className="h-full rounded-full"
