@@ -30,7 +30,11 @@ type Step = { key: StepKey; q: string; options: string[] };
 
 const STEPS: Step[] = [
   { key: "assignedFemale", q: "Were you assigned female at birth?", options: ["Yes", "No"] },
-  { key: "age", q: "Let's start simple — how old are you?", options: ["Under 55", "55–64", "65–74", "75 or older"] },
+  {
+    key: "age",
+    q: "Let's start simple — how old are you?",
+    options: ["Under 50", "50–54", "55–59", "60–64", "65–69", "70–74", "75–79", "80–84", "85 or older"],
+  },
   { key: "menopauseStatus", q: "Have your periods stopped for good?", options: ["Yes", "No", "Not sure"] },
   { key: "existingCare", q: "Have you already been diagnosed with osteoporosis, had a bone scan, or taken bone medication?", options: ["Yes", "No"] },
   { key: "menopause", q: "At what age did you reach menopause?", options: ["Before 40", "40–45", "After 45", "Not sure"] },
@@ -43,7 +47,7 @@ const STEPS: Step[] = [
 
 const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   assignedFemale: "Yes",
-  age: "65–74",
+  age: "65–69",
   menopauseStatus: "Yes",
   existingCare: "No",
   menopause: "40–45",
@@ -67,7 +71,18 @@ const FIELD_DEFAULTS = {
   calcium: tScoreModel.imputationDefaults.calcium,
 } as const;
 
-const AGE_MIDPOINT: Record<string, number> = { "Under 55": 50, "55–64": 60, "65–74": 70, "75 or older": 80 };
+const AGE_MIDPOINT: Record<string, number> = {
+  "Under 50": 47,
+  "50–54": 52,
+  "55–59": 57,
+  "60–64": 62,
+  "65–69": 67,
+  "70–74": 72,
+  "75–79": 77,
+  "80–84": 82,
+  "85 or older": 88,
+};
+const AGE_BRACKETS = Object.keys(AGE_MIDPOINT);
 const MENOPAUSE_AGE_MIDPOINT: Record<string, number> = { "Before 40": 35, "40–45": 42, "After 45": 48, "Not sure": 48 };
 const MENOPAUSE_STATUS = { Yes: "yes", No: "no", "Not sure": "not-sure" } as const;
 
@@ -132,7 +147,74 @@ function markerPercent(tScore: number): number {
   return Math.round((1 - normalized) * 100); // reversed: better (higher) -> left/"Low"
 }
 
-type ChatMessage = { role: "bot" | "user"; text: string };
+// Bar height for the age-sensitivity chart: same clinically-anchored axis as
+// the meter, so bar heights and the meter marker read consistently.
+function barHeightPercent(tScore: number): number {
+  const clamped = Math.max(AXIS_MIN, Math.min(AXIS_MAX, tScore));
+  return Math.round(((clamped - AXIS_MIN) / (AXIS_MAX - AXIS_MIN)) * 100);
+}
+
+function bandColor(tScore: number): string {
+  if (tScore <= -2.5) return "#B0442F"; // elevated
+  if (tScore >= -1.0) return "#0E7C6E"; // lower
+  return "#A06D14"; // uncertain
+}
+
+// Five reputable, evidence-based patient resources — shown as static links,
+// never routed through the LLM (no risk of a hallucinated URL).
+const RESOURCES = [
+  {
+    name: "Royal Osteoporosis Society (UK)",
+    url: "https://theros.org.uk",
+    note: "Patient guides on bone density, calcium & vitamin D, exercise, and a helpline.",
+  },
+  {
+    name: "International Osteoporosis Foundation",
+    url: "https://osteoporosis.foundation",
+    note: "Global patient resources and the “Are you at risk?” screening quiz.",
+  },
+  {
+    name: "NIH Osteoporosis and Related Bone Diseases Resource Center",
+    url: "https://bones.nih.gov",
+    note: "US government-run, plain-language info on prevention, diagnosis, and menopause-related bone loss.",
+  },
+  {
+    name: "Bone Health & Osteoporosis Foundation",
+    url: "https://bonehealthandosteoporosis.org",
+    note: "Clinician-vetted guidance on FRAX risk scoring, DEXA scans, and treatment options.",
+  },
+  {
+    name: "NHS — Osteoporosis",
+    url: "https://www.nhs.uk/conditions/osteoporosis",
+    note: "Concise UK clinical overview: symptoms, causes, diagnosis pathway, and when to see a GP.",
+  },
+] as const;
+
+type ChatMessage = { role: "bot" | "user"; text: string; kind?: "resources" };
+
+function ResourcesCard() {
+  return (
+    <div className="max-w-[88%] rounded-[14px_14px_14px_4px] border border-[#E3E9E7] bg-white px-4 py-3.5">
+      <div className="mb-2.5 text-sm font-semibold">A few reputable places to read more:</div>
+      <ul className="flex flex-col gap-2.5">
+        {RESOURCES.map((r) => (
+          <li key={r.url}>
+            <a
+              href={r.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-semibold underline decoration-1 underline-offset-2"
+              style={{ color: ACCENT }}
+            >
+              {r.name} ↗
+            </a>
+            <p className="mt-0.5 text-[13px] leading-[1.5] text-[#5A6462]">{r.note}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function BotBubble({ text, small }: { text: string; small?: boolean }) {
   return (
@@ -348,6 +430,16 @@ export default function Home() {
     setQaMessages((m) => [...m, { role: "bot", text }]);
   }
 
+  // Static, non-LLM: the chat directing her to reputable external resources
+  // should never depend on an API key, and must never risk a hallucinated URL.
+  function showResources() {
+    setQaMessages((m) => [
+      ...m,
+      { role: "user", text: "Where can I learn more?" },
+      { role: "bot", text: "", kind: "resources" },
+    ]);
+  }
+
   const step = STEPS[stepIdx];
   const inFlow = screen === "chat" && step && !typing && messages.length > 1;
   const progressPct = Math.round((stepIdx / STEPS.length) * 100);
@@ -452,13 +544,15 @@ export default function Home() {
                   <button
                     key={opt}
                     onClick={() => answer(opt)}
-                    className="rounded-full border-[1.5px] px-5 py-2.5 text-[15px] font-medium transition-colors hover:text-white"
+                    className="rounded-full border-[1.5px] px-5 py-2.5 text-[15px] font-medium transition-colors"
                     style={{ borderColor: ACCENT, color: ACCENT }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = ACCENT;
+                      e.currentTarget.style.color = "#FFFFFF";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = "transparent";
+                      e.currentTarget.style.color = ACCENT;
                     }}
                   >
                     {opt}
@@ -470,15 +564,79 @@ export default function Home() {
       )}
 
       {screen === "results" && !result && (
-        <div className="flex flex-1 items-center justify-center px-6 py-12">
-          <section className="w-full max-w-2xl rounded-2xl border border-[#E3E9E7] bg-white p-8">
-            <p className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">Initial screening result</p>
-            {triageResult && <p className="mt-4 font-[family-name:var(--font-heading)] text-6xl font-bold" style={{ color: ACCENT }}>{triageResult.probabilityPercent}%</p>}
-            {triageResult && <p className="mt-2 text-sm text-[#5A6462]">Below the {triageResult.thresholdPercent}% threshold for the full assessment.</p>}
-            <p className="mt-6 text-base leading-[1.6] text-[#4A5452]">{routeMessage}</p>
-            <div className="mt-6 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">{qaMessages[0]?.text}</div>
-            <button onClick={restart} className="mt-7 rounded-[10px] px-5 py-3 font-[family-name:var(--font-heading)] font-bold text-white" style={{ backgroundColor: ACCENT }}>Start over</button>
-          </section>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <header className="flex items-center gap-6 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
+            <div className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em]">
+              Bone<span style={{ color: ACCENT }}>Bot</span>
+            </div>
+            <div className="text-[13px] font-medium text-[#5A6462]">Initial screening result</div>
+            <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
+              Screening flag — not a diagnosis
+            </div>
+            <button
+              onClick={restart}
+              className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+            >
+              Start over
+            </button>
+          </header>
+          <div className="flex flex-1 items-start justify-center overflow-y-auto px-6 py-10">
+            <div className="flex w-full max-w-2xl flex-col gap-5">
+              <section className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                  Your initial screening estimate
+                </div>
+                {triageResult && (
+                  <>
+                    <p
+                      className="mt-4 font-[family-name:var(--font-heading)] text-6xl font-bold tracking-[-0.02em]"
+                      style={{ color: ACCENT }}
+                    >
+                      {triageResult.probabilityPercent}%
+                    </p>
+                    <p className="mt-2 text-sm text-[#5A6462]">
+                      Below the {triageResult.thresholdPercent}% threshold BoneBot uses to move to the full
+                      assessment.
+                    </p>
+                  </>
+                )}
+                <p className="mt-6 text-base leading-[1.6] text-[#4A5452]">{routeMessage}</p>
+                <div className="mt-6 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">
+                  {qaMessages[0]?.text}
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                  Trusted resources
+                </div>
+                <ul className="flex flex-col gap-3">
+                  {RESOURCES.map((r) => (
+                    <li key={r.url}>
+                      <a
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[15px] font-semibold underline decoration-1 underline-offset-2"
+                        style={{ color: ACCENT }}
+                      >
+                        {r.name} ↗
+                      </a>
+                      <p className="mt-0.5 text-[13px] leading-[1.5] text-[#5A6462]">{r.note}</p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <button
+                onClick={restart}
+                className="self-start rounded-[10px] px-5 py-3 font-[family-name:var(--font-heading)] font-bold text-white"
+                style={{ backgroundColor: ACCENT }}
+              >
+                Start over
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -625,6 +783,66 @@ export default function Home() {
                     What&apos;s a DEXA scan?
                   </button>
                 </div>
+
+                {features && (
+                  <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                    <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                      How your estimate changes with age
+                    </div>
+                    <p className="mt-1.5 text-[13px] leading-[1.5] text-[#5A6462]">
+                      Same profile, run through the model at each age bracket — everything else held fixed. Your
+                      answer is highlighted.
+                    </p>
+                    <div className="mt-6 flex h-[140px] items-end gap-1.5 sm:gap-2.5">
+                      {AGE_BRACKETS.map((bracket) => {
+                        const projected = scoreBone({ ...features, age: AGE_MIDPOINT[bracket] });
+                        const isYours = AGE_MIDPOINT[bracket] === features.age;
+                        return (
+                          <div key={bracket} className="flex flex-1 flex-col items-center gap-1.5">
+                            <div className="flex h-[100px] w-full items-end">
+                              <div
+                                className="w-full rounded-t-[4px] transition-[height]"
+                                style={{
+                                  height: `${Math.max(6, barHeightPercent(projected.estimatedTScore))}%`,
+                                  backgroundColor: isYours ? ACCENT : bandColor(projected.estimatedTScore) + "55",
+                                }}
+                                title={`${bracket}: estimated T-score ${projected.estimatedTScore}`}
+                              />
+                            </div>
+                            <div
+                              className="text-center text-[10px] leading-tight"
+                              style={{ color: isYours ? ACCENT : "#9AA5A2", fontWeight: isYours ? 700 : 400 }}
+                            >
+                              {bracket}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                  <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                    Trusted resources
+                  </div>
+                  <ul className="flex flex-col gap-3">
+                    {RESOURCES.map((r) => (
+                      <li key={r.url}>
+                        <a
+                          href={r.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[15px] font-semibold underline decoration-1 underline-offset-2"
+                          style={{ color: ACCENT }}
+                        >
+                          {r.name} ↗
+                        </a>
+                        <p className="mt-0.5 text-[13px] leading-[1.5] text-[#5A6462]">{r.note}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
 
               <div className="flex h-[640px] flex-col rounded-2xl border border-[#E3E9E7] bg-white">
@@ -633,13 +851,14 @@ export default function Home() {
                   <div className="mt-0.5 text-[13px] text-[#5A6462]">The AI explains — it never changes your score.</div>
                 </div>
                 <div ref={qaRef} className="flex flex-1 flex-col gap-3 overflow-y-auto px-6 py-5">
-                  {qaMessages.map((m, i) =>
-                    m.role === "bot" ? (
+                  {qaMessages.map((m, i) => {
+                    if (m.kind === "resources") return <ResourcesCard key={i} />;
+                    return m.role === "bot" ? (
                       <BotBubble key={i} text={m.text} small />
                     ) : (
                       <UserBubble key={i} text={m.text} small />
-                    )
-                  )}
+                    );
+                  })}
                   {qaTyping && <TypingDots small />}
                 </div>
                 <div className="flex flex-col gap-2.5 border-t border-[#E3E9E7] px-5 py-3.5">
@@ -654,6 +873,13 @@ export default function Home() {
                         {s}
                       </button>
                     ))}
+                    <button
+                      onClick={showResources}
+                      className="rounded-full bg-[#EEF2F0] px-3.5 py-[7px] text-[13px] font-medium hover:bg-[#DCE7E3]"
+                      style={{ color: ACCENT }}
+                    >
+                      Where can I learn more?
+                    </button>
                   </div>
                   <div className="flex gap-2">
                     <input
