@@ -164,7 +164,15 @@ async function runExtraction(
         f.key === "weightKg"
           ? ` [in kilograms — convert if she gives pounds or stone, e.g. "200 lb" -> 91]`
           : "";
-      return `- ${f.key}: "${f.question}"${optsText}${hint}${currentMark}${answeredMark}${menoMark}${heightMark}${weightMark}`;
+      const stepsMark =
+        f.key === "averageDailySteps"
+          ? ` [a single whole number of steps/day — collapse spoken numbers and ranges to ONE number, e.g. "six to seven thousand" -> 6500 (use the midpoint of a range), "about 8k" -> 8000, "10,000" -> 10000]`
+          : "";
+      const minutesMark =
+        f.key === "averageDailyActiveMinutes"
+          ? ` [a single whole number of minutes/day — e.g. "about 28 minutes" -> 28, "half an hour" -> 30, "an hour" -> 60]`
+          : "";
+      return `- ${f.key}: "${f.question}"${optsText}${hint}${currentMark}${answeredMark}${menoMark}${heightMark}${weightMark}${stepsMark}${minutesMark}`;
     })
     .join("\n");
 
@@ -189,7 +197,9 @@ async function runExtraction(
         "\"actually menopause was at 48\"); if it does, extract the corrected value for that field. " +
         "Some conversions ARE allowed and expected: (a) convert spoken numbers and units into the unit the field " +
         "asks for — especially height into centimetres, e.g. \"1 m 75\" / \"one metre seventy-five\" / \"1.75 m\" -> " +
-        "175, \"1 m 15\" -> 115, \"5 ft 6\" -> 168, and weight into kilograms if she gives pounds or stone; (b) for " +
+        "175, \"1 m 15\" -> 115, \"5 ft 6\" -> 168, and weight into kilograms if she gives pounds or stone, and " +
+        "collapse spoken large numbers and ranges into a single whole number (for a range use the midpoint, e.g. " +
+        "steps \"six to seven thousand\" -> 6500, minutes \"half an hour\" -> 30); (b) for " +
         "menopauseAge, if the reply gives her age at menopause relative to now (e.g. \"10 years ago\", \"stopped 8 " +
         "years back\") and her current age is shown in that field's candidate note, extract her age at menopause as " +
         "(current age minus that number of years). Do not invent or guess beyond these conversions. " +
@@ -223,16 +233,22 @@ async function runExtraction(
 
 const PhraseSchema = z.object({ reply: z.string() });
 
-async function runPhrase(field: FieldDef, lastUserText: string, isFirstTurn: boolean, extractedSomething: boolean, clarifyNote?: string): Promise<string> {
-  const fallback = clarifyNote ? `That looks a little off — could you double-check and tell me again? ${field.question}` : field.question;
+async function runPhrase(field: FieldDef, lastUserText: string, isFirstTurn: boolean, extractedSomething: boolean, clarifyNote?: string, encourageNote?: string): Promise<string> {
+  const fallback = clarifyNote
+    ? `That looks a little off — could you double-check and tell me again? ${field.question}`
+    : encourageNote
+      ? `It really helps your estimate to answer this if you can. ${field.question}`
+      : field.question;
 
   const situation = clarifyNote
     ? `There is a problem with her last reply: ${clarifyNote} Warmly and briefly point this out (never alarmed or accusing), say it might be a typo or a mis-heard word, and ask her to double-check and tell you again by re-answering the required question below. `
-    : isFirstTurn
-      ? "Open with a brief, friendly greeting of up to three short sentences. In it, mention once — warmly and briefly — that she can either type or talk to you, can share several details in one message, and that if you ever mishear or get something wrong she can just tell you and you'll fix it (she can change anything she's told you at any point). Then ask the required question below. "
-      : extractedSomething
-        ? "Briefly and naturally acknowledge what the user just said (do not just repeat it back), then ask the required question below. "
-        : "Her last reply didn't clearly answer the previous question — gently note that and ask the required question below again, without sounding repetitive or frustrated. ";
+    : encourageNote
+      ? `She was hesitant, unsure, or questioned whether she needs to answer the previous question. Warmly and briefly explain why it matters — ${encourageNote} — and gently encourage her to answer if she can, while reassuring her it is completely okay to say she is not sure. Then ask the required question below again. `
+      : isFirstTurn
+        ? "Open with a brief, friendly greeting of up to three short sentences. In it, mention once — warmly and briefly — that she can either type or talk to you, can share several details in one message, and that if you ever mishear or get something wrong she can just tell you and you'll fix it (she can change anything she's told you at any point). Then ask the required question below. "
+        : extractedSomething
+          ? "Briefly and naturally acknowledge what the user just said (do not just repeat it back), then ask the required question below. "
+          : "Her last reply didn't clearly answer the previous question — gently note that and ask the required question below again, without sounding repetitive or frustrated. ";
 
   const system =
     "You are BoneBot, a warm, plain-spoken bone-health screening assistant running a short conversational intake. " +
@@ -303,6 +319,17 @@ const FIELD_UNITS: Partial<Record<FieldKey, string>> = {
   averageDailyActiveMinutes: " min/day",
   vitaminD: " nmol/L",
   calcium: " mmol/L",
+};
+
+// Fields important enough that a hesitant / "not sure" / "do I have to?" reply
+// should be met ONCE with a short explanation of why it matters + a gentle
+// nudge to answer, rather than accepted as a skip immediately. After one nudge
+// (tracked per-field in `collected`), a repeated non-answer is accepted and the
+// intake moves on, so it never loops. Text is the plain reason, phrased warmly
+// by the LLM (runPhrase's encourageNote path).
+const PERSUADE_FIRST: Partial<Record<FieldKey, string>> = {
+  menopauseStatus:
+    "Menopause is one of the strongest drivers of the bone loss BoneBot screens for — when your periods stop, the fall in oestrogen accelerates bone loss, so whether (and when) you reached menopause is central to your estimate.",
 };
 
 // Plain-language rendering of an already-validated value — never a source of
@@ -569,6 +596,26 @@ export async function POST(req: Request) {
     }
   }
 
+  // Persuade-first fields: a hesitant / unsure / "do I have to?" reply to the
+  // just-asked important question earns one warm explanation of why it matters
+  // and a re-ask, before a skip is accepted.
+  if (currentField && PERSUADE_FIRST[currentField.key] && lastUserText.trim()) {
+    const v = collected[currentField.key];
+    const gaveRealAnswer = v !== undefined && v !== null && v !== "not-sure";
+    if (!gaveRealAnswer) {
+      const nudgeKey = `_persuaded_${currentField.key}`;
+      if (!incomingCollected[nudgeKey]) {
+        // First hesitant reply: don't accept the skip yet. Drop any "not sure"
+        // captured this turn, record that we've nudged, and re-ask with the reason.
+        const collectedNudge: Collected = { ...collected, [nudgeKey]: true };
+        delete collectedNudge[currentField.key];
+        return finishTurn(collectedNudge, lastUserText, isFirstTurn, false, undefined, PERSUADE_FIRST[currentField.key]);
+      }
+      // Already nudged once: accept that she's unsure and move on.
+      if (v === undefined) collected[currentField.key] = "not-sure";
+    }
+  }
+
   // The just-asked question got a value that parses but is outside the
   // plausible range (e.g. age 120). Don't re-ask blankly — flag it warmly.
   if (currentField && currentFieldOutOfRange && collected[currentField.key] === undefined) {
@@ -628,6 +675,7 @@ async function finishTurn(
   isFirstTurn: boolean,
   extractedSomething: boolean,
   clarifyNote?: string,
+  encourageNote?: string,
 ): Promise<Response> {
   const collected = applyDeterministicInferences(collectedIn);
   const decision = decide(collected);
@@ -692,7 +740,7 @@ async function finishTurn(
   }
 
   const { field } = decision;
-  const reply = await runPhrase(field, lastUserText, isFirstTurn, extractedSomething, clarifyNote);
+  const reply = await runPhrase(field, lastUserText, isFirstTurn, extractedSomething, clarifyNote, encourageNote);
 
   const response: ConverseResponse = {
     reply,
