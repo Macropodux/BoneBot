@@ -231,9 +231,10 @@ Two distinct components, deliberately decoupled — as built and deployed:
    artifact loaded at runtime:
    - A **logistic-regression triage gate** (`src/lib/triage-model.ts`, age + BMI +
      menopausal status only) returns an estimated probability and a
-     `proceedToFullAssessment` flag against the locked threshold from
-     `docs/TRIAGE_THRESHOLD_AUDIT.md` (2%, chosen on validation only for >=95%
-     sensitivity, then audited once on a held-out split).
+     `proceedToFullAssessment` flag against the locked threshold in
+     `model/model-parameters.ts` (currently 1%, lowered from the originally audited
+     2% for higher validation-split sensitivity; see
+     `docs/TRIAGE_THRESHOLD_AUDIT.md` for the locking protocol).
    - A **Ridge regression** over the full feature set (`src/lib/bone-model.ts`)
      returns an estimated T-score, a 95% prediction interval, a three-band
      `elevated / uncertain / lower` category, and per-factor contributions computed
