@@ -947,8 +947,8 @@ export default function Home() {
     botSay("Hi, I'm BoneBot 👋 Before we start — what should I call you?");
   }
 
-  function submitName() {
-    const name = nameInput.trim();
+  function submitName(overrideName?: string) {
+    const name = (overrideName ?? nameInput).trim();
     if (!name || questionsStartedRef.current) return;
     questionsStartedRef.current = true;
     setMessages((m) => [...m, { role: "user", text: name }]);
@@ -1279,10 +1279,13 @@ export default function Home() {
 
   // Web Speech API mic. Hidden entirely when unsupported (Safari/older
   // browsers) — see micSupported's feature-detect effect above; typing
-  // always still works. Using it flips the session into confirmMode
-  // (read-back-before-advancing), since voice transcription is error-prone —
-  // see api/converse/route.ts's confirmMode module comment.
-  function startMic() {
+  // always still works. Generic over both chat modes: the caller decides
+  // what happens with the transcript (conversation mode flips into
+  // confirmMode — read-back-before-advancing, since voice transcription is
+  // error-prone, see api/converse/route.ts's confirmMode module comment —
+  // classic mode submits it through the same validation a typed answer
+  // gets).
+  function startMic(onTranscript: (text: string) => void) {
     if (micListening) return;
     const w = window as unknown as SpeechWindow;
     const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
@@ -1293,10 +1296,7 @@ export default function Home() {
     recognition.maxAlternatives = 1;
     recognition.onresult = (event) => {
       const transcript = event.results[0]?.[0]?.transcript?.trim();
-      if (transcript) {
-        setConvConfirmMode(true);
-        void sendConverseTurn(transcript, { confirmModeOverride: true });
-      }
+      if (transcript) onTranscript(transcript);
     };
     recognition.onerror = () => setMicListening(false);
     recognition.onend = () => setMicListening(false);
@@ -1308,6 +1308,13 @@ export default function Home() {
   function stopMic() {
     speechRecognitionRef.current?.stop();
     setMicListening(false);
+  }
+
+  function startMicForConversation() {
+    startMic((transcript) => {
+      setConvConfirmMode(true);
+      void sendConverseTurn(transcript, { confirmModeOverride: true });
+    });
   }
 
   function answer(opt: string, display = opt, recordMessage = true) {
@@ -1501,8 +1508,8 @@ export default function Home() {
     }
   }
 
-  async function submitFreeInput() {
-    const raw = freeInput.trim();
+  async function submitFreeInput(overrideRaw?: string) {
+    const raw = (overrideRaw ?? freeInput).trim();
     const step = STEPS[stepIdx];
     if (!raw || !step || flowQuestionBusy || extracting) return;
     if (step.key === "bloodResults") {
@@ -2603,10 +2610,22 @@ export default function Home() {
                     autoFocus
                     value={nameInput}
                     onChange={(event) => setNameInput(event.target.value)}
-                    placeholder="Your first name (or a nickname)"
+                    placeholder={micListening ? "Listening…" : "Your first name (or a nickname)"}
                     aria-label="What should BoneBot call you?"
-                    className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none"
+                    disabled={micListening}
+                    className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-60"
                   />
+                  {micSupported && (
+                    <button
+                      type="button"
+                      onClick={() => (micListening ? stopMic() : startMic((t) => { setNameInput(t); submitName(t); }))}
+                      aria-label={micListening ? "Stop listening" : "Answer by voice"}
+                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-colors"
+                      style={{ backgroundColor: micListening ? "#B0442F" : ACCENT }}
+                    >
+                      <span aria-hidden>{micListening ? "⏹" : "🎤"}</span>
+                    </button>
+                  )}
                   <button
                     type="submit"
                     disabled={!nameInput.trim()}
@@ -3038,9 +3057,28 @@ export default function Home() {
                                 : "Type your answer, or ask a bone-health question"
                         }
                         aria-label="Answer or ask a bone-health question"
-                        disabled={flowQuestionBusy || extracting}
+                        disabled={flowQuestionBusy || extracting || micListening}
                         className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
                       />
+                      {micSupported && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            micListening
+                              ? stopMic()
+                              : startMic((t) => {
+                                  setFreeInput(t);
+                                  void submitFreeInput(t);
+                                })
+                          }
+                          disabled={flowQuestionBusy || extracting}
+                          aria-label={micListening ? "Stop listening" : "Answer by voice"}
+                          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-white transition-colors disabled:opacity-50"
+                          style={{ backgroundColor: micListening ? "#B0442F" : ACCENT }}
+                        >
+                          <span aria-hidden>{micListening ? "⏹" : "🎤"}</span>
+                        </button>
+                      )}
                       <button
                         type="submit"
                         disabled={flowQuestionBusy || extracting || !freeInput.trim()}
@@ -3200,7 +3238,7 @@ export default function Home() {
                 <div className="flex items-center justify-between gap-2">
                   <button
                     type="button"
-                    onClick={() => (micListening ? stopMic() : startMic())}
+                    onClick={() => (micListening ? stopMic() : startMicForConversation())}
                     className="flex items-center gap-2 rounded-full border-[1.5px] px-4 py-2 text-[13px] font-semibold transition-colors"
                     style={
                       micListening
