@@ -6,14 +6,15 @@ const model = readFileSync(new URL("../lib/bone-model.ts", import.meta.url), "ut
 
 describe("landing and questionnaire copy", () => {
   it("uses clear landing language and removes superseded claims", () => {
-    expect(page).toContain("Know your bone fracture risk");
+    expect(page).toContain("Know your bone{\" \"}");
+    expect(page).toContain("fracture");
     expect(page).toContain("before you break something.");
     expect(page).toContain("Three minutes. An NHANES-trained model does the maths.");
     expect(page).toContain("AI turns the result into plain English.");
     expect(page).toContain("Designed around bone changes after menopause.");
     expect(page).toContain("A bone-health tool built with women in mind.");
     expect(page).toContain(
-      '{ stat: "4", body: "quick written questions to start. We only ask more if your answers suggest a closer look." }',
+      '{ stat: "Adaptive", body: "Only 4 initial questions, with follow-ups only when a closer look may help. No account needed." }',
     );
     expect(page).not.toContain("bone fraction risk");
     expect(page).not.toContain("Most bone-health research and tools were built around men");
