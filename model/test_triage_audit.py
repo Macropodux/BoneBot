@@ -1,4 +1,5 @@
 import math
+import re
 import unittest
 
 from model.triage_audit import audit_threshold, select_threshold
@@ -38,6 +39,12 @@ class TriageAuditTests(unittest.TestCase):
         self.assertLessEqual(audit["npv_ci95"][1], 1)
         self.assertEqual(len(audit["calibration_bins"]), 10)
         self.assertTrue(math.isfinite(audit["brier_score"]))
+
+    def test_exported_triage_threshold_matches_the_audited_two_percent_rule(self):
+        with open("model/model-parameters.ts", encoding="utf-8") as parameters:
+            source = parameters.read()
+
+        self.assertIsNotNone(re.search(r"^\s*threshold:\s*0\.02,\s*$", source, re.MULTILINE))
 
 
 if __name__ == "__main__":
