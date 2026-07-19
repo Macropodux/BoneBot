@@ -21,9 +21,20 @@ const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 // value (wrong units, a misread digit, etc). Range-checking is done
 // deterministically below in boundedOrNull(), which turns an implausible
 // value into null instead of failing the whole extraction.
+const UnitValueSchema = z
+  .object({
+    value: z.number().describe("the numeric result exactly as printed"),
+    unit: z
+      .string()
+      .describe(
+        "the unit exactly as printed on the report, e.g. 'nmol/L', 'ng/mL', 'mmol/L', 'mg/dL'; empty string if none is printed",
+      ),
+  })
+  .nullable();
+
 const RawBloodResultsSchema = z.object({
-  vitaminD: z.number().nullable(),
-  calcium: z.number().nullable(),
+  vitaminD: UnitValueSchema,
+  calcium: UnitValueSchema,
   alkalinePhosphatase: z.number().nullable(),
   redBloodCellCount: z.number().nullable(),
 });
@@ -50,10 +61,28 @@ function boundedOrNull(value: number | null, key: keyof BloodResults): number | 
   return value >= min && value <= max ? value : null;
 }
 
+const round1 = (n: number) => Math.round(n * 10) / 10;
+
+// 25-OH vitamin D: ng/mL -> nmol/L is ×2.496. Anything else (nmol/L, or no
+// printed unit) is taken as already in nmol/L.
+function vitaminDToNmolL(uv: { value: number; unit: string } | null): number | null {
+  if (!uv || !Number.isFinite(uv.value)) return null;
+  const u = uv.unit.toLowerCase();
+  return round1(u.includes("ng") ? uv.value * 2.496 : uv.value);
+}
+
+// Serum calcium: mg/dL -> mmol/L is ÷4.008. Anything else (mmol/L, or no
+// printed unit) is taken as already in mmol/L.
+function calciumToMmolL(uv: { value: number; unit: string } | null): number | null {
+  if (!uv || !Number.isFinite(uv.value)) return null;
+  const u = uv.unit.toLowerCase();
+  return round1(u.includes("mg") ? uv.value / 4.008 : uv.value);
+}
+
 function sanitize(raw: RawBloodResults): BloodResults {
   return {
-    vitaminD: boundedOrNull(raw.vitaminD, "vitaminD"),
-    calcium: boundedOrNull(raw.calcium, "calcium"),
+    vitaminD: boundedOrNull(vitaminDToNmolL(raw.vitaminD), "vitaminD"),
+    calcium: boundedOrNull(calciumToMmolL(raw.calcium), "calcium"),
     alkalinePhosphatase: boundedOrNull(raw.alkalinePhosphatase, "alkalinePhosphatase"),
     redBloodCellCount: boundedOrNull(raw.redBloodCellCount, "redBloodCellCount"),
   };
@@ -112,14 +141,14 @@ export async function POST(req: Request) {
             model: openai(VISION_MODEL),
             schema: RawBloodResultsSchema,
             system:
-              "You extract laboratory values from an uploaded blood-result image. Extract only values that are clearly visible with the exact labels and units below. Do not estimate, convert units, interpret, diagnose, or give advice. Return null for a missing, unclear, or differently-unit-ed value.",
+              "You extract laboratory values from an uploaded blood-result image. Report each value's NUMBER exactly as printed and its UNIT exactly as printed — do NOT convert, estimate, interpret, diagnose, or advise. Recognise common label variants: vitamin D includes 'Vitamin D', 'Vit D', 'Vit. D', '25-OH Vitamin D', '25-hydroxyvitamin D', '25(OH)D', 'Vitamin D3', 'cholecalciferol', 'calcidiol'; calcium includes 'Calcium', 'Ca', 'Serum calcium', 'Total calcium', 'Corrected calcium'. If a value is not clearly present, return null for it.",
             messages: [
               {
                 role: "user",
                 content: [
                   {
                     type: "text",
-                    text: "Extract only: vitamin D in nmol/L, calcium in mmol/L, alkaline phosphatase in U/L, and red blood cell count in 10^12/L. Return null for every other measurement.",
+                    text: "From this blood report, extract: vitamin D (25-OH vitamin D / Vit D / Vitamin D3 — any variant), calcium (serum/total/corrected), alkaline phosphatase, and red blood cell count. For vitamin D and calcium, give both the number as printed AND its unit as printed (e.g. value 30, unit 'ng/mL'; or value 75, unit 'nmol/L') — never convert. Return null for anything not clearly shown.",
                   },
                   { type: "file", data: new Uint8Array(buffer), mediaType: image.type },
                 ],
