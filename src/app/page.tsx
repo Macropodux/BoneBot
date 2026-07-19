@@ -22,14 +22,14 @@ import { useEffect, useRef, useState } from "react";
 import { resolveAmbiguousAnswer } from "@/lib/ambiguity";
 import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model";
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
-import { tScoreModel } from "../../model/model-parameters";
+import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-parameters";
 
 const ACCENT = "#0E7C6E";
 const ACCENT_HOVER = "#0A5A50";
 const ACCENT_TINT = "#E4F0ED";
 const FRACTURE = "#B0442F";
 
-type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "bloodResults" | "weight" | "activity";
+type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "bloodResults" | "weight" | "activity" | "secondaryCondition";
 
 type Step = { key: StepKey; q: string; options: string[] };
 
@@ -67,6 +67,18 @@ const STEPS: Step[] = [
   { key: "bloodResults", q: "If you have blood-test results, upload an image now, or tap Skip to continue without one.", options: [] },
   { key: "weight", q: "What's your weight and height? BoneBot uses these to calculate your BMI.", options: [] },
   { key: "activity", q: "How active are you day-to-day, with weight-bearing activity like walking, jogging, or strength training? You can also upload a screenshot from your watch or activity app instead.", options: ["Low", "Moderate", "High"] },
+  // Appended last and gated on SECONDARY_CONDITION_TRAINED so it is only asked
+  // once the model is retrained with the feature. Appending (not inserting)
+  // keeps the earlier gate/DXA step indices and FULL_QUESTION_START stable.
+  ...(SECONDARY_CONDITION_TRAINED
+    ? [
+        {
+          key: "secondaryCondition" as StepKey,
+          q: "Have you been diagnosed with thyroid disease, coeliac disease, or chronic kidney disease?",
+          options: ["Yes", "No", "Not sure"],
+        },
+      ]
+    : []),
 ];
 
 const EXAMPLE_ANSWERS: Record<StepKey, string> = {
@@ -85,6 +97,7 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   bloodResults: "Skip",
   weight: "24.5",
   activity: "Moderate",
+  secondaryCondition: "No",
 };
 
 // Fields the 7-question flow never asks about — hormone therapy, rheumatoid
@@ -205,6 +218,9 @@ function mapAnswersToFeatures(
     weightBearingActivity: activityValue ?? FIELD_DEFAULTS.weightBearingActivity,
     vitaminD: bloodResults?.vitaminD ?? FIELD_DEFAULTS.vitaminD,
     calcium: bloodResults?.calcium ?? FIELD_DEFAULTS.calcium,
+    // Only meaningful once SECONDARY_CONDITION_TRAINED (the question is gated on
+    // it); otherwise the coefficient is 0 and this has no effect.
+    secondaryCondition: answerOrDefault(answers.secondaryCondition, tScoreModel.imputationDefaults.secondaryCondition),
   };
 
   const provided: Array<keyof BoneFeatures> = ["age"];
@@ -217,6 +233,7 @@ function mapAnswersToFeatures(
   if (activityValue !== null) provided.push("weightBearingActivity");
   if (bloodResults?.vitaminD != null) provided.push("vitaminD");
   if (bloodResults?.calcium != null) provided.push("calcium");
+  if (SECONDARY_CONDITION_TRAINED && isYesNo(answers.secondaryCondition)) provided.push("secondaryCondition");
 
   return { features, provided };
 }
@@ -264,22 +281,19 @@ const TABS = [
 type Tab = (typeof TABS)[number]["id"];
 
 // Meter axis: equal thirds over a clinically-anchored T-score range, so the
-// three zones line up with the real bands (normal >= -1.0, osteopenia
-// -1.0..-2.5, osteoporosis <= -2.5) instead of an arbitrary split.
+// three zones line up with the real bands (osteoporosis <= -2.5, osteopenia
+// -2.5..-1.0, normal >= -1.0) instead of an arbitrary split. Ascending, left
+// to right, like a normal number line: more negative (worse) is further left.
 const AXIS_MIN = -4.0;
 const AXIS_MAX = 0.5;
-function markerPercent(tScore: number): number {
-  const clamped = Math.max(AXIS_MIN, Math.min(AXIS_MAX, tScore));
-  const normalized = (clamped - AXIS_MIN) / (AXIS_MAX - AXIS_MIN); // 0..1, higher tScore = better
-  return Math.round((1 - normalized) * 100); // reversed: better (higher) -> left/"Low"
-}
-
-// Bar height for the age-sensitivity chart: same clinically-anchored axis as
-// the meter, so bar heights and the meter marker read consistently.
-function barHeightPercent(tScore: number): number {
+function axisPercent(tScore: number): number {
   const clamped = Math.max(AXIS_MIN, Math.min(AXIS_MAX, tScore));
   return Math.round(((clamped - AXIS_MIN) / (AXIS_MAX - AXIS_MIN)) * 100);
 }
+// Named alias for the horizontal meter's left-offset — same axis, read as a position.
+const markerPercent = axisPercent;
+// Named alias for the age-sensitivity chart's bar height — same axis, read as a magnitude.
+const barHeightPercent = axisPercent;
 
 function bandColor(tScore: number): string {
   if (tScore <= -2.5) return "#B0442F"; // elevated
@@ -398,6 +412,27 @@ function TrustedResources({ small }: { small?: boolean }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+// Labels a section as LLM-written (vs. the deterministic model output above
+// it) — the same "model predicts, LLM only explains" honesty rule, made
+// visible in the UI so it's never ambiguous which parts are which.
+function AIWrittenBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-[#EEF2F0] px-2 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-[#5A6462]"
+      title="Generated by the LLM from the model's fixed output — it never sets the number"
+    >
+      <span
+        className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[9px] font-bold text-white"
+        style={{ backgroundColor: ACCENT }}
+        aria-hidden
+      >
+        AI
+      </span>
+      AI-written explanation
+    </span>
   );
 }
 
@@ -527,8 +562,11 @@ export default function Home() {
   const emailSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // stepIdx (not just messages/typing) because the chip row now renders
+    // inside this scrollable pane, right under the last bot message — it
+    // changes the pane's content height without changing messages/typing.
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [messages, typing]);
+  }, [messages, typing, stepIdx]);
   useEffect(() => {
     if (qaRef.current) qaRef.current.scrollTop = qaRef.current.scrollHeight;
   }, [qaMessages, qaTyping]);
@@ -1285,16 +1323,18 @@ export default function Home() {
   const cat = result ? CATEGORY_MAP[result.category] : "low";
   const catMeta = CAT_META[cat];
   const marker = result ? markerPercent(result.estimatedTScore) : 50;
+  const rangeLeftPct = result ? markerPercent(result.tScoreRange[0]) : 50;
+  const rangeRightPct = result ? markerPercent(result.tScoreRange[1]) : 50;
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-[#F5F7F6] text-[#15181A] font-[family-name:var(--font-body)]"
+      className="flex h-full flex-col bg-[#F5F7F6] text-[#15181A] font-[family-name:var(--font-body)]"
       style={{ ["--bw-accent" as string]: ACCENT }}
     >
       <style>{`@keyframes bw-blink { 0%,80%,100% { opacity: .25; } 40% { opacity: 1; } }`}</style>
 
       {screen === "landing" && (
-        <div className="relative flex flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
+        <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
           <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-12">
             <div className="font-[family-name:var(--font-heading)] text-[22px] font-bold tracking-[-0.02em]">
               Bone<span style={{ color: ACCENT }}>Bot</span>
@@ -1386,10 +1426,6 @@ export default function Home() {
                 m.role === "bot" ? <BotBubble key={i} text={m.text} /> : <UserBubble key={i} text={m.text} />
               )}
               {typing && <TypingDots />}
-            </div>
-          </div>
-          <div className="border-t border-[#E3E9E7] bg-white px-6 py-5">
-            <div className="mx-auto flex max-w-[680px] flex-col gap-3">
               {inFlow && step.options.length > 0 && !(step.key === "activity" && pendingActivityResult) && (
                 <div className="flex flex-wrap justify-end gap-2.5">
                   {step.options.map((opt) => (
@@ -1412,6 +1448,10 @@ export default function Home() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+          <div className="border-t border-[#E3E9E7] bg-white px-6 py-5">
+            <div className="mx-auto flex max-w-[680px] flex-col gap-3">
 
               {inFlow && step.key === "bloodResults" && pendingBloodResults && !bloodEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
@@ -1721,7 +1761,7 @@ export default function Home() {
                 </div>
               )}
 
-              {inFlow && step.options.length === 0 && !pendingBloodResults && step.key !== "weight" && (
+              {inFlow && !pendingBloodResults && step.key !== "weight" && step.key !== "activity" && (
                 <div className="flex flex-col gap-2.5">
                   <form
                     onSubmit={(event) => {
@@ -1733,7 +1773,11 @@ export default function Home() {
                     <input
                       value={freeInput}
                       onChange={(event) => setFreeInput(event.target.value)}
-                      placeholder="Type your answer, or ask a bone-health question"
+                      placeholder={
+                        step.options.length > 0
+                          ? "Or type your answer here…"
+                          : "Type your answer, or ask a bone-health question"
+                      }
                       aria-label="Answer or ask a bone-health question"
                       disabled={flowQuestionBusy || extracting}
                       className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
@@ -2014,40 +2058,45 @@ export default function Home() {
                   )}
 
                   {tab !== "category" && (
-                    <div className="mt-2 mb-2">
-                      <div className="flex h-3.5 overflow-hidden rounded-full">
-                        <div className="w-1/3" style={{ backgroundColor: "#BFDDD3" }} />
-                        <div className="w-1/3" style={{ backgroundColor: "#F0DFAE" }} />
-                        <div className="w-1/3" style={{ backgroundColor: "#EFC3B8" }} />
-                      </div>
-                      <div className="relative h-0">
+                    <div className="mt-8 mb-2">
+                      <div className="relative">
+                        <div className="flex h-3.5 overflow-hidden rounded-full">
+                          <div className="w-1/3" style={{ backgroundColor: "#EFC3B8" }} />
+                          <div className="w-1/3" style={{ backgroundColor: "#F0DFAE" }} />
+                          <div className="w-1/3" style={{ backgroundColor: "#BFDDD3" }} />
+                        </div>
+                        {/* Uncertainty range — the box, not just the point estimate */}
                         <div
-                          className="absolute -top-[21px] h-7 w-1 -translate-x-1/2 rounded-sm bg-[#15181A]"
+                          className="absolute top-0 h-3.5 rounded-full border-2 border-dashed border-[#4A5452]"
+                          style={{
+                            left: `${rangeLeftPct}%`,
+                            width: `${Math.max(3, rangeRightPct - rangeLeftPct)}%`,
+                          }}
+                        />
+                        <div
+                          className="absolute -top-[26px] -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
+                          style={{ backgroundColor: "#15181A", left: `${marker}%` }}
+                        >
+                          you
+                        </div>
+                        <div
+                          className="absolute top-0 h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#15181A]"
                           style={{ left: `${marker}%` }}
                         />
                       </div>
-                      <div className="mt-3.5 flex justify-between text-xs font-semibold text-[#5A6462]">
-                        <span>Low</span>
-                        <span>Moderate</span>
-                        <span>Elevated</span>
+                      <div className="mt-3.5 flex justify-between gap-2 text-xs font-semibold">
+                        {[...T_SCORE_BANDS].reverse().map((b) => (
+                          <span key={b.label}>
+                            <span style={{ color: b.color }}>{b.label.replace(" (low bone mass)", "")}</span>{" "}
+                            <span className="font-normal text-[#9AA5A2]">{b.range}</span>
+                          </span>
+                        ))}
                       </div>
-                      <div className="mt-4 rounded-xl bg-[#F5F7F6] p-4">
-                        <p className="text-sm leading-[1.6] text-[#4A5452]">
-                          Your <strong>estimated T-score is {result.estimatedTScore}</strong>, likely somewhere
-                          between {result.tScoreRange[0]} and {result.tScoreRange[1]}. A T-score compares your bone
-                          density to a healthy young adult: 0 is average, and lower (more negative) means less
-                          dense bone.
-                        </p>
-                        <ul className="mt-3 flex flex-col gap-1.5">
-                          {T_SCORE_BANDS.map((b) => (
-                            <li key={b.label} className="flex items-center gap-2 text-[13px]">
-                              <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ backgroundColor: b.color }} />
-                              <span className="font-semibold text-[#15181A]">{b.label}</span>
-                              <span className="text-[#5A6462]">{b.range}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                      <p className="mt-4 text-sm leading-[1.6] text-[#4A5452]">
+                        The dashed box is the uncertainty range — your true score most likely sits inside it. A
+                        T-score compares your bone density to a healthy young adult: 0 is average, and lower (more
+                        negative) means less dense bone.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -2066,45 +2115,49 @@ export default function Home() {
                 )}
 
                 <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                  <div className="mb-1 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                  <div className="mb-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
                     What drove this result
                   </div>
-                  <p className="mb-5 text-[13px] leading-[1.5] text-[#5A6462]">
-                    Each bar is how much that factor pushed your estimate. <span style={{ color: ACCENT }}>Green pushes it up (better)</span>, <span style={{ color: "#B0442F" }}>red pushes it down</span>. Longer bar, bigger effect.
-                  </p>
-                  <div className="flex flex-col gap-4">
+                  <div className="mb-3 flex items-center justify-between text-[12px] font-semibold">
+                    <span style={{ color: "#B0442F" }}>← Pulls your estimate down</span>
+                    <span style={{ color: ACCENT }}>Supports your bones →</span>
+                  </div>
+                  <div className="flex flex-col gap-3.5">
                     {(() => {
                       const maxAbs = Math.max(...result.contributions.map((f) => Math.abs(f.contribution)), 0.1);
                       return result.contributions.map((f) => {
                         const isPositive = f.direction === "raises";
-                        const widthPct = Math.max(4, Math.round((Math.abs(f.contribution) / maxAbs) * 100));
+                        const halfWidthPct = Math.max(3, Math.round((Math.abs(f.contribution) / maxAbs) * 50));
                         const detail = features ? factorDetail(f.factor, features) : { value: "" };
                         return (
-                          <div key={f.factor}>
-                            <div className="flex items-baseline justify-between gap-3 text-[13.5px]">
-                              <span className="text-[#15181A]">{f.factor}</span>
-                              <span
-                                className="font-[family-name:var(--font-heading)] font-bold"
-                                style={{ color: isPositive ? ACCENT : "#B0442F" }}
-                              >
-                                {f.contribution > 0 ? "+" : ""}
-                                {f.contribution.toFixed(1)}
-                              </span>
-                            </div>
-                            {detail.value && (
-                              <div className="mb-1.5 text-[12.5px]">
-                                <span className="font-medium text-[#4A5452]">{detail.value}</span>
-                                {detail.reference && <span className="text-[#9AA5A2]"> · {detail.reference}</span>}
+                          <div key={f.factor} className="flex items-center gap-3">
+                            <div className="w-[110px] flex-shrink-0 sm:w-[150px]">
+                              <div className="truncate text-[13px] text-[#15181A]" title={f.factor}>
+                                {f.factor}
                               </div>
-                            )}
-                            <div className="h-2 overflow-hidden rounded-full bg-[#F0F2F1]">
+                              {detail.value && (
+                                <div className="truncate text-[11px] text-[#9AA5A2]" title={detail.value}>
+                                  {detail.value}
+                                </div>
+                              )}
+                            </div>
+                            <div className="relative h-2.5 flex-1 overflow-visible rounded-full bg-[#F0F2F1]">
+                              <div className="absolute inset-y-0 left-1/2 w-px bg-[#D5DCDA]" />
                               <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${widthPct}%`,
-                                  backgroundColor: isPositive ? ACCENT : "#B0442F",
-                                }}
+                                className="absolute top-0 h-full rounded-full"
+                                style={
+                                  isPositive
+                                    ? { left: "50%", width: `${halfWidthPct}%`, backgroundColor: ACCENT }
+                                    : { right: "50%", width: `${halfWidthPct}%`, backgroundColor: "#B0442F" }
+                                }
                               />
+                            </div>
+                            <div
+                              className="w-10 flex-shrink-0 text-right font-[family-name:var(--font-heading)] text-[13px] font-bold"
+                              style={{ color: isPositive ? ACCENT : "#B0442F" }}
+                            >
+                              {f.contribution > 0 ? "+" : ""}
+                              {f.contribution.toFixed(1)}
                             </div>
                           </div>
                         );
@@ -2112,21 +2165,30 @@ export default function Home() {
                     })()}
                   </div>
                   <div className="mt-5 text-[13px] leading-[1.5] text-[#5A6462]">
-                    Weights follow established clinical and NHANES-derived risk factors. Only factors you
-                    answered are shown. Anything you skipped uses a population average and is left out here.
+                    Bars show how much each answer moved your estimated T-score. Only factors that measurably
+                    moved it are listed — anything you skipped uses a population average and isn&apos;t shown here.
+                    Weights follow NHANES-derived clinical risk factors.
                   </div>
                 </div>
 
                 <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                  <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
-                    Understanding your estimated T-score
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]"
+                    >
+                      Understanding your estimated T-score
+                    </span>
+                    <AIWrittenBadge />
                   </div>
                   <p className="mt-4 whitespace-pre-wrap text-[15px] leading-[1.65] text-[#4A5452]">{scoreExplanation}</p>
                 </div>
 
                 <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                  <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
-                    What this could mean for you
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                      What this means for you
+                    </span>
+                    <AIWrittenBadge />
                   </div>
                   <p className="mt-4 whitespace-pre-wrap text-[15px] leading-[1.65] text-[#4A5452]">{implicationsExplanation}</p>
                 </div>
@@ -2187,18 +2249,24 @@ export default function Home() {
                       Same profile, run through the model at each age bracket, with everything else held fixed. Your
                       answer is highlighted.
                     </p>
-                    <div className="mt-6 flex h-[140px] items-end gap-1.5 sm:gap-2.5">
+                    <div className="mt-6 flex h-[150px] items-end gap-1.5 sm:gap-2.5">
                       {AGE_BRACKETS.map((bracket) => {
                         const projected = scoreBone({ ...features, age: AGE_MIDPOINT[bracket] });
                         const isYours = AGE_MIDPOINT[bracket] === features.age;
                         return (
                           <div key={bracket} className="flex flex-1 flex-col items-center gap-1.5">
+                            <div
+                              className="text-[11px] font-semibold"
+                              style={{ color: isYours ? ACCENT : "#5A6462" }}
+                            >
+                              {projected.estimatedTScore}
+                            </div>
                             <div className="flex h-[100px] w-full items-end">
                               <div
                                 className="w-full rounded-t-[4px] transition-[height]"
                                 style={{
                                   height: `${Math.max(6, barHeightPercent(projected.estimatedTScore))}%`,
-                                  backgroundColor: isYours ? ACCENT : bandColor(projected.estimatedTScore) + "55",
+                                  backgroundColor: isYours ? ACCENT : bandColor(projected.estimatedTScore) + "70",
                                 }}
                                 title={`${bracket}: estimated T-score ${projected.estimatedTScore}`}
                               />

@@ -21,6 +21,9 @@ export type BoneFeatures = {
   highAlcohol: boolean;
   vitaminD: number;
   calcium: number;
+  // Thyroid / coeliac / CKD "secondary osteoporosis" flag. Only affects the
+  // estimate once the model is retrained with it (SECONDARY_CONDITION_TRAINED).
+  secondaryCondition: boolean;
 };
 
 export const MODEL_IS_VALIDATED = true;
@@ -42,6 +45,61 @@ export type ModelOutput = {
 const round1 = (value: number) => Math.round(value * 10) / 10;
 const binary = (value: boolean) => (value ? 1 : 0);
 
+type CoefKey = keyof typeof tScoreModel.coefficients;
+
+export type IntervalConfig = {
+  residualStd: number;
+  z: number;
+  featureVariances: Partial<Record<string, number>>;
+  fixedHalfWidth: number;
+};
+
+// Per-person prediction-interval half-width. When the training variances have
+// been exported, the band widens for each imputed feature by
+// coefficient^2 * Var(feature) — the variance discarded by imputing that
+// feature's mean — added in quadrature onto the residual variance. With no
+// exported variances it falls back to the model's fixed complete-data
+// half-width, so behaviour is unchanged until the notebook fills them in.
+export function adaptiveHalfWidth(
+  imputedFeatures: ReadonlyArray<string>,
+  coefficients: Readonly<Record<string, number>>,
+  cfg: IntervalConfig,
+): number {
+  if (!cfg.featureVariances || Object.keys(cfg.featureVariances).length === 0) {
+    return cfg.fixedHalfWidth;
+  }
+  let variance = cfg.residualStd * cfg.residualStd;
+  for (const key of imputedFeatures) {
+    const v = cfg.featureVariances[key];
+    if (typeof v === "number") variance += coefficients[key] * coefficients[key] * v;
+  }
+  return cfg.z * Math.sqrt(variance);
+}
+
+function predictionInterval(
+  estimate: number,
+  terms: ReadonlyArray<[keyof BoneFeatures, string, number, CoefKey]>,
+  provided: Set<keyof BoneFeatures> | null,
+  c: typeof tScoreModel.coefficients,
+): [number, number] {
+  // Without a provided set we cannot tell which inputs were imputed, so use the
+  // fixed band. Otherwise every coefficient key whose feature was not supplied
+  // is treated as imputed.
+  const imputed = provided
+    ? terms.filter(([key]) => !provided.has(key)).map(([, , , coefKey]) => coefKey)
+    : [];
+  const iv = tScoreModel.intervals;
+  const halfWidth = provided
+    ? adaptiveHalfWidth(imputed, c, {
+        residualStd: iv.residualStd,
+        z: iv.z,
+        featureVariances: iv.featureVariances,
+        fixedHalfWidth: tScoreModel.intervalHalfWidth,
+      })
+    : tScoreModel.intervalHalfWidth;
+  return [estimate - halfWidth, estimate + halfWidth];
+}
+
 // `providedFeatures`, when given, lists the feature keys the user actually
 // supplied. Missing features are still imputed (a linear model has to plug in
 // *some* value — the population mean is the neutral choice that adds no
@@ -55,32 +113,37 @@ export function scoreBone(
   providedFeatures?: ReadonlyArray<keyof BoneFeatures>,
 ): ModelOutput {
   const c = tScoreModel.coefficients;
-  const terms: [keyof BoneFeatures, string, number][] = [
-    ["age", "Age", c.age * features.age],
-    ["yearsSinceMenopause", "Years since menopause", c.yearsSinceMenopause * features.yearsSinceMenopause],
-    ["onHormoneTherapy", "Hormone therapy", c.onHormoneTherapy * binary(features.onHormoneTherapy)],
-    ["priorFragilityFracture", "Prior fragility fracture", c.priorFragilityFracture * binary(features.priorFragilityFracture)],
-    ["bmi", "Body mass index", c.bmi * features.bmi],
-    ["weightBearingActivity", "Weight-bearing activity", c.activityLevel * features.weightBearingActivity],
-    ["currentSmoker", "Current smoker", c.currentSmoker * binary(features.currentSmoker)],
-    ["parentalHipFracture", "Parental hip fracture", c.parentalHipFracture * binary(features.parentalHipFracture)],
-    ["glucocorticoids", "Glucocorticoid use", c.glucocorticoids * binary(features.glucocorticoids)],
-    ["rheumatoidArthritis", "Rheumatoid arthritis", c.rheumatoidArthritis * binary(features.rheumatoidArthritis)],
-    ["highAlcohol", "High alcohol intake", c.highAlcohol * binary(features.highAlcohol)],
-    ["vitaminD", "Vitamin D", c.vitaminD * features.vitaminD],
-    ["calcium", "Serum calcium", c.calcium * features.calcium],
+  // Each term: [feature key, label, contribution, coefficient key]. The
+  // coefficient key links the feature to its coefficient and training variance
+  // in model-parameters (note weightBearingActivity uses the activityLevel
+  // coefficient).
+  const terms: [keyof BoneFeatures, string, number, CoefKey][] = [
+    ["age", "Age", c.age * features.age, "age"],
+    ["yearsSinceMenopause", "Years since menopause", c.yearsSinceMenopause * features.yearsSinceMenopause, "yearsSinceMenopause"],
+    ["onHormoneTherapy", "Hormone therapy", c.onHormoneTherapy * binary(features.onHormoneTherapy), "onHormoneTherapy"],
+    ["priorFragilityFracture", "Prior fragility fracture", c.priorFragilityFracture * binary(features.priorFragilityFracture), "priorFragilityFracture"],
+    ["bmi", "Body mass index", c.bmi * features.bmi, "bmi"],
+    ["weightBearingActivity", "Weight-bearing activity", c.activityLevel * features.weightBearingActivity, "activityLevel"],
+    ["currentSmoker", "Current smoker", c.currentSmoker * binary(features.currentSmoker), "currentSmoker"],
+    ["parentalHipFracture", "Parental hip fracture", c.parentalHipFracture * binary(features.parentalHipFracture), "parentalHipFracture"],
+    ["glucocorticoids", "Glucocorticoid use", c.glucocorticoids * binary(features.glucocorticoids), "glucocorticoids"],
+    ["rheumatoidArthritis", "Rheumatoid arthritis", c.rheumatoidArthritis * binary(features.rheumatoidArthritis), "rheumatoidArthritis"],
+    ["highAlcohol", "High alcohol intake", c.highAlcohol * binary(features.highAlcohol), "highAlcohol"],
+    ["vitaminD", "Vitamin D", c.vitaminD * features.vitaminD, "vitaminD"],
+    ["calcium", "Serum calcium", c.calcium * features.calcium, "calcium"],
+    ["secondaryCondition", "Thyroid / coeliac / kidney disease", c.secondaryCondition * binary(features.secondaryCondition), "secondaryCondition"],
   ];
 
   const estimate = tScoreModel.intercept + terms.reduce((sum, [, , value]) => sum + value, 0);
-  const low = estimate - tScoreModel.intervalHalfWidth;
-  const high = estimate + tScoreModel.intervalHalfWidth;
+
+  const provided = providedFeatures ? new Set(providedFeatures) : null;
+  const [low, high] = predictionInterval(estimate, terms, provided, c);
 
   let category: ModelOutput["category"];
   if (estimate <= -2.5 || low <= -2.5) category = "elevated";
   else if (estimate >= -1.0) category = "lower";
   else category = "uncertain";
 
-  const provided = providedFeatures ? new Set(providedFeatures) : null;
   const contributions = terms
     .filter(([key, , value]) => Math.abs(value) > 1e-3 && (!provided || provided.has(key)))
     .map(([, factor, contribution]): FactorContribution => ({

@@ -284,6 +284,7 @@ function toBoneFeatures(answers: IntakeAnswers): BoneFeatures {
     highAlcohol: Boolean(tScoreModel.imputationDefaults.highAlcohol),
     vitaminD: tScoreModel.imputationDefaults.vitaminD,
     calcium: tScoreModel.imputationDefaults.calcium,
+    secondaryCondition: Boolean(tScoreModel.imputationDefaults.secondaryCondition),
   };
 }
 
