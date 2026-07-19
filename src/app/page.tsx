@@ -924,7 +924,7 @@ export default function Home() {
   // "classic" — no UI path switches into "conversation" anymore, so that
   // screen is unreachable; left in place rather than deleted in case it's
   // revisited later.
-  const [flowMode, setFlowMode] = useState<"conversation" | "classic">("classic");
+  const [flowMode, setFlowMode] = useState<"conversation" | "classic">("conversation");
   const [convMessages, setConvMessages] = useState<ChatMessage[]>([]);
   const [convBusy, setConvBusy] = useState(false);
   const [convCollected, setConvCollected] = useState<Record<string, unknown>>({});
@@ -2432,24 +2432,9 @@ export default function Home() {
             <div className={`${LANDING_HEADING_FONT} text-[26px] font-bold tracking-[-0.02em]`} style={{ color: LANDING_INK }}>
               Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
             </div>
-            <label className="ml-auto flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: "#5A6462" }}>
-              <span aria-hidden>🌐</span>
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                aria-label="BoneBot's reply language"
-                className="cursor-pointer rounded-lg border-[1.5px] border-[#C6CFCC] bg-transparent px-2 py-[6px] text-[13px] font-semibold text-[#4A5452] outline-none hover:border-[#0E6E62]"
-              >
-                {LANGUAGES.map((l) => (
-                  <option key={l.name} value={l.name}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </label>
             <button
               onClick={startConversation}
-              className={`${LANDING_HEADING_FONT} inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
+              className={`${LANDING_HEADING_FONT} ml-auto inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
               style={{ backgroundColor: LANDING_ACCENT }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
               onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT)}

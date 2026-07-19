@@ -180,8 +180,8 @@ studies) found a similar-sized association (RR 2.25 overall, RR 1.99 in the
 female subgroup). This is why FRAX and NOGG retain RA as a standalone clinical
 risk factor alongside, not instead of, glucocorticoid use. It supports the
 *direction* of the model's existing `rheumatoidArthritis` coefficient in
-`bone-model.ts`; the coefficient's magnitude remains a placeholder pending
-NHANES training, per that file's own validation note.
+`bone-model.ts`, which is now trained on NHANES like the rest of the model
+(see `model/model-parameters.ts`, `model/README.md`).
 
 ### Secondary-cause cards: thyroid disease, coeliac disease, chronic kidney disease
 

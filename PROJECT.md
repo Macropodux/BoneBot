@@ -3,8 +3,7 @@
 **Hack-Nation Challenge 05 — Women's Hormonal Health.** Product name: **BoneBot**.
 
 > **Read this before spawning an agent.** It is the shared brain. `AGENTS.md` =
-> the rules; this = the plan; `PLAYBOOK.md` = how to build fast; `RUNBOOK.md` =
-> schedule & non-negotiables.
+> the rules; this = the plan.
 
 ---
 
@@ -79,7 +78,9 @@ profile + activity → scoreBone() [deterministic, NHANES-trained] → {estimate
 ```
 
 Files already drafted:
-- `src/lib/bone-model.ts` — the model. **Coefficients are PLACEHOLDERS.** 🔴
+- `src/lib/bone-model.ts` — the model. Coefficients are trained and validated
+  (`MODEL_IS_VALIDATED = true`); exported from `model/model-parameters.ts`. See
+  `model/README.md` for performance.
 - `src/lib/bone-schema.ts` — the LLM explanation shape.
 - `src/app/api/screen/route.ts` — the loop (model → LLM → report).
 - `src/app/screen/page.tsx` — functional form + result card (design later).
@@ -100,8 +101,9 @@ Files already drafted:
 
 - Screening flag, **never** a diagnosis. Every result carries "confirm with DXA
   and your clinician."
-- Placeholder coefficients show a "not yet validated" banner until the real
-  NHANES model lands. Do not demo placeholder numbers as validated.
+- If coefficients are ever unvalidated, the UI must show the "not yet
+  validated" banner — see `MODEL_IS_VALIDATED` in `bone-model.ts`. Do not demo
+  placeholder numbers as validated.
 - Report **uncertain** honestly — a confident wrong screen is the worst outcome.
 - Separate known clinical risk factors from anything only statistically
   associated. No treatment advice.

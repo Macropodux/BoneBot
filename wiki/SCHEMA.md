@@ -101,7 +101,7 @@ Generation is reproducible from markdown via `scripts/wiki_graph_extract.py`. Th
 ## Workflow customizations
 
 - **Raw sources cited in place.** The project's core operating docs
-  (`AGENTS.md`, `PROJECT.md`, `TASKBOARD.md`, `RUNBOOK.md`, `SCREEN.md`) are
+  (`AGENTS.md`, `PROJECT.md`, `SCREEN.md`) are
   NOT copied into `raw/` — they're already canonical, single-owner files at
   the repo root. Their source pages' `raw:` frontmatter points directly at
   the repo-relative path (e.g. `raw: "AGENTS.md"`), not a `raw/` copy. Only

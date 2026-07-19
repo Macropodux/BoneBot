@@ -78,15 +78,33 @@ Ablation — osteoporosis classification on the same split:
 The lift over baseline is modest on AUC but clearer on PR-AUC (0.280 → 0.350),
 which matters more for a rare-positive screening target.
 
+## Benchmark files (`model/data/`)
+
+The dataset is committed as a downloadable artifact, so you can score a model
+without rebuilding anything:
+
+| File | What |
+|---|---|
+| `bonebot_nhanes_2013_2014.csv` | Heavyweight T-score benchmark, 1,119 women, one row per `SEQN`, with the 13 features, the DXA label (`Tscore`, `femoralNeckBMD`, `osteoporosis`), and the **exact published split** (`split` = train/test, 839/280) and `training_outlier` flag. The held-out set is the 280 `split == "test"` rows. |
+| `bonebot_triage_2013_2014.csv` | Lightweight triage benchmark, 1,581 women: age, BMI, postmenopausal flag, osteoporosis label. |
+| `nhanes_sources.sha256` | SHA-256 of every source `.xpt`, so the raw fetch is hash-verifiable. |
+
+Scoring metrics, definitions, and a copy-pasteable `evaluate()` are in
+[`EVAL.md`](EVAL.md) / [`eval.py`](eval.py).
+
 ## Reproduce
 
 ```bash
+# Rebuild the committed dataset from NHANES source (hash-verified vs the manifest)
+python3.10 model/export_dataset.py
 # Fit, evaluate, and export coefficients + interval params
 jupyter nbconvert --to notebook --execute model/train_bonebot.ipynb
 # Triage threshold held-out audit
 python model/triage_audit.py
 ```
 
+Feature values in the CSVs are RAW (pre-imputation), so NHANES missingness shows
+as empty cells; median imputation is a modeling step, not part of the data.
 `model-parameters.ts` is auto-generated from the notebook — regenerate it there,
 never edit by hand.
 

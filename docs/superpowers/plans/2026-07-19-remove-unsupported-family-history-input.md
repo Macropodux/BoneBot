@@ -70,7 +70,7 @@ class RemovedFamilyHistoryTest(unittest.TestCase):
 
 - [ ] **Step 2: Run test to verify RED**
 
-Run: `/Library/Frameworks/Python.framework/Versions/3.10/bin/python3 -m unittest model/test_removed_family_history.py`
+Run: `python3.10 -m unittest model/test_removed_family_history.py`
 
 Expected: FAIL listing current source, model, notebook, and documentation references.
 
@@ -152,7 +152,7 @@ Rewrite affected sentences and table rows so they remain grammatical while omitt
 
 - [ ] **Step 4: Run the regression scan to verify GREEN**
 
-Run: `/Library/Frameworks/Python.framework/Versions/3.10/bin/python3 -m unittest model/test_removed_family_history.py`
+Run: `python3.10 -m unittest model/test_removed_family_history.py`
 
 Expected: PASS.
 
@@ -167,7 +167,7 @@ Expected: no output related to the removed input.
 ### Task 4: Verify the application and synchronize local notebook
 
 **Files:**
-- Modify: `/Users/macbook/Desktop/CV, Transcripts & Documents/Emreapplications/Hack-Nation.ipynb`
+- Modify: `~/local/Hack-Nation.ipynb`
 - Create: timestamped Desktop backup beside that notebook
 
 **Interfaces:**
@@ -177,7 +177,7 @@ Expected: no output related to the removed input.
 - [ ] **Step 1: Run all repository verification**
 
 ```bash
-/Library/Frameworks/Python.framework/Versions/3.10/bin/python3 -m unittest model/test_triage_audit.py model/test_removed_family_history.py
+python3.10 -m unittest model/test_triage_audit.py model/test_removed_family_history.py
 npm test
 npx tsc --noEmit
 npm run lint
@@ -189,13 +189,13 @@ Expected: all tests and build pass; lint has no errors.
 - [ ] **Step 2: Back up and replace the Desktop notebook**
 
 ```bash
-cp "/Users/macbook/Desktop/CV, Transcripts & Documents/Emreapplications/Hack-Nation.ipynb" "/Users/macbook/Desktop/CV, Transcripts & Documents/Emreapplications/Hack-Nation.before-family-history-removal.ipynb"
-cp model/train_bonebot.ipynb "/Users/macbook/Desktop/CV, Transcripts & Documents/Emreapplications/Hack-Nation.ipynb"
+cp "~/local/Hack-Nation.ipynb" "~/local/Hack-Nation.before-family-history-removal.ipynb"
+cp model/train_bonebot.ipynb "~/local/Hack-Nation.ipynb"
 ```
 
 - [ ] **Step 3: Verify notebook identity**
 
-Run: `cmp model/train_bonebot.ipynb "/Users/macbook/Desktop/CV, Transcripts & Documents/Emreapplications/Hack-Nation.ipynb"`
+Run: `cmp model/train_bonebot.ipynb "~/local/Hack-Nation.ipynb"`
 
 Expected: exit 0 with no output.
 
@@ -213,7 +213,7 @@ Expected: handoff transcripts, Python cache, and Desktop backup are not staged.
 
 ```bash
 git pull --rebase origin main
-/Library/Frameworks/Python.framework/Versions/3.10/bin/python3 -m unittest model/test_triage_audit.py model/test_removed_family_history.py
+python3.10 -m unittest model/test_triage_audit.py model/test_removed_family_history.py
 npm test
 npx tsc --noEmit
 npm run build

@@ -7,7 +7,7 @@ shows, then returns an **estimated-T-score report** — spoken back, **built for
 the consumer** (a clinician view is future work, not this build). The plain `/screen` form is the zero-dependency
 **fallback demo**. No login.
 
-- The narration is the demo script in `PROJECT.md` / `RUNBOOK.md §2`.
+- The narration is the demo script in `PROJECT.md`.
 - The number comes from `src/lib/bone-model.ts` (a regression predicting an
   **estimated T-score**, trained on real DXA scans in NHANES) — computed
   deterministically. **The LLM only explains it; it never sets the number.**
@@ -313,12 +313,14 @@ everything else is done and Josh green-lights it; consumer mode only, never clin
 
 ---
 
-## The "not yet validated" banner (temporary state)
+## The "not yet validated" banner (historical — resolved 2026-07-19)
 
-While `MODEL_IS_VALIDATED = false` in `bone-model.ts`, a visible strip reads:
-*"Illustrative — coefficients not yet trained on NHANES."* It disappears the moment
-Emre exports the real regression coefficients. **Never demo placeholder numbers
-without this banner.**
+`MODEL_IS_VALIDATED` is now `true` (real NHANES-trained coefficients, see
+`model/model-parameters.ts`, `model/README.md`), so this banner no longer
+shows. It remains in the code as a dead path for if the model is ever
+unvalidated again: while `MODEL_IS_VALIDATED = false` in `bone-model.ts`, a
+visible strip reads *"Illustrative — coefficients not yet trained on NHANES."*
+**Never demo placeholder numbers without this banner.**
 
 ---
 
