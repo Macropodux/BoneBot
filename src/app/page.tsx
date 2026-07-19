@@ -3811,7 +3811,10 @@ export default function Home() {
 
               {convChatReady &&
                 convField &&
-                (convInputType === "text" || convInputType === "number" || convField === "confirm") && (
+                (convInputType === "text" ||
+                  convInputType === "number" ||
+                  convInputType === "image" ||
+                  convField === "confirm") && (
                   <form
                     onSubmit={(event) => {
                       event.preventDefault();
@@ -3825,7 +3828,13 @@ export default function Home() {
                       inputMode={convInputType === "number" ? "numeric" : undefined}
                       value={convInput}
                       onChange={(event) => setConvInput(event.target.value)}
-                      placeholder={convField === "confirm" ? "Or type a correction…" : "Type your answer"}
+                      placeholder={
+                        convField === "confirm"
+                          ? "Or type a correction…"
+                          : convInputType === "image"
+                            ? "Type your answer, or use the options above"
+                            : "Type your answer"
+                      }
                       aria-label="Answer BoneBot"
                       disabled={convBusy || micListening}
                       className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
