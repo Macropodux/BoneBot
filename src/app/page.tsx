@@ -33,7 +33,6 @@ import FloatingBones from "./FloatingBones";
 const ACCENT = "#0E7C6E";
 const ACCENT_HOVER = "#0A5A50";
 const ACCENT_TINT = "#E4F0ED";
-const FRACTURE = "#B0442F";
 
 type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "smoke" | "steroids" | "bloodResults" | "weight" | "averageDailySteps" | "averageDailyActiveMinutes" | "secondaryCondition";
 
@@ -1577,25 +1576,16 @@ export default function Home() {
               Bone-health screening for postmenopausal women
             </div>
             <h1 className="max-w-[880px] text-balance font-[family-name:var(--font-heading)] text-[2.85rem] font-bold leading-[1.02] tracking-[-0.035em] text-[#12211E] sm:text-6xl lg:text-[4.6rem]">
-              Know when your bones may need a closer look
-              <br className="hidden sm:block" /> before a{" "}
-              <span className="relative whitespace-nowrap" style={{ color: FRACTURE }}>
-                fracture
-                <span
-                  aria-hidden
-                  className="absolute inset-x-0 -bottom-1 h-[3px] rounded-full"
-                  style={{ backgroundColor: FRACTURE, opacity: 0.35 }}
-                />
-              </span>{" "}
-              happens.
+              Know your bone fracture risk
+              <br />
+              before you break something.
             </h1>
             <p className="mt-7 max-w-[600px] text-pretty text-lg leading-[1.6] text-[#41504C] sm:text-[19px]">
-              A three-minute conversational screen estimates your T-score using an NHANES-trained model. AI
-              explains the result; it never sets or changes it.
+              <span className="block">Three minutes. An NHANES-trained model does the maths.</span>
+              <span className="block">AI turns the result into plain English.</span>
             </p>
             <p className="mt-3 max-w-[600px] text-pretty text-[15px] leading-[1.6]" style={{ color: ACCENT }}>
-              Designed around bone changes after menopause. This is a screening estimate—not a diagnosis or a
-              substitute for DXA.
+              Designed around bone changes after menopause. A bone-health tool built with women in mind.
             </p>
             <div className="mt-9 flex flex-wrap justify-center gap-3.5">
               <button
@@ -1618,7 +1608,7 @@ export default function Home() {
               {[
                 { stat: "Often silent", body: "Bone loss may cause no symptoms until a fracture occurs." },
                 { stat: "Model-led", body: "A model trained on NHANES data produces the estimate. AI only explains it." },
-                { stat: "Adaptive", body: "Only 4 initial questions, with follow-ups only when a closer look may help. No account needed." },
+                { stat: "4", body: "quick written questions to start. We only ask more if your answers suggest a closer look." },
               ].map((c) => (
                 <div
                   key={c.stat}
