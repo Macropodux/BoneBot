@@ -224,9 +224,6 @@ const FIELD_LABELS: Record<FieldKey, string> = {
   age: "age",
   menopauseStatus: "periods stopped for good",
   hasExistingBoneCare: "existing bone care",
-  knowsDxaTScore: "knows DXA T-score",
-  dxaTScore: "DXA T-score",
-  dxaYear: "DXA scan year",
   menopauseAge: "age at menopause",
   priorFragilityFracture: "prior fragility fracture",
   currentSmoker: "current smoker",
@@ -319,6 +316,21 @@ function isAffirmativeConfirmation(raw: string): boolean {
   return AFFIRMATIVE_LEAD_RE.test(t);
 }
 
+// Deterministic read of the existing-care routing choice ("Continue" vs
+// "Head home"). Local to this route because "continueOrHome" is a routing
+// marker, not a real intake FieldDef with its own parse(). A routing gate
+// must never depend on the LLM, so the reply is read here. Returns null when
+// the reply matches neither option, so the gate can simply be re-presented.
+function parseContinueOrHome(raw: string): "continue" | "head-home" | null {
+  const t = raw.trim().toLowerCase();
+  if (!t) return null;
+  // "Head home" (and stop-ish phrasings) checked first so it wins over any
+  // stray "continue" substring; the two option labels never overlap.
+  if (/\b(head\s*home|home|stop|quit|leave|exit|go\s*back|back home|no thanks)\b/.test(t)) return "head-home";
+  if (/\b(continue|carry on|keep going|proceed|go on|anyway|yes|yeah|yep)\b/.test(t)) return "continue";
+  return null;
+}
+
 export async function POST(req: Request) {
   if (!process.env.OPENAI_API_KEY) {
     return Response.json({ error: "BoneBot is unavailable: no API key configured." }, { status: 503 });
@@ -405,6 +417,28 @@ export async function POST(req: Request) {
     return Response.json(response);
   }
 
+  // ---- Existing-care routing gate: when the previous turn presented the
+  // "Continue / Head home" choice (hasExistingBoneCare true, no
+  // continueOrHome captured yet), THIS message is the reply to it. Parse it
+  // deterministically — a routing gate must never hinge on LLM extraction —
+  // then let the ordinary decide()/next-question logic route on the result.
+  // (On the turn hasExistingBoneCare is first answered it is not yet echoed
+  // back in `collected`, so this block only fires on the reply turn.) ----
+  if (
+    incomingCollected.hasExistingBoneCare === true &&
+    incomingCollected.continueOrHome === undefined &&
+    !isFirstTurn
+  ) {
+    const choice = parseContinueOrHome(lastUserText);
+    if (choice === null) {
+      // Couldn't read a clear Continue / Head home — re-present the gate as-is
+      // (decide() returns the same deterministic choice) rather than guess.
+      return finishTurn(incomingCollected, lastUserText, isFirstTurn, false);
+    }
+    const collected: Collected = { ...incomingCollected, continueOrHome: choice };
+    return finishTurn(collected, lastUserText, isFirstTurn, true);
+  }
+
   // 1. EXTRACT (LLM proposes, server validates deterministically) — same as
   // today whether or not confirmMode is on.
   const candidates = outstandingApplicableFields(incomingCollected);
@@ -467,6 +501,23 @@ async function finishTurn(
       inputType: null,
       collected,
       gateExit: { message: decision.message },
+      readyToScore: false,
+      features: null,
+      awaitingConfirm: false,
+    };
+    return Response.json(response);
+  }
+
+  if (decision.kind === "gateChoice") {
+    // Deterministic routing gate: fixed, server-owned message (NOT phrased by
+    // the LLM) plus a choice input. Nothing is collected here in the intake
+    // sense; `field` is a routing marker the client echoes back next turn.
+    const response: ConverseResponse = {
+      reply: decision.message,
+      field: decision.field,
+      inputType: "choice",
+      options: decision.options,
+      collected,
       readyToScore: false,
       features: null,
       awaitingConfirm: false,
