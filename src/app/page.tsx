@@ -1229,6 +1229,14 @@ export default function Home() {
             <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
               Screening flag, not a diagnosis
             </div>
+            <button
+              onClick={() => {
+                if (messages.length <= 1 || window.confirm("Start over? This clears your answers so far.")) restart();
+              }}
+              className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+            >
+              Start over
+            </button>
           </header>
           <div ref={chatRef} className="flex-1 overflow-y-auto px-6 py-8">
             <div className="mx-auto flex max-w-[680px] flex-col gap-3.5">
