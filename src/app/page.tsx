@@ -779,6 +779,31 @@ export default function Home() {
     runModel(EXAMPLE_ANSWERS);
   }
 
+  // No backend involved on purpose: this opens her own email app with the
+  // result pre-filled. No new dependency, no API key, works immediately —
+  // a server-sent email would need both and neither exists yet.
+  function emailResultHref(): string {
+    if (!result) return "";
+    const lines = [
+      `BoneBot screening result — ${catMeta.label}`,
+      "",
+      `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
+      `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
+      "",
+      "What drove this result:",
+      ...result.contributions
+        .slice(0, 5)
+        .map((f) => `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}`),
+      "",
+      "This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score — please discuss this result with your GP or clinician.",
+      "",
+      "— BoneBot, Hack-Nation 6th Global AI Hackathon",
+    ];
+    const subject = encodeURIComponent(`My BoneBot bone-health screening result — ${catMeta.label}`);
+    const body = encodeURIComponent(lines.join("\n"));
+    return `mailto:?subject=${subject}&body=${body}`;
+  }
+
   function restart() {
     setScreen("landing");
     setMessages([]);
@@ -1207,10 +1232,16 @@ export default function Home() {
             <div className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em]">
               Bone<span style={{ color: ACCENT }}>Bot</span>
             </div>
-            <div className="text-[13px] font-medium text-[#5A6462]">Screening complete</div>
+            <div className="hidden text-[13px] font-medium text-[#5A6462] sm:block">Screening complete</div>
             <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
               Screening flag — not a diagnosis
             </div>
+            <a
+              href={emailResultHref()}
+              className="hidden items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E] sm:flex"
+            >
+              <span aria-hidden>✉️</span> Email this result
+            </a>
             <button
               onClick={restart}
               className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
@@ -1321,28 +1352,45 @@ export default function Home() {
                 )}
 
                 <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                  <div className="mb-4.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                  <div className="mb-1 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
                     What drove this result
                   </div>
-                  <div className="flex flex-col gap-3">
-                    {result.contributions.map((f) => (
-                      <div key={f.factor} className="flex items-center gap-3.5">
-                        <div
-                          className="min-w-[34px] rounded-lg px-2.5 py-1.5 text-center font-[family-name:var(--font-heading)] text-sm font-bold"
-                          style={
-                            f.direction === "raises"
-                              ? { color: ACCENT, backgroundColor: ACCENT_TINT }
-                              : { color: "#B0442F", backgroundColor: "#F9E7E2" }
-                          }
-                        >
-                          {f.contribution > 0 ? "+" : ""}
-                          {f.contribution.toFixed(1)}
-                        </div>
-                        <div className="text-[15px]">{f.factor}</div>
-                      </div>
-                    ))}
+                  <p className="mb-5 text-[13px] leading-[1.5] text-[#5A6462]">
+                    Each bar is how much that factor pushed your estimate — <span style={{ color: ACCENT }}>green pushes it up (better)</span>, <span style={{ color: "#B0442F" }}>red pushes it down</span>. Longer bar, bigger effect.
+                  </p>
+                  <div className="flex flex-col gap-3.5">
+                    {(() => {
+                      const maxAbs = Math.max(...result.contributions.map((f) => Math.abs(f.contribution)), 0.1);
+                      return result.contributions.map((f) => {
+                        const isPositive = f.direction === "raises";
+                        const widthPct = Math.max(4, Math.round((Math.abs(f.contribution) / maxAbs) * 100));
+                        return (
+                          <div key={f.factor}>
+                            <div className="mb-1 flex items-baseline justify-between gap-3 text-[13.5px]">
+                              <span className="text-[#15181A]">{f.factor}</span>
+                              <span
+                                className="font-[family-name:var(--font-heading)] font-bold"
+                                style={{ color: isPositive ? ACCENT : "#B0442F" }}
+                              >
+                                {f.contribution > 0 ? "+" : ""}
+                                {f.contribution.toFixed(1)}
+                              </span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-[#F0F2F1]">
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${widthPct}%`,
+                                  backgroundColor: isPositive ? ACCENT : "#B0442F",
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
-                  <div className="mt-4.5 text-[13px] leading-[1.5] text-[#5A6462]">
+                  <div className="mt-5 text-[13px] leading-[1.5] text-[#5A6462]">
                     Weights follow established clinical and NHANES-derived risk factors — only the factors that
                     measurably moved this estimate are shown above.
                   </div>
@@ -1434,6 +1482,24 @@ export default function Home() {
                     </div>
                   </div>
                 )}
+
+                <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-[#E3E9E7] bg-white px-7 py-6 sm:flex-row sm:items-center sm:px-8">
+                  <div>
+                    <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
+                      Keep a copy of this result
+                    </div>
+                    <div className="mt-0.5 text-[13px] text-[#5A6462]">
+                      Email it to yourself, or bring it to your GP appointment.
+                    </div>
+                  </div>
+                  <a
+                    href={emailResultHref()}
+                    className="flex items-center gap-2 whitespace-nowrap rounded-[9px] px-5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white"
+                    style={{ backgroundColor: ACCENT }}
+                  >
+                    <span aria-hidden>✉️</span> Email this result
+                  </a>
+                </div>
 
                 <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
                   <div className="mb-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
