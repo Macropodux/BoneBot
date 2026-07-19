@@ -2324,7 +2324,7 @@ export default function Home() {
                       type="button"
                       onClick={skipStep}
                       disabled={flowQuestionBusy}
-                      className="self-end text-[13px] font-semibold text-[#5A6462] underline underline-offset-2 hover:text-[#0E7C6E] disabled:opacity-40"
+                      className="self-end rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E] disabled:opacity-50"
                     >
                       Skip this question
                     </button>
@@ -2422,12 +2422,13 @@ export default function Home() {
 
       {screen === "results" && !result && (
         <MotionConfig reducedMotion="user">
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
+            <FloatingBones />
             <motion.header
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: EASE_OUT }}
-              className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12"
+              className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12"
             >
               <button
                 type="button"
@@ -2452,7 +2453,7 @@ export default function Home() {
                 </motion.button>
               </div>
             </motion.header>
-            <div className="flex flex-1 items-start justify-center overflow-y-auto px-6 py-10">
+            <div className="relative z-10 flex flex-1 items-start justify-center overflow-y-auto px-6 py-10">
               <motion.div
                 variants={revealContainer}
                 initial="hidden"
@@ -2539,12 +2540,13 @@ export default function Home() {
 
       {screen === "results" && result && (
         <MotionConfig reducedMotion="user">
-          <div className="flex min-h-0 flex-1 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
+            <FloatingBones />
             <motion.header
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: EASE_OUT }}
-              className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12"
+              className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12"
             >
               <button
                 type="button"
@@ -2579,7 +2581,7 @@ export default function Home() {
               </div>
             </motion.header>
 
-            <div className="flex-1 overflow-y-auto px-6 py-8 sm:px-12">
+            <div className="relative z-10 flex-1 overflow-y-auto px-6 py-8 sm:px-12">
               <div className="mx-auto grid max-w-[1140px] grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_420px] 2xl:max-w-[1360px] 2xl:grid-cols-[1fr_460px]">
                 <motion.div
                   variants={revealContainer}
@@ -2962,7 +2964,7 @@ export default function Home() {
                   initial={reduceMotion ? false : { opacity: 0, x: 16 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.45, ease: EASE_OUT, delay: 0.15 }}
-                  className="flex h-[640px] flex-col rounded-2xl border border-[#E3E9E7] bg-white lg:sticky lg:top-8 lg:h-[calc(100vh-8.5rem)] lg:min-h-[420px]"
+                  className="flex h-[640px] flex-col rounded-2xl border border-[#E3E9E7] bg-white lg:sticky lg:top-8 lg:h-[calc(100vh-12rem)] lg:min-h-[420px]"
                 >
                   <div className="border-b border-[#E3E9E7] px-6 py-[18px]">
                     <div className="font-[family-name:var(--font-heading)] text-base font-bold">Ask about your result</div>
