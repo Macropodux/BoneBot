@@ -2319,7 +2319,7 @@ export default function Home() {
   // those on chatReady, not inFlow, or questionLanded hides them.
   const chatReady = screen === "chat" && !typing;
   const convChatReady = screen === "chat" && flowMode === "conversation" && !convBusy;
-  const inFlow = chatReady && step && messages.length > 1 && questionLanded;
+  const inFlow = chatReady && step && questionLanded;
   const progressPct = Math.round((stepIdx / STEPS.length) * 100);
   const progressLabel =
     stepIdx < STEPS.length
@@ -2656,18 +2656,6 @@ export default function Home() {
           </header>
           <div ref={chatRef} className="relative z-10 flex-1 overflow-y-auto px-6 py-8">
             <div className="mx-auto flex max-w-[680px] flex-col gap-3.5">
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setVoiceEnabled((v) => !v)}
-                  aria-label={voiceEnabled ? "Mute BoneBot's voice" : "Unmute BoneBot's voice"}
-                  aria-pressed={voiceEnabled}
-                  title={voiceEnabled ? "Voice on" : "Voice off"}
-                  className="rounded-lg border-[1.5px] border-[#C6CFCC] bg-white px-3 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
-                >
-                  <span aria-hidden>{voiceEnabled ? "🔊" : "🔇"}</span>
-                </button>
-              </div>
               {messages.map((m, i) =>
                 m.role === "bot" ? <BotBubble key={i} text={m.text} /> : <UserBubble key={i} text={m.text} />
               )}
@@ -2698,6 +2686,18 @@ export default function Home() {
           </div>
           <div className="relative z-10 border-t border-[#E3E9E7] bg-white/90 px-6 py-5 backdrop-blur-sm">
             <div className="mx-auto flex max-w-[680px] flex-col gap-3">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setVoiceEnabled((v) => !v)}
+                  aria-label={voiceEnabled ? "Mute BoneBot's voice" : "Unmute BoneBot's voice"}
+                  aria-pressed={voiceEnabled}
+                  title={voiceEnabled ? "Voice on" : "Voice off"}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border-[1.5px] border-[#D5DCDA] bg-white text-[13px] text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                >
+                  <span aria-hidden>{voiceEnabled ? "🔊" : "🔇"}</span>
+                </button>
+              </div>
 
               {chatReady && step?.key === "bloodResults" && pendingBloodResults && !bloodEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
