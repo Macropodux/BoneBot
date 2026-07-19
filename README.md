@@ -42,6 +42,42 @@ Model training and the threshold audit live in `model/`; canonical input
 definitions are in `docs/INPUT_SPEC.md`; the clinical evidence constraining the
 explanations is in `docs/EVIDENCE.md`.
 
+## Model performance
+
+Trained and evaluated on **1,119 postmenopausal women** in NHANES 2013–2014 with
+femur DXA and wrist-accelerometry (activity averaged over valid wear days only).
+Split is a held-out test set the model never saw during fitting; the DXA T-score
+is the label only and never a feature (anti-leakage rule).
+
+**T-score model** (Ridge regression, 13 features → estimated femoral-neck T-score):
+
+| Metric | Value |
+|---|---|
+| Mean absolute error (held-out) | **0.727 T-score units** |
+| R² (held-out) | 0.276 |
+| Train / held-out test | 788 / 280 |
+| 95% interval empirical coverage under ~50% missing inputs | **0.946** (target 0.95) |
+
+The uncertainty range shown to the user is a genuine 95% prediction interval
+(complete-data half-width ±1.85 T-score units) that **widens automatically** when
+inputs are imputed, so a sparser profile visibly shows less confidence.
+
+**Does the extra signal help?** Against an age + BMI baseline that stands in for
+today's simple tools, on the same held-out split (osteoporosis classification):
+
+| Model | AUC | PR-AUC |
+|---|---|---|
+| Baseline (age + BMI) ≈ current tools | 0.772 | 0.280 |
+| OST reference tool (age + weight) | 0.779 | — |
+| **Full model** (+ menopause, wearable activity, risk factors, labs) | **0.789** | **0.350** |
+
+**Triage gate** (age + BMI + postmenopausal status): AUC 0.867, threshold chosen
+so validation sensitivity stays ≥ 95% while excluding ~49% of women from the
+longer questionnaire. Full held-out audit in `docs/TRIAGE_THRESHOLD_AUDIT.md`.
+
+The benchmark task, split, and reproduction steps are documented in
+`model/README.md`.
+
 ## Limitations & responsible use
 
 BoneBot outputs an **estimate, not a diagnosis**. Only a DXA scan measures bone
