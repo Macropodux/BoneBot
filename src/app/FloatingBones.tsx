@@ -21,7 +21,7 @@ export const FLOATING_BONES: readonly FloatingBone[] = [
   { id: "top-right", left: "84%", top: "8%", width: 126, rotation: 22, duration: 11, delay: -5.2, opacity: 0.12, tone: "teal" },
   { id: "upper-right", left: "73%", top: "29%", width: 72, rotation: -30, duration: 8, delay: -2.4, opacity: 0.09, tone: "teal", mobileHidden: true },
   { id: "mid-right", left: "91%", top: "48%", width: 134, rotation: -18, duration: 12.5, delay: -8.6, opacity: 0.1, tone: "teal" },
-  { id: "lower-right", left: "80%", top: "72%", width: 96, rotation: 28, duration: 9, delay: -4.1, opacity: 0.14, tone: "coral" },
+  { id: "lower-right", left: "80%", top: "72%", width: 96, rotation: 28, duration: 9, delay: -4.1, opacity: 0.11, tone: "teal" },
   { id: "bottom-right", left: "67%", top: "88%", width: 62, rotation: -8, duration: 10, delay: -6.4, opacity: 0.08, tone: "teal", mobileHidden: true },
 ] as const;
 

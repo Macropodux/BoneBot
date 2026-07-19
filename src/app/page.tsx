@@ -62,10 +62,13 @@ const LANDING_DISCLAIMER_SUB = THEME.disclaimerSub;
 const LANDING_HEADING_FONT = HEADING_FONT;
 const LANDING_BODY_FONT = BODY_FONT;
 
+// A real sequence, so the 01/02/03 numbering encodes order rather than
+// decorating three unordered points: answer -> model -> explain. It doubles as
+// the proof of the section's claim ("the model predicts, the AI only explains").
 const LANDING_WHY_TRUST_IT = [
-  { num: "01", title: "Often silent", body: "Bone loss may cause no symptoms until a fracture occurs." },
-  { num: "02", title: "Model-led", body: "A model trained on NHANES data produces the estimate. AI only explains it." },
-  { num: "03", title: "Adaptive", body: "Only 4 initial questions, with follow-ups only when a closer look may help. No account needed." },
+  { num: "01", title: "You answer", body: "Four quick questions — then a few more only if a closer look helps. Tap an option or reply in your own words. No account." },
+  { num: "02", title: "The model decides", body: "An NHANES-trained model produces your screening estimate. Not the AI — a fixed, validated model that always gives the same answer for the same inputs." },
+  { num: "03", title: "The AI explains", body: "The AI only puts that result into plain English. It never sets or changes your score." },
 ] as const;
 
 type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "smoke" | "steroids" | "bloodResults" | "weight" | "averageDailySteps" | "averageDailyActiveMinutes" | "secondaryCondition";
@@ -2409,6 +2412,19 @@ export default function Home() {
                   Most are never screened until something breaks. Bone loss after menopause is usually silent —
                   screening earlier is how you get ahead of it.
                 </p>
+                {/* Proportion pictograph: alternating filled/outline figures show
+                    "one in every two" at a glance, reinforcing the headline stat. */}
+                <div role="img" aria-label="One in two women over 50 are affected" className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1.5">
+                  {Array.from({ length: 10 }).map((_, i) => {
+                    const affected = i % 2 === 0;
+                    return (
+                      <svg key={i} width="15" height="25" viewBox="0 0 16 28" aria-hidden="true">
+                        <circle cx="8" cy="5" r="3.6" fill={affected ? LANDING_ACCENT : "none"} stroke={affected ? "none" : LANDING_ORNAMENT} strokeWidth="1.4" />
+                        <path d="M1.6 28C1.6 19 4.2 15.4 8 15.4S14.4 19 14.4 28Z" fill={affected ? LANDING_ACCENT : "none"} stroke={affected ? "none" : LANDING_ORNAMENT} strokeWidth="1.4" />
+                      </svg>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </section>
