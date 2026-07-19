@@ -326,7 +326,7 @@ export const FIELDS: FieldDef[] = [
     question: "Do you have a recent vitamin D blood-test result? You can upload a photo, or tell me the number.",
     inputType: "image",
     stage: "deep",
-    required: false,
+    required: true,
     skippable: true,
     hint: `A vitamin D value in nmol/L, roughly ${VITAMIN_D_RANGE.min}-${VITAMIN_D_RANGE.max}.`,
     parse: parseNumber(VITAMIN_D_RANGE.min, VITAMIN_D_RANGE.max, {}, true),
