@@ -447,6 +447,28 @@ const RESOURCES = [
   },
 ] as const;
 
+// General (non-personalised) list for the result email — distinct from
+// `result.contributions`, which is this person's own answers. Phrasing is
+// drawn from the clinician-reviewed EVIDENCE_CARDS in bone-evidence.ts
+// (age, menopause, prior-fragility-fracture, bmi, weight-bearing-activity,
+// smoking, glucocorticoids, rheumatoid-arthritis, alcohol, vitamin-d,
+// thyroid-disease, coeliac-disease, chronic-kidney-disease) rather than
+// written fresh, so it stays inside the same evidence-approval process as
+// everything else BoneBot states as fact.
+const KNOWN_RISK_FACTORS = [
+  "Age",
+  "Menopause and the drop in oestrogen around it",
+  "A previous fracture from a minor fall or injury",
+  "Low body weight or low BMI",
+  "Low weight-bearing or muscle-strengthening activity",
+  "Smoking",
+  "Long-term oral steroid (glucocorticoid) use",
+  "Rheumatoid arthritis",
+  "Heavy alcohol use",
+  "Low vitamin D",
+  "Certain other conditions, including thyroid disease, coeliac disease, and chronic kidney disease",
+] as const;
+
 type ChatMessage = { role: "bot" | "user"; text: string; kind?: "resources" };
 
 // Shared everywhere BoneBot surfaces the resource list — the compact chat
@@ -1583,8 +1605,10 @@ export default function Home() {
     if (!result) return { subject: "", text: "", html: "" };
     const contributions = shownEmailContributions();
     const lines = [
+      `Dear ${userName || "there"},`,
+      "Here are the results from your predicted T-score.",
+      "",
       `BoneBot screening result: ${catMeta.label}`,
-      ...(userName ? [`For ${userName}`] : []),
       "",
       `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
       `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
@@ -1596,7 +1620,13 @@ export default function Home() {
         return `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}${valueNote}`;
       }),
       "",
-      "This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score, so please discuss this result with your GP or clinician.",
+      "Known risk factors for bone fracture after menopause:",
+      ...KNOWN_RISK_FACTORS.map((r) => `  - ${r}`),
+      "",
+      "This is not a clinical tool: BoneBot is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. Please discuss this result, and any changes based on it, with a clinical specialist such as your GP before acting on it.",
+      "",
+      "Learn more about osteoporosis and menopause:",
+      ...RESOURCES.map((r) => `  - ${r.name}: ${r.url}`),
       "",
       "BoneBot, Hack-Nation 6th Global AI Hackathon",
     ];
@@ -1632,6 +1662,9 @@ export default function Home() {
             </tr>
             <tr>
               <td style="padding:32px;">
+                <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#15181A;">
+                  Dear ${escapeHtml(userName || "there")},<br>Here are the results from your predicted T-score.
+                </p>
                 <div style="font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5A6462;">${heading}</div>
                 <div style="margin-top:10px;font-size:34px;font-weight:700;color:${catMeta.color};">${escapeHtml(catMeta.label)}</div>
                 <div style="margin-top:14px;font-size:15px;line-height:1.6;color:#4A5452;">
@@ -1645,9 +1678,17 @@ export default function Home() {
                 </table>`
                     : ""
                 }
+                <div style="margin-top:28px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5A6462;">Known risk factors for bone fracture after menopause</div>
+                <ul style="margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.7;color:#4A5452;">
+                  ${KNOWN_RISK_FACTORS.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}
+                </ul>
                 <div style="margin-top:28px;padding:16px;background-color:#F5F7F6;border-radius:12px;font-size:13px;line-height:1.6;color:#5A6462;">
-                  This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score, so please discuss this result with your GP or clinician.
+                  <strong>This is not a clinical tool.</strong> BoneBot is a screening estimate from a model trained on NHANES data &mdash; not a diagnosis, a bone-density measurement, or medical advice. Please discuss this result, and any changes based on it, with a clinical specialist such as your GP before acting on it.
                 </div>
+                <div style="margin-top:20px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#5A6462;">Learn more about osteoporosis and menopause</div>
+                <ul style="margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.8;">
+                  ${RESOURCES.map((r) => `<li><a href="${r.url}" style="color:#0E7C6E;">${escapeHtml(r.name)}</a></li>`).join("")}
+                </ul>
               </td>
             </tr>
             <tr>
