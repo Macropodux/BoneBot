@@ -37,30 +37,31 @@ import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
 import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-parameters";
 import FloatingBones from "./FloatingBones";
+import VoiceScreen from "./VoiceScreen";
+import { THEME, HEADING_FONT, BODY_FONT } from "@/lib/editorial-theme";
 
-// "Vital Bloom" brand — Emre, 2026-07-19: magenta/violet rebrand, applies to
-// chat and results (untouched by the landing redesign below).
+// "Vital Bloom" brand — Emre, 2026-07-19: magenta/violet rebrand. Being
+// phased out in favor of the editorial theme (THEME.accent) below as chat
+// and results get redesigned to match landing; kept until that's complete.
 const ACCENT = "#E11D74";
 const ACCENT_TINT = "#FCE7F1";
 
-// Editorial redesign palette — scoped to the landing screen only (see the
-// `screen === "landing"` block below). Kept separate from ACCENT above, so
-// the brand-color changes there can't bleed into chat or results.
-const LANDING_BG = "#FAF7F2";
-const LANDING_BAND_BG = "#F5F0E7";
-const LANDING_BORDER = "#E7DFD3";
-const LANDING_BORDER_INPUT = "#E0D6C6";
-const LANDING_BORDER_SECONDARY = "#C9BFAF";
-const LANDING_INK = "#221B16";
-const LANDING_BODY = "#55493E";
-const LANDING_MUTED = "#8A7E6E";
-const LANDING_ORNAMENT = "#B3A692";
-const LANDING_ACCENT = "#0E6E62";
-const LANDING_ACCENT_HOVER = "#0A5148";
-const LANDING_DISCLAIMER_BG = "#2A2320";
-const LANDING_DISCLAIMER_SUB = "#BFB4A4";
-const LANDING_HEADING_FONT = "font-[family-name:var(--font-fraunces)]";
-const LANDING_BODY_FONT = "font-[family-name:var(--font-source-sans)]";
+// Editorial redesign palette — see src/lib/editorial-theme.ts.
+const LANDING_BG = THEME.bg;
+const LANDING_BAND_BG = THEME.bandBg;
+const LANDING_BORDER = THEME.border;
+const LANDING_BORDER_INPUT = THEME.borderInput;
+const LANDING_BORDER_SECONDARY = THEME.borderSecondary;
+const LANDING_INK = THEME.ink;
+const LANDING_BODY = THEME.body;
+const LANDING_MUTED = THEME.muted;
+const LANDING_ORNAMENT = THEME.ornament;
+const LANDING_ACCENT = THEME.accent;
+const LANDING_ACCENT_HOVER = THEME.accentHover;
+const LANDING_DISCLAIMER_BG = THEME.disclaimerBg;
+const LANDING_DISCLAIMER_SUB = THEME.disclaimerSub;
+const LANDING_HEADING_FONT = HEADING_FONT;
+const LANDING_BODY_FONT = BODY_FONT;
 
 const LANDING_WHY_TRUST_IT = [
   { num: "01", title: "Often silent", body: "Bone loss may cause no symptoms until a fracture occurs." },
@@ -691,7 +692,7 @@ function AnimatedNumber({
 }
 
 export default function Home() {
-  const [screen, setScreen] = useState<"landing" | "chat" | "results">("landing");
+  const [screen, setScreen] = useState<"landing" | "chat" | "results" | "voice">("landing");
   const [showExampleMenu, setShowExampleMenu] = useState(false);
   // Which demo patient is currently loading (runModel's score/implications/
   // summary calls take a beat) — drives the spinner on that one chip so
@@ -1977,7 +1978,14 @@ export default function Home() {
                 </button>
               </div>
               <p className="m-0 text-[15px]" style={{ color: LANDING_MUTED }}>
-                No account. No forms. About 3 minutes.
+                No account. No forms. About 3 minutes.{" "}
+                <button
+                  onClick={() => setScreen("voice")}
+                  className="font-semibold underline decoration-1 underline-offset-2 transition-colors"
+                  style={{ color: LANDING_ACCENT }}
+                >
+                  Prefer to talk? Try voice screening.
+                </button>
               </p>
               {showExampleMenu && (
                 <motion.div
@@ -2157,6 +2165,8 @@ export default function Home() {
           </section>
         </div>
       )}
+
+      {screen === "voice" && <VoiceScreen onExit={goToLanding} />}
 
       {screen === "chat" && (
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
