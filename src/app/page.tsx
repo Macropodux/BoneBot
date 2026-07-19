@@ -37,30 +37,31 @@ import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
 import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-parameters";
 import FloatingBones from "./FloatingBones";
+import VoiceScreen from "./VoiceScreen";
+import { THEME, HEADING_FONT, BODY_FONT } from "@/lib/editorial-theme";
 
-// "Vital Bloom" brand — Emre, 2026-07-19: magenta/violet rebrand, applies to
-// chat and results (untouched by the landing redesign below).
+// "Vital Bloom" brand — Emre, 2026-07-19: magenta/violet rebrand. Being
+// phased out in favor of the editorial theme (THEME.accent) below as chat
+// and results get redesigned to match landing; kept until that's complete.
 const ACCENT = "#E11D74";
 const ACCENT_TINT = "#FCE7F1";
 
-// Editorial redesign palette — scoped to the landing screen only (see the
-// `screen === "landing"` block below). Kept separate from ACCENT above, so
-// the brand-color changes there can't bleed into chat or results.
-const LANDING_BG = "#FAF7F2";
-const LANDING_BAND_BG = "#F5F0E7";
-const LANDING_BORDER = "#E7DFD3";
-const LANDING_BORDER_INPUT = "#E0D6C6";
-const LANDING_BORDER_SECONDARY = "#C9BFAF";
-const LANDING_INK = "#221B16";
-const LANDING_BODY = "#55493E";
-const LANDING_MUTED = "#8A7E6E";
-const LANDING_ORNAMENT = "#B3A692";
-const LANDING_ACCENT = "#0E6E62";
-const LANDING_ACCENT_HOVER = "#0A5148";
-const LANDING_DISCLAIMER_BG = "#2A2320";
-const LANDING_DISCLAIMER_SUB = "#BFB4A4";
-const LANDING_HEADING_FONT = "font-[family-name:var(--font-fraunces)]";
-const LANDING_BODY_FONT = "font-[family-name:var(--font-source-sans)]";
+// Editorial redesign palette — see src/lib/editorial-theme.ts.
+const LANDING_BG = THEME.bg;
+const LANDING_BAND_BG = THEME.bandBg;
+const LANDING_BORDER = THEME.border;
+const LANDING_BORDER_INPUT = THEME.borderInput;
+const LANDING_BORDER_SECONDARY = THEME.borderSecondary;
+const LANDING_INK = THEME.ink;
+const LANDING_BODY = THEME.body;
+const LANDING_MUTED = THEME.muted;
+const LANDING_ORNAMENT = THEME.ornament;
+const LANDING_ACCENT = THEME.accent;
+const LANDING_ACCENT_HOVER = THEME.accentHover;
+const LANDING_DISCLAIMER_BG = THEME.disclaimerBg;
+const LANDING_DISCLAIMER_SUB = THEME.disclaimerSub;
+const LANDING_HEADING_FONT = HEADING_FONT;
+const LANDING_BODY_FONT = BODY_FONT;
 
 const LANDING_WHY_TRUST_IT = [
   { num: "01", title: "Often silent", body: "Bone loss may cause no symptoms until a fracture occurs." },
@@ -759,7 +760,7 @@ function AnimatedNumber({
 }
 
 export default function Home() {
-  const [screen, setScreen] = useState<"landing" | "chat" | "results">("landing");
+  const [screen, setScreen] = useState<"landing" | "chat" | "results" | "voice">("landing");
   const [showExampleMenu, setShowExampleMenu] = useState(false);
   // Which demo patient is currently loading (runModel's score/implications/
   // summary calls take a beat) — drives the spinner on that one chip so
@@ -886,6 +887,7 @@ export default function Home() {
     // changes the pane's content height without changing messages/typing.
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [messages, typing, stepIdx]);
+
 
   useEffect(() => {
     // The free-text input is the same DOM node across consecutive free-text
@@ -2221,17 +2223,21 @@ export default function Home() {
   // Several flows chain two botSay() calls with a setTimeout between them
   // (e.g. the name greeting, then the first question, a beat later) — typing
   // is false in that gap, so also require the step's own question to have
-  // actually landed in the transcript before showing its chips/input. Without
-  // this, answer options could flash in right after the FIRST message, before
-  // the question they answer has appeared.
-  const lastMessage = messages[messages.length - 1];
-  const currentQuestionShown = Boolean(step) && lastMessage?.role === "bot" && lastMessage.text === step.q;
+  // actually landed in the transcript before showing its chips/input.
+  // Without this, answer options could flash in right after the FIRST
+  // message, before the question they answer has appeared. Searching the
+  // whole transcript (not just the last message) means a follow-up bot
+  // message that re-asks in its own words (menopause-age outlier reject,
+  // out-of-range age, the clarify loop) doesn't reset this back to false, so
+  // free-text re-entry isn't silently blocked after one of those. STEPS[].q
+  // strings are each unique, so this can't false-match a different step.
+  const questionLanded = Boolean(step) && messages.some((m) => m.role === "bot" && m.text === step.q);
   // Confirm/re-ask prompts (menopause-age outlier, existing-care GP steer,
   // recent-DXA-score check) post their OWN bot message, not step.q — gate
-  // those on chatReady, not inFlow, or currentQuestionShown hides them.
+  // those on chatReady, not inFlow, or questionLanded hides them.
   const chatReady = screen === "chat" && !typing;
-  const inFlow = chatReady && step && messages.length > 1 && currentQuestionShown;
   const convChatReady = screen === "chat" && flowMode === "conversation" && !convBusy;
+  const inFlow = chatReady && step && messages.length > 1 && questionLanded;
   const progressPct = awaitingName ? 0 : Math.round((stepIdx / STEPS.length) * 100);
   const progressLabel = awaitingName
     ? "Getting started"
@@ -2244,6 +2250,8 @@ export default function Home() {
   const cat = result ? CATEGORY_MAP[result.category] : "low";
   const catMeta = CAT_META[cat];
   const marker = result ? markerPercent(result.estimatedTScore) : 50;
+  const rangeLeftPct = result ? markerPercent(result.tScoreRange[0]) : 50;
+  const rangeRightPct = result ? markerPercent(result.tScoreRange[1]) : 50;
   const reportedActivitySteps = parseDailyActivity(answers.averageDailySteps ?? "", 100_000);
   const reportedActivityMinutes = parseDailyActivity(answers.averageDailyActiveMinutes ?? "", 1_440);
 
@@ -2336,14 +2344,11 @@ export default function Home() {
               <p className="m-0 text-[15px]" style={{ color: LANDING_MUTED }}>
                 No account. No forms. About 3 minutes.{" "}
                 <button
-                  type="button"
-                  onClick={startClassic}
-                  className="underline underline-offset-2 transition-colors"
-                  style={{ color: LANDING_MUTED }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = LANDING_ACCENT)}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = LANDING_MUTED)}
+                  onClick={() => setScreen("voice")}
+                  className="font-semibold underline decoration-1 underline-offset-2 transition-colors"
+                  style={{ color: LANDING_ACCENT }}
                 >
-                  Prefer a classic step-by-step questionnaire? Switch to classic mode.
+                  Prefer to talk? Try voice screening.
                 </button>
               </p>
               {showExampleMenu && (
@@ -2525,7 +2530,9 @@ export default function Home() {
         </div>
       )}
 
-      {screen === "chat" && flowMode === "classic" && (
+      {screen === "voice" && <VoiceScreen onExit={goToLanding} />}
+
+      {screen === "chat" && (
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
           <FloatingBones />
           <header className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12">
@@ -3662,26 +3669,37 @@ export default function Home() {
                       </>
 
                     <div className="mt-8 mb-2">
-                        <div className="relative">
+                        <div className="relative pt-[26px]">
                           <div className="flex h-3.5 overflow-hidden rounded-full">
                             <div className="w-1/3" style={{ backgroundColor: "#EFC3B8" }} />
                             <div className="w-1/3" style={{ backgroundColor: "#F0DFAE" }} />
                             <div className="w-1/3" style={{ backgroundColor: "#BFDDD3" }} />
                           </div>
+                          {/* Uncertainty range — the shaded area, not just the point estimate */}
+                          <motion.div
+                            initial={reduceMotion ? false : { left: "50%", width: 0, opacity: 0 }}
+                            animate={{
+                              left: `${rangeLeftPct}%`,
+                              width: `${Math.max(3, rangeRightPct - rangeLeftPct)}%`,
+                              opacity: 1,
+                            }}
+                            transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
+                            className="absolute top-[26px] h-3.5 rounded-full border-2 border-[#241436]/50 bg-[#241436]/12"
+                          />
                           <motion.div
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute -top-[26px] -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
+                            className="absolute top-0 -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
                             style={{ backgroundColor: "#7C3AED" }}
                           >
-                            you
+                            {result.estimatedTScore.toFixed(1)}
                           </motion.div>
                           <motion.div
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute top-0 h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#7C3AED]"
+                            className="absolute top-[26px] h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#7C3AED]"
                           />
                         </div>
                         <div className="mt-3.5 flex justify-between gap-2 text-xs font-semibold">
@@ -3693,7 +3711,8 @@ export default function Home() {
                           ))}
                         </div>
                         <p className="mt-4 text-sm leading-[1.6] text-[#4A5452]">
-                          A T-score compares your bone density to a healthy young adult: 0 is average, and lower
+                          The shaded area is the uncertainty range — your true score most likely sits inside it. A
+                          T-score compares your bone density to a healthy young adult: 0 is average, and lower
                           (more negative) means less dense bone.
                         </p>
                       </div>
