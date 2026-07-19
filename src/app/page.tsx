@@ -2268,11 +2268,11 @@ export default function Home() {
         >
           {/* Top bar */}
           <header
-            className="flex flex-wrap items-center gap-5 px-5 py-[18px] sm:px-16"
-            style={{ borderBottom: `1px solid ${LANDING_BORDER}` }}
+            className="sticky top-0 z-20 flex flex-wrap items-center gap-5 px-5 py-[18px] sm:px-16"
+            style={{ borderBottom: `1px solid ${LANDING_BORDER}`, backgroundColor: LANDING_BG }}
           >
-            <div className={`${LANDING_HEADING_FONT} text-[24px] font-semibold tracking-[-0.01em]`} style={{ color: LANDING_INK }}>
-              BoneBot
+            <div className={`${LANDING_HEADING_FONT} text-[24px] font-bold tracking-[-0.01em]`} style={{ color: LANDING_INK }}>
+              Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
             </div>
             <div
               className="pl-5 text-[13px] font-semibold uppercase tracking-[0.14em]"
@@ -2522,7 +2522,7 @@ export default function Home() {
         </div>
       )}
 
-      {screen === "chat" && (
+      {screen === "chat" && flowMode === "classic" && (
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#FAF7F2]">
           <FloatingBones />
           <header className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12">
@@ -3674,13 +3674,13 @@ export default function Home() {
                               opacity: 1,
                             }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute top-[26px] h-3.5 rounded-full border-2 border-[#221B16]/50 bg-[#221B16]/12"
+                            className="absolute top-[26px] h-3.5 rounded-full bg-[#221B16]/12 shadow-[inset_0_0_0_1px_rgba(34,27,22,0.18)]"
                           />
                           <motion.div
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute top-0 -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
+                            className="absolute top-0 -translate-x-1/2 rounded-md px-2.5 py-1 text-sm font-bold text-white shadow-md"
                             style={{ backgroundColor: "#0E6E62" }}
                           >
                             {result.estimatedTScore.toFixed(1)}
