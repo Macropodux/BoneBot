@@ -16,7 +16,10 @@ export const triage = {
     postmenopausal: -0.158907,
   },
   bmiMedian: 28.0000,
-  threshold: 0.02,
+  // Refer for full assessment at P(osteoporosis) >= 1%. Lowered from 2% so the
+  // triage catches ~99% of DXA-defined cases on validation (see notebook cell 7:
+  // TARGET_SENSITIVITY = 0.99), trading more referrals for fewer missed cases.
+  threshold: 0.01,
   auc: 0.8666,
 } as const;
 

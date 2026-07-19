@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     return new Response("Emailing results is unavailable: no Resend key configured.", { status: 503 });
   }
 
-  let body: { to?: string; subject?: string; text?: string };
+  let body: { to?: string; subject?: string; text?: string; html?: string };
   try {
     body = await req.json();
   } catch {
@@ -42,6 +42,9 @@ export async function POST(req: Request) {
         to: [to],
         subject: body.subject,
         text: body.text,
+        // html is optional — the client always sends both; text is the
+        // fallback for clients that don't render HTML.
+        ...(body.html ? { html: body.html } : {}),
       }),
     });
 

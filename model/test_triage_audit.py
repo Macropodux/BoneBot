@@ -40,11 +40,11 @@ class TriageAuditTests(unittest.TestCase):
         self.assertEqual(len(audit["calibration_bins"]), 10)
         self.assertTrue(math.isfinite(audit["brier_score"]))
 
-    def test_exported_triage_threshold_matches_the_audited_two_percent_rule(self):
+    def test_exported_triage_threshold_matches_the_audited_one_percent_rule(self):
         with open("model/model-parameters.ts", encoding="utf-8") as parameters:
             source = parameters.read()
 
-        self.assertIsNotNone(re.search(r"^\s*threshold:\s*0\.02,\s*$", source, re.MULTILINE))
+        self.assertIsNotNone(re.search(r"^\s*threshold:\s*0\.01,\s*$", source, re.MULTILINE))
 
 
 if __name__ == "__main__":
