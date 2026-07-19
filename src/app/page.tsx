@@ -2274,12 +2274,6 @@ export default function Home() {
             <div className={`${LANDING_HEADING_FONT} text-[24px] font-bold tracking-[-0.01em]`} style={{ color: LANDING_INK }}>
               Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
             </div>
-            <div
-              className="pl-5 text-[13px] font-semibold uppercase tracking-[0.14em]"
-              style={{ color: LANDING_MUTED, borderLeft: `1px solid ${LANDING_BORDER}` }}
-            >
-              Hack-Nation · Challenge 05
-            </div>
             <button
               onClick={startConversation}
               className={`${LANDING_HEADING_FONT} ml-auto inline-flex min-h-[48px] items-center justify-center rounded-full px-[26px] text-[16px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
@@ -3445,6 +3439,16 @@ export default function Home() {
                   </form>
                 )}
 
+              {convChatReady && convField && convField !== "confirm" && convInputType !== "image" && (
+                <button
+                  type="button"
+                  onClick={() => void sendConverseTurn("Not sure — skip this one")}
+                  className="self-end rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                >
+                  Skip this question
+                </button>
+              )}
+
               {convBusy && <p className="text-right text-sm text-[#5A6462]">BoneBot is thinking…</p>}
             </div>
           </div>
@@ -4089,7 +4093,6 @@ export default function Home() {
           BoneBot is a screening flag, not a diagnosis. It does not provide medical advice. Discuss results with
           your clinician.
         </div>
-        <div className="whitespace-nowrap text-[12.5px] text-[#9AA5A2]">Hack-Nation 6th Global AI Hackathon · 2026</div>
       </footer>
     </div>
   );
