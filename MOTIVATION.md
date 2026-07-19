@@ -338,6 +338,14 @@ A natural extension: a second model that scores fall risk from gait, then combin
 with the bone-density risk to prioritise the women most likely to fracture. Future
 work, not a core hackathon deliverable.
 
+**Note:** consumer platforms already expose default gait/fall-risk metrics we don't
+currently have data for — Apple Health (Walking Steadiness, Walking Asymmetry,
+Double Support Time, step length/speed), Garmin (cadence, stride length), Fitbit/
+Google (gait speed, step length, stance/swing time, double support time), and Oura
+(inactive time, activity volume, HRV/sleep recovery as frailty precursors). None are
+in our current dataset; flagged here as candidate inputs for a future gait/fall-risk
+model, complementary to bone-density risk.
+
 ---
 
 ## 8. Responsible use
