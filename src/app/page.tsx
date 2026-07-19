@@ -24,6 +24,7 @@ import { tScoreModel } from "../../model/model-parameters";
 const ACCENT = "#0E7C6E";
 const ACCENT_HOVER = "#0A5A50";
 const ACCENT_TINT = "#E4F0ED";
+const FRACTURE = "#B0442F";
 
 type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "bloodResults" | "weight";
 
@@ -38,18 +39,18 @@ type UploadedBloodResults = {
 
 const STEPS: Step[] = [
   { key: "assignedFemale", q: "Were you assigned female at birth?", options: ["Yes", "No"] },
-  { key: "age", q: "Let's start simple — how old are you?", options: [] },
+  { key: "age", q: "Let's start simple. How old are you?", options: [] },
   { key: "menopauseStatus", q: "Have your periods stopped for good?", options: ["Yes", "No", "Not sure"] },
   { key: "existingCare", q: "Have you already been diagnosed with osteoporosis, had a bone scan, or taken bone medication?", options: ["Yes", "No"] },
   { key: "knowsDxa", q: "Do you know the T-score from your most recent DXA bone-density scan?", options: ["Yes", "No"] },
   { key: "dxaScore", q: "What was the T-score on that scan?", options: [] },
   { key: "dxaYear", q: "What year was that scan performed?", options: [] },
   { key: "menopause", q: "At what age did you reach menopause?", options: [] },
-  { key: "fracture", q: "Have you broken a bone since age 50 — even from a minor fall or bump?", options: [] },
+  { key: "fracture", q: "Have you broken a bone since age 50, even from a minor fall or bump?", options: [] },
   { key: "parent", q: "Did either of your parents ever fracture a hip?", options: [] },
   { key: "smoke", q: "Do you currently smoke?", options: [] },
   { key: "steroids", q: "Have you ever taken corticosteroids (like prednisone) for 3 months or more?", options: [] },
-  { key: "bloodResults", q: "If you have blood-test results, upload an image now — or tap Skip to continue without one.", options: [] },
+  { key: "bloodResults", q: "If you have blood-test results, upload an image now, or tap Skip to continue without one.", options: [] },
   { key: "weight", q: "What's your weight and height? BoneBot uses these to calculate your BMI.", options: [] },
 ];
 
@@ -180,21 +181,21 @@ const CAT_META = {
     chip: "Keep it that way",
     color: "#0E7C6E",
     bg: "#E4F0ED",
-    desc: "Your answers didn't flag major clinical risk factors. Bones still change after menopause — re-screen yearly and keep up weight-bearing exercise, calcium, and vitamin D.",
+    desc: "Your answers didn't flag major clinical risk factors. Bones still change after menopause, so re-screen yearly and keep up weight-bearing exercise, calcium, and vitamin D.",
   },
   moderate: {
     label: "Moderate risk",
     chip: "Worth a conversation",
     color: "#A06D14",
     bg: "#FBF3DD",
-    desc: "Some of your answers match established risk factors for low bone density. This doesn't mean you have osteoporosis — it means a DEXA scan is worth discussing with your GP.",
+    desc: "Some of your answers match established risk factors for low bone density. This doesn't mean you have osteoporosis; it means a DEXA scan is worth discussing with your GP.",
   },
   elevated: {
     label: "Elevated risk",
     chip: "Ask your GP about a DEXA scan",
     color: "#B0442F",
     bg: "#F9E7E2",
-    desc: "Several of your answers match strong clinical risk factors. A screening flag is not a diagnosis — but this profile is exactly what DEXA referral guidelines are designed to catch. Please raise it with your GP.",
+    desc: "Several of your answers match strong clinical risk factors. A screening flag is not a diagnosis, but this profile is exactly what DEXA referral guidelines are designed to catch. Please raise it with your GP.",
   },
 } as const;
 
@@ -297,7 +298,7 @@ const RESOURCES = [
     name: "Royal Osteoporosis Society (UK)",
     url: "https://theros.org.uk/information-and-support/",
     brief:
-      "The UK's leading bone-health charity. Covers what bone density actually means, how calcium and vitamin D protect bone, safe exercise if you have osteoporosis, and treatment options — plus a nurse-staffed helpline for personal questions.",
+      "The UK's leading bone-health charity. Covers what bone density actually means, how calcium and vitamin D protect bone, safe exercise if you have osteoporosis, and treatment options, plus a nurse-staffed helpline for personal questions.",
   },
   {
     name: "International Osteoporosis Foundation",
@@ -318,7 +319,7 @@ const RESOURCES = [
       "A US clinician-and-patient organization (formerly NOF). Their fracture-prevention guidance covers FRAX risk scoring, what a DEXA scan involves, and the range of treatments a doctor might discuss.",
   },
   {
-    name: "NHS — Osteoporosis",
+    name: "NHS: Osteoporosis",
     url: "https://www.nhs.uk/conditions/osteoporosis",
     brief:
       "The UK's National Health Service overview. A concise clinical summary: symptoms, what causes bone loss, how osteoporosis is diagnosed, and when it's worth seeing a GP.",
@@ -969,7 +970,7 @@ export default function Home() {
   function buildResultEmail(): { subject: string; text: string } {
     const lines = result
       ? [
-          `BoneBot screening result — ${catMeta.label}`,
+          `BoneBot screening result: ${catMeta.label}`,
           "",
           `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
           `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
@@ -981,13 +982,13 @@ export default function Home() {
             return `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}${valueNote}`;
           }),
           "",
-          "This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score — please discuss this result with your GP or clinician.",
+          "This is a screening estimate from a model trained on NHANES data, not a diagnosis or a bone-density measurement. A DXA scan gives the real T-score, so please discuss this result with your GP or clinician.",
           "",
-          "— BoneBot, Hack-Nation 6th Global AI Hackathon",
+          "BoneBot, Hack-Nation 6th Global AI Hackathon",
         ]
       : [];
     return {
-      subject: `My BoneBot bone-health screening result — ${catMeta.label}`,
+      subject: `My BoneBot bone-health screening result: ${catMeta.label}`,
       text: lines.join("\n"),
     };
   }
@@ -1103,25 +1104,36 @@ export default function Home() {
       <style>{`@keyframes bw-blink { 0%,80%,100% { opacity: .25; } 40% { opacity: 1; } }`}</style>
 
       {screen === "landing" && (
-        <div className="flex flex-1 flex-col">
-          <header className="flex items-center justify-between px-6 py-5 sm:px-12">
+        <div className="relative flex flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
+          <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-12">
             <div className="font-[family-name:var(--font-heading)] text-[22px] font-bold tracking-[-0.02em]">
               Bone<span style={{ color: ACCENT }}>Bot</span>
             </div>
-            <div className="rounded-full border border-[#D5DCDA] px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#5A6462]">
+            <div className="rounded-full border border-[#D5DCDA] bg-white/70 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#5A6462] backdrop-blur-sm">
               Hack-Nation · Challenge 05
             </div>
           </header>
-          <main className="flex flex-1 flex-col items-center justify-center px-6 pb-16 pt-12 text-center">
-            <div className="mb-5 text-[13px] font-semibold uppercase tracking-[0.12em]" style={{ color: ACCENT }}>
+          <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pb-16 pt-8 text-center">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#CDE0DB] bg-white/70 px-4 py-1.5 text-[12.5px] font-semibold uppercase tracking-[0.13em] backdrop-blur-sm" style={{ color: ACCENT }}>
+              <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ACCENT }} />
               Bone-health screening for postmenopausal women
             </div>
-            <h1 className="max-w-[820px] text-balance font-[family-name:var(--font-heading)] text-5xl font-bold leading-[1.05] tracking-[-0.03em] sm:text-6xl">
-              Know your bone risk before it breaks something.
+            <h1 className="max-w-[880px] text-balance font-[family-name:var(--font-heading)] text-[2.85rem] font-bold leading-[1.02] tracking-[-0.035em] text-[#12211E] sm:text-6xl lg:text-[4.6rem]">
+              Know your bone risk
+              <br className="hidden sm:block" /> before it{" "}
+              <span className="relative whitespace-nowrap" style={{ color: FRACTURE }}>
+                breaks
+                <span
+                  aria-hidden
+                  className="absolute inset-x-0 -bottom-1 h-[3px] rounded-full"
+                  style={{ backgroundColor: FRACTURE, opacity: 0.35 }}
+                />
+              </span>{" "}
+              something.
             </h1>
-            <p className="mt-6 max-w-[620px] text-pretty text-lg leading-[1.6] text-[#4A5452] sm:text-[19px]">
-              A 3-minute conversational screening. The risk model is trained on NHANES population data — the AI
-              explains your result, it never decides it.
+            <p className="mt-7 max-w-[600px] text-pretty text-lg leading-[1.6] text-[#41504C] sm:text-[19px]">
+              A 3-minute conversational screening. The risk model is trained on NHANES population data. The AI
+              explains your result; it never decides it.
             </p>
             <div className="mt-9 flex flex-wrap justify-center gap-3.5">
               <button
@@ -1140,17 +1152,20 @@ export default function Home() {
                 Try an example patient
               </button>
             </div>
-            <div className="mt-16 grid max-w-[900px] grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="mt-16 grid max-w-[920px] grid-cols-1 gap-4 sm:grid-cols-3">
               {[
                 { stat: "1 in 2", body: "women over 50 will fracture a bone due to osteoporosis." },
-                { stat: "NHANES", body: "The prediction comes from a model trained on national health survey data — not from a chatbot." },
-                { stat: "Adaptive chat", body: "Four quick screening questions, then more detail only when needed. No account or forms." },
+                { stat: "NHANES", body: "The prediction comes from a model trained on national health survey data, not from a chatbot." },
+                { stat: "Adaptive", body: "Four quick screening questions, then more detail only when needed. No account or forms." },
               ].map((c) => (
-                <div key={c.stat} className="rounded-[14px] border border-[#E3E9E7] bg-white px-6 py-[22px] text-left">
-                  <div className="font-[family-name:var(--font-heading)] text-[28px] font-bold" style={{ color: ACCENT }}>
+                <div
+                  key={c.stat}
+                  className="rounded-[16px] border border-[#E1EAE7] bg-white/85 px-6 py-6 text-left shadow-[0_1px_2px_rgba(16,60,54,0.04)] backdrop-blur-sm"
+                >
+                  <div className="font-[family-name:var(--font-heading)] text-[30px] font-bold leading-none tracking-[-0.02em]" style={{ color: ACCENT }}>
                     {c.stat}
                   </div>
-                  <div className="mt-1.5 text-sm leading-[1.5] text-[#4A5452]">{c.body}</div>
+                  <div className="mt-2.5 text-sm leading-[1.5] text-[#41504C]">{c.body}</div>
                 </div>
               ))}
             </div>
@@ -1172,7 +1187,7 @@ export default function Home() {
             </div>
             <div className="text-[13px] font-medium text-[#5A6462]">{progressLabel}</div>
             <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
-              Screening flag — not a diagnosis
+              Screening flag, not a diagnosis
             </div>
           </header>
           <div ref={chatRef} className="flex-1 overflow-y-auto px-6 py-8">
@@ -1430,7 +1445,7 @@ export default function Home() {
                           <span className="font-semibold text-[#15181A]">
                             {uploadBusy ? "Reading your photo…" : "Attach a photo instead"}
                           </span>
-                          <span className="text-[13px] text-[#5A6462]">A blood-test result or lab report — JPG, PNG, or WEBP.</span>
+                          <span className="text-[13px] text-[#5A6462]">A blood-test result or lab report. JPG, PNG, or WEBP.</span>
                         </span>
                         <input
                           type="file"
@@ -1472,7 +1487,7 @@ export default function Home() {
             </div>
             <div className="text-[13px] font-medium text-[#5A6462]">Initial screening result</div>
             <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
-              Screening flag — not a diagnosis
+              Screening flag, not a diagnosis
             </div>
             <button
               onClick={restart}
@@ -1563,7 +1578,7 @@ export default function Home() {
             </div>
             <div className="hidden text-[13px] font-medium text-[#5A6462] sm:block">Screening complete</div>
             <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
-              Screening flag — not a diagnosis
+              Screening flag, not a diagnosis
             </div>
             <button
               onClick={() => emailSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
@@ -1584,7 +1599,7 @@ export default function Home() {
               <div className="flex flex-col gap-5">
                 {!result.validated && (
                   <p className="rounded-[14px] border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-700">
-                    ⚠️ Illustrative — coefficients not yet trained on NHANES. Do not present these numbers as real.
+                    ⚠️ Illustrative: coefficients not yet trained on NHANES. Do not present these numbers as real.
                   </p>
                 )}
 
@@ -1685,7 +1700,7 @@ export default function Home() {
                     What drove this result
                   </div>
                   <p className="mb-5 text-[13px] leading-[1.5] text-[#5A6462]">
-                    Each bar is how much that factor pushed your estimate — <span style={{ color: ACCENT }}>green pushes it up (better)</span>, <span style={{ color: "#B0442F" }}>red pushes it down</span>. Longer bar, bigger effect.
+                    Each bar is how much that factor pushed your estimate. <span style={{ color: ACCENT }}>Green pushes it up (better)</span>, <span style={{ color: "#B0442F" }}>red pushes it down</span>. Longer bar, bigger effect.
                   </p>
                   <div className="flex flex-col gap-4">
                     {(() => {
@@ -1728,7 +1743,7 @@ export default function Home() {
                   </div>
                   <div className="mt-5 text-[13px] leading-[1.5] text-[#5A6462]">
                     Weights follow established clinical and NHANES-derived risk factors. Only factors you
-                    answered are shown — anything you skipped uses a population average and is left out here.
+                    answered are shown. Anything you skipped uses a population average and is left out here.
                   </div>
                 </div>
 
@@ -1787,7 +1802,7 @@ export default function Home() {
                       How your estimate changes with age
                     </div>
                     <p className="mt-1.5 text-[13px] leading-[1.5] text-[#5A6462]">
-                      Same profile, run through the model at each age bracket — everything else held fixed. Your
+                      Same profile, run through the model at each age bracket, with everything else held fixed. Your
                       answer is highlighted.
                     </p>
                     <div className="mt-6 flex h-[140px] items-end gap-1.5 sm:gap-2.5">
@@ -1824,7 +1839,7 @@ export default function Home() {
                     Keep a copy of this result
                   </div>
                   <div className="mt-0.5 text-[13px] text-[#5A6462]">
-                    We&apos;ll email it to you — bring it to your GP appointment.
+                    We&apos;ll email it to you. Bring it to your GP appointment.
                   </div>
 
                   {emailSendState === "sent" ? (
@@ -1878,7 +1893,7 @@ export default function Home() {
               <div className="flex h-[640px] flex-col rounded-2xl border border-[#E3E9E7] bg-white">
                 <div className="border-b border-[#E3E9E7] px-6 py-[18px]">
                   <div className="font-[family-name:var(--font-heading)] text-base font-bold">Ask about your result</div>
-                  <div className="mt-0.5 text-[13px] text-[#5A6462]">The AI explains — it never changes your score.</div>
+                  <div className="mt-0.5 text-[13px] text-[#5A6462]">The AI explains; it never changes your score.</div>
                 </div>
                 <div ref={qaRef} className="flex flex-1 flex-col gap-3 overflow-y-auto px-6 py-5">
                   {qaMessages.map((m, i) => {
@@ -1937,7 +1952,7 @@ export default function Home() {
 
       <footer className="flex flex-col items-start justify-between gap-3 border-t border-[#E3E9E7] bg-white px-6 py-3.5 sm:flex-row sm:items-center sm:px-12">
         <div className="text-[12.5px] text-[#5A6462]">
-          BoneBot is a screening flag, not a diagnosis. It does not provide medical advice — discuss results with
+          BoneBot is a screening flag, not a diagnosis. It does not provide medical advice. Discuss results with
           your clinician.
         </div>
         <div className="whitespace-nowrap text-[12.5px] text-[#9AA5A2]">Hack-Nation 6th Global AI Hackathon · 2026</div>
