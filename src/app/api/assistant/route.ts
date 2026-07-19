@@ -136,6 +136,22 @@ Respond with the "answer" field containing your reply, and an "evidenceIds" fiel
 
 If a name is supplied in the context, address her by it naturally and warmly (typically once, near the start) — do not overuse it or force it into every sentence. If no name is supplied, do not use or invent one.`;
 
+// Light spelling normalization so common misspellings/variants of bone-health
+// terms still hit the right evidence topic (e.g. "DEXA scan" -> "dxa scan").
+// Used ONLY for evidence topic-matching below — never for what the LLM sees.
+const QUESTION_TERM_REPLACEMENTS: [RegExp, string][] = [
+  [/\bdexa\b/g, "dxa"],
+  [/\b(osteoprosis|osteoporsis|osteporosis)\b/g, "osteoporosis"],
+  [/\b(osteopenya|osteopeania)\b/g, "osteopenia"],
+];
+function normalizeQuestion(q: string): string {
+  const lowered = q.toLowerCase();
+  return QUESTION_TERM_REPLACEMENTS.reduce(
+    (text, [pattern, replacement]) => text.replace(pattern, replacement),
+    lowered
+  );
+}
+
 // Deterministic uncertainty read from the model's own range — never left to
 // the LLM to judge, so it can't over- or under-state confidence. A range that
 // crosses into the osteoporosis threshold, or is wide, reads as uncertain and
@@ -163,7 +179,7 @@ export async function POST(req: Request) {
   // a topic keyword below — so the strict keyword-only gate is relaxed for
   // that case (still applied as a fallback when no result is available).
   const hasResultContext = Boolean(body.result) && body.stage === "results";
-  const questionEvidence = body.question ? selectEvidenceForQuestion(body.question) : null;
+  const questionEvidence = body.question ? selectEvidenceForQuestion(normalizeQuestion(body.question)) : null;
   const resultEvidence = hasResultContext
     ? selectEvidence(body.result!.contributions.map((contribution) => contribution.factor))
     : null;
