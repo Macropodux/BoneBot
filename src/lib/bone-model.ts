@@ -39,6 +39,7 @@ export type ModelOutput = {
   category: "elevated" | "uncertain" | "lower";
   contributions: FactorContribution[];
   validated: boolean;
+  mae: number;
 };
 
 const round1 = (value: number) => Math.round(value * 10) / 10;
@@ -164,5 +165,6 @@ export function scoreBone(
     category,
     contributions,
     validated: MODEL_IS_VALIDATED,
+    mae: tScoreModel.mae,
   };
 }

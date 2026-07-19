@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Space_Grotesk, IBM_Plex_Sans } from "next/font/google";
+import { Geist, Geist_Mono, Space_Grotesk, IBM_Plex_Sans, Fraunces, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,6 +28,23 @@ const body = IBM_Plex_Sans({
   subsets: ["latin"],
 });
 
+// Editorial redesign type, scoped to the landing page only (src/app/page.tsx
+// "landing" screen) — Fraunces serif headlines + Source Sans 3 body, kept
+// separate from the heading/body vars above so chat/results are unaffected.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  weight: "variable",
+  style: ["normal", "italic"],
+  axes: ["opsz", "SOFT", "WONK"],
+  subsets: ["latin"],
+});
+
+const sourceSans = Source_Sans_3({
+  variable: "--font-source-sans",
+  weight: ["400", "500", "600", "700"],
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "BoneBot",
   description: "Hormone-aware bone-health screening for postmenopausal women — Hack-Nation Challenge 05.",
@@ -41,7 +58,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${heading.variable} ${body.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${heading.variable} ${body.variable} ${fraunces.variable} ${sourceSans.variable} h-full antialiased`}
     >
       <body className="h-full flex flex-col overflow-hidden">{children}</body>
     </html>

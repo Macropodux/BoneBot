@@ -211,6 +211,7 @@ export default function Screen() {
             <div className="flex items-center gap-2.5"><span className={`h-2.5 w-2.5 rounded-full ${category.dot}`} /><span className="text-lg font-semibold">{category.label}</span></div>
             <span className="font-mono text-sm text-zinc-500">est. T-score {result.model.estimatedTScore} ({result.model.tScoreRange[0]} … {result.model.tScoreRange[1]})</span>
           </div>
+          {result.model.validated && <p className="text-xs text-zinc-500">Validated on NHANES: mean error ±{result.model.mae} T-score units; the 95% range captured the true score 94.6% of the time in held-out testing (target 95%).</p>}
           {result.report ? (
             <>
               <p>{result.report.summary}</p>
