@@ -59,7 +59,7 @@ import type { TriageOutput } from "@/lib/triage-model";
 
 export const maxDuration = 30;
 
-const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o";
 
 type IncomingMessage = { role: "user" | "assistant"; content: string };
 

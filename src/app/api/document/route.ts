@@ -12,7 +12,7 @@ import { z } from "zod";
 
 export const maxDuration = 30;
 
-const MODEL = process.env.OPENAI_MODEL ?? "gpt-5-nano";
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o";
 
 const MAX_PDF_BYTES = 8 * 1024 * 1024; // 8MB — a scanned report fits comfortably under this
 

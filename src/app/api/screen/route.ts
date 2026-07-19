@@ -6,7 +6,7 @@ import { evidencePrompt, selectEvidence, usesOnlySelectedEvidence } from "@/lib/
 
 export const maxDuration = 30;
 
-const MODEL = process.env.OPENAI_MODEL ?? "gpt-5-nano";
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o";
 
 const SYSTEM = `You explain a bone-health SCREENING model's output to a postmenopausal woman, in plain, warm, non-alarming language.
 

@@ -329,6 +329,34 @@ function mapAnswersToFeatures(
   return { features, provided };
 }
 
+// ---- Conversational (AI-led) intake support ----
+// Mirrors intake-fields.ts's assembleFeatures() "which fields did the user
+// actually answer" rule (that file is read-only from here, never modified —
+// see AGENTS.md) so the results screen's "what drove this result" bars only
+// show factors the AI conversation actually collected, exactly like the
+// classic flow's own `provided` list above.
+function providedFromConverseCollected(collected: Record<string, unknown>): Array<keyof BoneFeatures> {
+  const provided: Array<keyof BoneFeatures> = ["age"];
+  if (typeof collected.menopauseAge === "number") provided.push("yearsSinceMenopause");
+  if (typeof collected.priorFragilityFracture === "boolean") provided.push("priorFragilityFracture");
+  if (typeof collected.currentSmoker === "boolean") provided.push("currentSmoker");
+  if (typeof collected.glucocorticoids === "boolean") provided.push("glucocorticoids");
+  if (typeof collected.weightKg === "number" && typeof collected.heightCm === "number") provided.push("bmi");
+  const steps = typeof collected.averageDailySteps === "number" ? collected.averageDailySteps : null;
+  const minutes =
+    typeof collected.averageDailyActiveMinutes === "number" ? collected.averageDailyActiveMinutes : null;
+  if (activityLevelFromDailyAverages(steps, minutes) !== null) provided.push("weightBearingActivity");
+  if (typeof collected.vitaminD === "number") provided.push("vitaminD");
+  if (typeof collected.calcium === "number") provided.push("calcium");
+  if (
+    SECONDARY_CONDITION_TRAINED &&
+    (collected.secondaryCondition === "yes" || collected.secondaryCondition === "no")
+  ) {
+    provided.push("secondaryCondition");
+  }
+  return provided;
+}
+
 const CATEGORY_MAP = { lower: "low", uncertain: "moderate", elevated: "elevated" } as const;
 
 const CAT_META = {
@@ -495,6 +523,46 @@ const KNOWN_RISK_FACTORS = [
 ] as const;
 
 type ChatMessage = { role: "bot" | "user"; text: string; kind?: "resources" };
+
+// ---- /api/converse contract — client-side mirror only. That route
+// (src/app/api/converse/route.ts) is the source of truth and is not edited
+// here; see its own header comment for the full contract. ----
+type ConverseInputType = "text" | "boolean" | "number" | "choice" | "image" | "none" | null;
+
+type ConverseTurnResponse = {
+  reply: string;
+  field: string | null;
+  inputType: ConverseInputType;
+  options?: string[];
+  collected: Record<string, unknown>;
+  gateExit?: { message: string };
+  triageStop?: { message: string; triage: TriageOutput };
+  readyToScore: boolean;
+  features?: BoneFeatures | null;
+  awaitingConfirm?: boolean;
+};
+
+function toConverseMessages(msgs: ChatMessage[]): { role: "user" | "assistant"; content: string }[] {
+  return msgs
+    .filter((m) => m.kind !== "resources" && m.text)
+    .map((m) => ({ role: m.role === "user" ? ("user" as const) : ("assistant" as const), content: m.text }));
+}
+
+// Minimal structural types for the (non-standard, vendor-prefixed) Web Speech
+// API — not in TypeScript's DOM lib. Only the surface BoneBot's mic button
+// actually uses.
+type SpeechRecognitionInstance = {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
+type SpeechRecognitionCtor = new () => SpeechRecognitionInstance;
+type SpeechWindow = { SpeechRecognition?: SpeechRecognitionCtor; webkitSpeechRecognition?: SpeechRecognitionCtor };
 
 // Shared everywhere BoneBot surfaces the resource list — the compact chat
 // bubble version (small) and the full result-page card (below).
@@ -773,10 +841,44 @@ export default function Home() {
   const [qaTyping, setQaTyping] = useState(false);
   const [qaInput, setQaInput] = useState("");
 
+  // ---------------- Conversational (AI-led) mode ----------------
+  // Additive alternative driver for the intake, talking to POST
+  // /api/converse (src/app/api/converse/route.ts) instead of walking the
+  // STEPS array below. It reuses the SAME shared state above (features,
+  // result, triageResult, routeMessage, qaMessages, bloodResults, and
+  // friends) and the same results screen — only how the intake questions
+  // are asked differs. See AGENTS.md: the model still predicts (scoreBone,
+  // via runModelFromFeatures), this only changes how BoneFeatures is
+  // collected. Defaults to "conversation" — the STEPS flow stays reachable
+  // via "Classic mode" (see startClassic()).
+  const [flowMode, setFlowMode] = useState<"conversation" | "classic">("conversation");
+  const [convMessages, setConvMessages] = useState<ChatMessage[]>([]);
+  const [convBusy, setConvBusy] = useState(false);
+  const [convCollected, setConvCollected] = useState<Record<string, unknown>>({});
+  const [convConfirmMode, setConvConfirmMode] = useState(false);
+  const [convAwaitingConfirm, setConvAwaitingConfirm] = useState(false);
+  const [convField, setConvField] = useState<string | null>(null);
+  const [convInputType, setConvInputType] = useState<ConverseInputType>(null);
+  const [convOptions, setConvOptions] = useState<string[] | undefined>(undefined);
+  const [convInput, setConvInput] = useState("");
+  const [micListening, setMicListening] = useState(false);
+  // Web Speech API feature-detect. A lazy initializer (not an effect) so
+  // there's no extra render/cascading setState — safe because the mic
+  // button it gates is only ever rendered once screen === "chat", well
+  // after hydration, so there's no SSR/client mismatch risk in practice.
+  const [micSupported] = useState(() => {
+    if (typeof window === "undefined") return false;
+    const w = window as unknown as SpeechWindow;
+    return Boolean(w.SpeechRecognition || w.webkitSpeechRecognition);
+  });
+
   const chatRef = useRef<HTMLDivElement>(null);
   const qaRef = useRef<HTMLDivElement>(null);
   const emailSectionRef = useRef<HTMLDivElement>(null);
   const freeInputRef = useRef<HTMLInputElement>(null);
+  const convChatRef = useRef<HTMLDivElement>(null);
+  const convInputRef = useRef<HTMLInputElement>(null);
+  const speechRecognitionRef = useRef<SpeechRecognitionInstance | null>(null);
 
   useEffect(() => {
     // stepIdx (not just messages/typing) because the chip row now renders
@@ -801,6 +903,21 @@ export default function Home() {
   useEffect(() => {
     if (qaRef.current) qaRef.current.scrollTop = qaRef.current.scrollHeight;
   }, [qaMessages, qaTyping]);
+
+  useEffect(() => {
+    if (convChatRef.current) convChatRef.current.scrollTop = convChatRef.current.scrollHeight;
+  }, [convMessages, convBusy]);
+
+  useEffect(() => {
+    if (
+      screen === "chat" &&
+      flowMode === "conversation" &&
+      !convBusy &&
+      (convInputType === "text" || convInputType === "number" || convField === "confirm")
+    ) {
+      convInputRef.current?.focus();
+    }
+  }, [convField, convInputType, convBusy, screen, flowMode]);
 
   function botSay(text: string, delay = 650) {
     setTyping(true);
@@ -868,13 +985,19 @@ export default function Home() {
     window.setTimeout(() => botSay(STEPS[0].q), 1400);
   }
 
-  async function runModel(all: Record<StepKey, string>, nameOverride?: string) {
-    // Accepts an explicit name (rather than always reading the userName state)
-    // because the "Try an example" path calls setUserName() and runModel() in
-    // the same tick — the state update wouldn't be visible in this closure
-    // yet, so the very first /api/assistant call would go out with no name.
+  // THE shared scoring + explanation + results-screen path — used by BOTH
+  // drivers (classic STEPS via runModel() below, and the AI-led conversation
+  // via sendConverseTurn()'s readyToScore branch). Accepts an explicit name
+  // (rather than always reading the userName state) because the "Try an
+  // example" path calls setUserName() and this in the same tick — the state
+  // update wouldn't be visible in this closure yet, so the very first
+  // /api/assistant call would go out with no name.
+  async function runModelFromFeatures(
+    full: BoneFeatures,
+    provided: Array<keyof BoneFeatures> | undefined,
+    nameOverride?: string,
+  ) {
     const explainerName = nameOverride ?? userName;
-    const { features: full, provided } = mapAnswersToFeatures(all, bloodResults);
     setFeatures(full);
     const model = scoreBone(full, provided);
     setResult(model);
@@ -918,6 +1041,11 @@ export default function Home() {
     setSummaryExplanation(summaryText);
     setQaMessages([{ role: "bot", text: "Ask a question about your bone-health screening result." }]);
     setScreen("results");
+  }
+
+  async function runModel(all: Record<StepKey, string>, nameOverride?: string) {
+    const { features: full, provided } = mapAnswersToFeatures(all, bloodResults);
+    await runModelFromFeatures(full, provided, nameOverride);
   }
 
   async function finishAtGate(message: string, triageResultValue?: TriageOutput) {
@@ -967,6 +1095,212 @@ export default function Home() {
     setQaMessages([]);
     setRouteMessage("This is an explanation of the DXA score you reported. It does not replace the original scan report or your clinician’s assessment.");
     setScreen("results");
+  }
+
+  // ---------------- Conversational (AI-led) mode: turn driver ----------------
+  // Routes chat bubbles to whichever transcript is active — reused by
+  // uploadBloodResults() below so the SAME upload function works for both
+  // the classic STEPS flow and the AI-led conversation.
+  function pushChatMessage(role: "bot" | "user", text: string) {
+    if (flowMode === "conversation") {
+      setConvMessages((m) => [...m, { role, text }]);
+    } else {
+      setMessages((m) => [...m, { role, text }]);
+    }
+  }
+
+  function startConversation() {
+    setFlowMode("conversation");
+    setScreen("chat");
+    setConvMessages([]);
+    setConvCollected({});
+    setConvConfirmMode(false);
+    setConvAwaitingConfirm(false);
+    setConvField(null);
+    setConvInputType(null);
+    setConvOptions(undefined);
+    setConvInput("");
+    setBloodResults(null);
+    setPendingBloodResults(null);
+    setBloodEditMode(false);
+    setBloodEditVitaminD("");
+    setBloodEditCalcium("");
+    setBloodEditError("");
+    setBloodImageFiles([]);
+    setResult(null);
+    setFeatures(null);
+    setTriageResult(null);
+    setRouteMessage("");
+    setScoreExplanation("");
+    setImplicationsExplanation("");
+    setSummaryExplanation("");
+    setUserName("");
+    void sendConverseTurn(null, {
+      collected: {},
+      messagesBase: [],
+      confirmModeOverride: false,
+      awaitingConfirmOverride: false,
+    });
+  }
+
+  // The reachable classic-mode fallback — see AGENTS.md ("keep the STEPS
+  // flow present and reachable"). Reuses the pre-existing start() function
+  // untouched; only tags which driver is now active.
+  function startClassic() {
+    setFlowMode("classic");
+    speechRecognitionRef.current?.stop();
+    setMicListening(false);
+    start();
+  }
+
+  // Optional voice playback of BoneBot's reply via the existing /api/tts
+  // route — silent, best-effort; never blocks the conversation if
+  // ElevenLabs is unavailable (see AGENTS.md "degrade gracefully").
+  async function speak(text: string) {
+    try {
+      const response = await fetch("/api/tts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!response.ok) return;
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => URL.revokeObjectURL(url);
+      void audio.play().catch(() => {});
+    } catch {
+      /* TTS is optional — silent fallback. */
+    }
+  }
+
+  // THE conversational turn driver: sends the running transcript + collected
+  // answers to /api/converse, then routes the response exactly per the
+  // route's contract — gateExit/triageStop reuse the existing
+  // finishAtGate() (same low-risk/no-result results screens as the classic
+  // flow), and readyToScore reuses the existing runModelFromFeatures() (same
+  // scoring + explanation calls + results sheet as the classic flow). This
+  // function never decides eligibility, triage, or the final feature set
+  // itself — that is entirely server-side (src/lib/intake-fields.ts), per
+  // AGENTS.md ("the model predicts, the LLM only explains").
+  async function sendConverseTurn(
+    userText: string | null,
+    opts?: {
+      collected?: Record<string, unknown>;
+      messagesBase?: ChatMessage[];
+      confirmModeOverride?: boolean;
+      awaitingConfirmOverride?: boolean;
+    },
+  ) {
+    if (convBusy) return;
+    const baseMessages = opts?.messagesBase ?? convMessages;
+    const collected = opts?.collected ?? convCollected;
+    const confirmModeValue = opts?.confirmModeOverride ?? convConfirmMode;
+    const awaitingConfirmValue = opts?.awaitingConfirmOverride ?? convAwaitingConfirm;
+
+    let nextMessages = baseMessages;
+    if (userText !== null) {
+      nextMessages = [...baseMessages, { role: "user", text: userText }];
+      setConvMessages(nextMessages);
+    }
+    setConvInput("");
+    setConvBusy(true);
+
+    let data: ConverseTurnResponse | null = null;
+    try {
+      const response = await fetch("/api/converse", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          messages: toConverseMessages(nextMessages),
+          collected,
+          confirmMode: confirmModeValue,
+          awaitingConfirm: awaitingConfirmValue,
+        }),
+      });
+      if (response.ok) data = (await response.json()) as ConverseTurnResponse;
+    } catch {
+      /* handled below via null data — degrade gracefully, see AGENTS.md */
+    }
+    setConvBusy(false);
+
+    if (!data) {
+      setConvMessages((m) => [
+        ...m,
+        {
+          role: "bot",
+          text: "BoneBot's conversation mode is unavailable right now. You can try again, or switch to classic mode.",
+        },
+      ]);
+      return;
+    }
+
+    const nextCollected = data.collected ?? {};
+    setConvCollected(nextCollected);
+    setConvAwaitingConfirm(Boolean(data.awaitingConfirm));
+    setConvMessages((m) => [...m, { role: "bot", text: data!.reply }]);
+    if (confirmModeValue) void speak(data.reply);
+
+    if (data.gateExit) {
+      setConvField(null);
+      setConvInputType(null);
+      setConvOptions(undefined);
+      await finishAtGate(data.gateExit.message);
+      return;
+    }
+
+    if (data.triageStop) {
+      setConvField(null);
+      setConvInputType(null);
+      setConvOptions(undefined);
+      await finishAtGate(data.triageStop.message, data.triageStop.triage);
+      return;
+    }
+
+    if (data.readyToScore && data.features) {
+      setConvField(null);
+      setConvInputType(null);
+      setConvOptions(undefined);
+      await runModelFromFeatures(data.features, providedFromConverseCollected(nextCollected), userName || undefined);
+      return;
+    }
+
+    setConvField(data.field);
+    setConvInputType(data.inputType);
+    setConvOptions(data.options);
+  }
+
+  // Web Speech API mic. Hidden entirely when unsupported (Safari/older
+  // browsers) — see micSupported's feature-detect effect above; typing
+  // always still works. Using it flips the session into confirmMode
+  // (read-back-before-advancing), since voice transcription is error-prone —
+  // see api/converse/route.ts's confirmMode module comment.
+  function startMic() {
+    if (micListening) return;
+    const w = window as unknown as SpeechWindow;
+    const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Ctor) return;
+    const recognition = new Ctor();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (event) => {
+      const transcript = event.results[0]?.[0]?.transcript?.trim();
+      if (transcript) {
+        setConvConfirmMode(true);
+        void sendConverseTurn(transcript, { confirmModeOverride: true });
+      }
+    };
+    recognition.onerror = () => setMicListening(false);
+    recognition.onend = () => setMicListening(false);
+    speechRecognitionRef.current = recognition;
+    setMicListening(true);
+    recognition.start();
+  }
+
+  function stopMic() {
+    speechRecognitionRef.current?.stop();
+    setMicListening(false);
   }
 
   function answer(opt: string, display = opt, recordMessage = true) {
@@ -1344,21 +1678,17 @@ export default function Home() {
         extractedResults.vitaminD === null ? "vitamin D" : null,
         extractedResults.calcium === null ? "calcium" : null,
       ].filter(Boolean);
-      setMessages((items) => [
-        ...items,
-        {
-          role: "bot",
-          text:
-            `I read ${readText}.` +
-            (contextParts.length ? ` Also ${contextParts.join(", ")} (context only, not scored).` : "") +
-            (missing.length
-              ? ` I didn't find a ${missing.join(" or ")} value — upload another image, or tap Edit below to add it.`
-              : "") +
-            " Please confirm before I include this in your estimate.",
-        },
-      ]);
+      pushChatMessage(
+        "bot",
+        `I read ${readText}.` +
+          (contextParts.length ? ` Also ${contextParts.join(", ")} (context only, not scored).` : "") +
+          (missing.length
+            ? ` I didn't find a ${missing.join(" or ")} value — upload another image, or tap Edit below to add it.`
+            : "") +
+          " Please confirm before I include this in your estimate.",
+      );
     } else if (message) {
-      setMessages((items) => [...items, { role: "bot", text: message }]);
+      pushChatMessage("bot", message);
     }
   }
 
@@ -1404,15 +1734,27 @@ export default function Home() {
 
   function useTheseBloodValues() {
     if (!pendingBloodResults) return;
-    setBloodResults(pendingBloodResults);
+    const values = pendingBloodResults;
+    setBloodResults(values);
     setPendingBloodResults(null);
     setBloodEditMode(false);
+    if (flowMode === "conversation") {
+      const merged = { ...convCollected };
+      if (values.vitaminD !== null) merged.vitaminD = values.vitaminD;
+      if (values.calcium !== null) merged.calcium = values.calcium;
+      void sendConverseTurn("I uploaded my blood-test results.", { collected: merged });
+      return;
+    }
     if (STEPS[stepIdx]?.key === "bloodResults") answer("Uploaded", "Use these values");
   }
 
   function skipPendingBloodValues() {
     setPendingBloodResults(null);
     setBloodEditMode(false);
+    if (flowMode === "conversation") {
+      void sendConverseTurn("Skip — I don't have blood-test results.");
+      return;
+    }
     if (STEPS[stepIdx]?.key === "bloodResults") answer("Skip", "Skip");
   }
 
@@ -1439,6 +1781,13 @@ export default function Home() {
     setBloodResults(edited);
     setPendingBloodResults(null);
     setBloodEditMode(false);
+    if (flowMode === "conversation") {
+      const merged = { ...convCollected };
+      if (edited.vitaminD !== null) merged.vitaminD = edited.vitaminD;
+      if (edited.calcium !== null) merged.calcium = edited.calcium;
+      void sendConverseTurn("I edited my blood-test values.", { collected: merged });
+      return;
+    }
     if (STEPS[stepIdx]?.key === "bloodResults") answer("Uploaded", "Edited values confirmed");
   }
 
@@ -1808,13 +2157,27 @@ export default function Home() {
     setUserName("");
     setNameInput("");
     setAwaitingName(false);
+    setFlowMode("conversation");
+    setConvMessages([]);
+    setConvBusy(false);
+    setConvCollected({});
+    setConvConfirmMode(false);
+    setConvAwaitingConfirm(false);
+    setConvField(null);
+    setConvInputType(null);
+    setConvOptions(undefined);
+    setConvInput("");
+    speechRecognitionRef.current?.stop();
+    setMicListening(false);
   }
 
   // Wordmark click target from chat/results screens. Mid-chat it's the same
   // "are you sure" gate as the Start over button; from a finished results
   // screen there's nothing to lose, so it goes straight back.
   function goToLanding() {
-    if (screen === "chat" && messages.length > 1 && !window.confirm("Start over? This clears your answers so far.")) return;
+    const hasProgress =
+      screen === "chat" && (flowMode === "conversation" ? convMessages.length > 0 : messages.length > 1);
+    if (hasProgress && !window.confirm("Start over? This clears your answers so far.")) return;
     restart();
   }
 
@@ -1872,6 +2235,7 @@ export default function Home() {
   // recent-DXA-score check) post their OWN bot message, not step.q — gate
   // those on chatReady, not inFlow, or questionLanded hides them.
   const chatReady = screen === "chat" && !typing;
+  const convChatReady = screen === "chat" && flowMode === "conversation" && !convBusy;
   const inFlow = chatReady && step && messages.length > 1 && questionLanded;
   const progressPct = awaitingName ? 0 : Math.round((stepIdx / STEPS.length) * 100);
   const progressLabel = awaitingName
@@ -1917,7 +2281,7 @@ export default function Home() {
               Hack-Nation · Challenge 05
             </div>
             <button
-              onClick={start}
+              onClick={startConversation}
               className={`${LANDING_HEADING_FONT} ml-auto inline-flex min-h-[48px] items-center justify-center rounded-full px-[26px] text-[16px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
               style={{ backgroundColor: LANDING_ACCENT }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
@@ -1952,7 +2316,7 @@ export default function Home() {
               </p>
               <div className="mt-2 flex flex-wrap gap-3.5">
                 <button
-                  onClick={start}
+                  onClick={startConversation}
                   className={`${LANDING_HEADING_FONT} inline-flex min-h-[56px] items-center justify-center rounded-full px-[34px] text-[18px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
                   style={{ backgroundColor: LANDING_ACCENT }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
@@ -2783,6 +3147,305 @@ export default function Home() {
 
               {flowQuestionBusy && <p className="text-right text-sm text-[#5A6462]">Checking the approved evidence…</p>}
               {extracting && <p className="text-right text-sm text-[#5A6462]">Reading your answer…</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {screen === "chat" && flowMode === "conversation" && (
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
+          <FloatingBones />
+          <header className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12">
+            <button
+              type="button"
+              onClick={goToLanding}
+              className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+            >
+              Bone<span style={{ color: ACCENT }}>Bot</span>
+            </button>
+            <div className="text-[13px] font-medium text-[#5A6462]">AI-led conversation</div>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <div className="rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
+                Screening flag, not a diagnosis
+              </div>
+              <button
+                type="button"
+                onClick={startClassic}
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
+              >
+                Classic mode
+              </button>
+              <button
+                onClick={() => {
+                  if (convMessages.length <= 1 || window.confirm("Start over? This clears your answers so far.")) restart();
+                }}
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
+              >
+                Start over
+              </button>
+            </div>
+          </header>
+          <div ref={convChatRef} className="relative z-10 flex-1 overflow-y-auto px-6 py-8">
+            <div className="mx-auto flex max-w-[680px] flex-col gap-3.5">
+              {convMessages.map((m, i) =>
+                m.role === "bot" ? <BotBubble key={i} text={m.text} /> : <UserBubble key={i} text={m.text} />
+              )}
+              {convBusy && <TypingDots />}
+            </div>
+          </div>
+          <div className="relative z-10 border-t border-[#E3E9E7] bg-white/90 px-6 py-5 backdrop-blur-sm">
+            <div className="mx-auto flex max-w-[680px] flex-col gap-3">
+              {micSupported && convChatReady && convField && (
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => (micListening ? stopMic() : startMic())}
+                    className="flex items-center gap-2 rounded-full border-[1.5px] px-4 py-2 text-[13px] font-semibold transition-colors"
+                    style={
+                      micListening
+                        ? { borderColor: ACCENT, backgroundColor: ACCENT, color: "#fff" }
+                        : { borderColor: "#C6CFCC", color: "#4A5452" }
+                    }
+                  >
+                    <span aria-hidden>{micListening ? "⏹" : "🎤"}</span>
+                    {micListening ? "Listening… tap to stop" : "Answer by voice"}
+                  </button>
+                  {convConfirmMode && <span className="text-[12px] text-[#9AA5A2]">Voice mode on</span>}
+                </div>
+              )}
+
+              {convChatReady &&
+                convField &&
+                (convInputType === "boolean" || convInputType === "choice") &&
+                convOptions &&
+                convOptions.length > 0 && (
+                  <div className="flex flex-wrap justify-end gap-2.5">
+                    {convOptions.map((opt) => (
+                      <button
+                        key={opt}
+                        onClick={() => void sendConverseTurn(opt)}
+                        className="rounded-full border-[1.5px] px-5 py-2.5 text-[15px] font-medium transition-colors"
+                        style={{ borderColor: ACCENT, color: ACCENT }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = ACCENT;
+                          e.currentTarget.style.color = "#FFFFFF";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                          e.currentTarget.style.color = ACCENT;
+                        }}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+              {convChatReady && convField && convInputType === "image" && (
+                <div className="flex flex-col gap-3">
+                  {pendingBloodResults && !bloodEditMode && (
+                    <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
+                      <div className="text-sm font-semibold text-[#241436]">Confirm blood values</div>
+                      <div className="text-sm leading-[1.5] text-[#4A5452]">
+                        {pendingBloodResults.vitaminD !== null && `Vitamin D: ${pendingBloodResults.vitaminD} nmol/L. `}
+                        {pendingBloodResults.calcium !== null && `Calcium: ${pendingBloodResults.calcium} mmol/L. `}
+                        Only these two are used in your estimate.
+                      </div>
+                      <div className="flex flex-wrap gap-2.5">
+                        <button
+                          onClick={useTheseBloodValues}
+                          className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
+                          style={{ backgroundColor: ACCENT }}
+                        >
+                          Use these
+                        </button>
+                        <button
+                          onClick={() => setBloodEditMode(true)}
+                          className="rounded-full border-[1.5px] px-5 py-2.5 text-[15px] font-medium transition-colors"
+                          style={{ borderColor: ACCENT, color: ACCENT }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={skipPendingBloodValues}
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {pendingBloodResults && bloodEditMode && (
+                    <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
+                      <div className="text-sm font-semibold text-[#241436]">Edit blood values</div>
+                      <div className="flex flex-wrap gap-3">
+                        <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
+                          Vitamin D (nmol/L)
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            value={bloodEditVitaminD}
+                            onChange={(event) => setBloodEditVitaminD(event.target.value)}
+                            placeholder="e.g. 55"
+                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
+                          Calcium (mmol/L)
+                          <input
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            value={bloodEditCalcium}
+                            onChange={(event) => setBloodEditCalcium(event.target.value)}
+                            placeholder="e.g. 2.3"
+                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                          />
+                        </label>
+                      </div>
+                      {bloodEditError && <div className="text-[13px] text-[#B0442F]">{bloodEditError}</div>}
+                      <div className="flex flex-wrap gap-2.5">
+                        <button
+                          onClick={submitEditedBloodValues}
+                          className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
+                          style={{ backgroundColor: ACCENT }}
+                        >
+                          Save & continue
+                        </button>
+                        <button
+                          onClick={() => setBloodEditMode(false)}
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={skipPendingBloodValues}
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!pendingBloodResults && (
+                    <div className="flex flex-col gap-2.5">
+                      {bloodImageFiles.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {bloodImageFiles.map((file, index) => (
+                            <div
+                              key={`${file.name}-${index}`}
+                              className="flex items-center gap-1.5 rounded-[10px] border border-[#D5DCDA] bg-white px-2 py-1.5 text-xs"
+                            >
+                              <img src={URL.createObjectURL(file)} alt="" className="h-7 w-7 rounded-[6px] object-cover" />
+                              <span className="max-w-[90px] truncate">{file.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => removeBloodImage(index)}
+                                className="text-[#9AA5A2] hover:text-[#B0442F]"
+                                aria-label={`Remove ${file.name}`}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <label
+                        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#E11D74] hover:bg-[#FCE7F1]"
+                        aria-disabled={uploadBusy || bloodImageFiles.length >= MAX_IMAGES}
+                      >
+                        <span
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-base"
+                          style={{ backgroundColor: ACCENT_TINT, color: ACCENT }}
+                          aria-hidden
+                        >
+                          📎
+                        </span>
+                        <span className="flex flex-col">
+                          <span className="font-semibold text-[#241436]">
+                            {bloodImageFiles.length >= MAX_IMAGES
+                              ? "Maximum 3 photos added"
+                              : "Attach a photo of your blood-test results"}
+                          </span>
+                          <span className="text-[13px] text-[#5A6462]">
+                            Up to {MAX_IMAGES} images · {bloodImageFiles.length}/{MAX_IMAGES} added.
+                          </span>
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          multiple
+                          className="sr-only"
+                          disabled={uploadBusy || bloodImageFiles.length >= MAX_IMAGES}
+                          onChange={(event) => {
+                            addBloodImages(event.target.files);
+                            event.currentTarget.value = "";
+                          }}
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-2.5">
+                        {bloodImageFiles.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => void uploadBloodResults(bloodImageFiles)}
+                            disabled={uploadBusy}
+                            className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors disabled:opacity-50"
+                            style={{ backgroundColor: ACCENT }}
+                          >
+                            {uploadBusy
+                              ? "Reading your photo(s)…"
+                              : `Analyze ${bloodImageFiles.length} photo${bloodImageFiles.length > 1 ? "s" : ""}`}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void sendConverseTurn("Skip — I don't have blood-test results.")}
+                          disabled={uploadBusy}
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74] disabled:opacity-50"
+                        >
+                          Skip — I don&apos;t have blood-test results
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {convChatReady &&
+                convField &&
+                (convInputType === "text" || convInputType === "number" || convField === "confirm") && (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (convInput.trim()) void sendConverseTurn(convInput.trim());
+                    }}
+                    className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#E11D74]"
+                  >
+                    <input
+                      ref={convInputRef}
+                      type={convInputType === "number" ? "number" : "text"}
+                      inputMode={convInputType === "number" ? "numeric" : undefined}
+                      value={convInput}
+                      onChange={(event) => setConvInput(event.target.value)}
+                      placeholder={convField === "confirm" ? "Or type a correction…" : "Type your answer"}
+                      aria-label="Answer BoneBot"
+                      disabled={convBusy}
+                      className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
+                    />
+                    <button
+                      type="submit"
+                      disabled={convBusy || !convInput.trim()}
+                      className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      Send
+                    </button>
+                  </form>
+                )}
+
+              {convBusy && <p className="text-right text-sm text-[#5A6462]">BoneBot is thinking…</p>}
             </div>
           </div>
         </div>

@@ -8,7 +8,7 @@ export const maxDuration = 30;
 // extraction was reported unreliable on real blood-result photos. Kept as its
 // own env var so it can be tuned independently of OPENAI_MODEL (the text-only
 // routes). No temperature override: leave the model's default.
-const VISION_MODEL = process.env.OPENAI_VISION_MODEL ?? "gpt-4o-mini";
+const VISION_MODEL = process.env.OPENAI_VISION_MODEL ?? "gpt-4o";
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 // Both the blood-results and activity-extract uploaders share this cap —
 // enforced client-side (page.tsx disables adding a 4th) and re-checked here.
