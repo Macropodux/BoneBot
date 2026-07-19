@@ -484,8 +484,11 @@ export default function Home() {
   const emailSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // stepIdx (not just messages/typing) because the chip row now renders
+    // inside this scrollable pane, right under the last bot message — it
+    // changes the pane's content height without changing messages/typing.
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [messages, typing]);
+  }, [messages, typing, stepIdx]);
   useEffect(() => {
     if (qaRef.current) qaRef.current.scrollTop = qaRef.current.scrollHeight;
   }, [qaMessages, qaTyping]);
@@ -1118,13 +1121,13 @@ export default function Home() {
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-[#F5F7F6] text-[#15181A] font-[family-name:var(--font-body)]"
+      className="flex h-full flex-col bg-[#F5F7F6] text-[#15181A] font-[family-name:var(--font-body)]"
       style={{ ["--bw-accent" as string]: ACCENT }}
     >
       <style>{`@keyframes bw-blink { 0%,80%,100% { opacity: .25; } 40% { opacity: 1; } }`}</style>
 
       {screen === "landing" && (
-        <div className="relative flex flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
+        <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
           <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-12">
             <div className="font-[family-name:var(--font-heading)] text-[22px] font-bold tracking-[-0.02em]">
               Bone<span style={{ color: ACCENT }}>Bot</span>
@@ -1216,10 +1219,6 @@ export default function Home() {
                 m.role === "bot" ? <BotBubble key={i} text={m.text} /> : <UserBubble key={i} text={m.text} />
               )}
               {typing && <TypingDots />}
-            </div>
-          </div>
-          <div className="border-t border-[#E3E9E7] bg-white px-6 py-5">
-            <div className="mx-auto flex max-w-[680px] flex-col gap-3">
               {inFlow && step.options.length > 0 && (
                 <div className="flex flex-wrap justify-end gap-2.5">
                   {step.options.map((opt) => (
@@ -1242,6 +1241,10 @@ export default function Home() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+          <div className="border-t border-[#E3E9E7] bg-white px-6 py-5">
+            <div className="mx-auto flex max-w-[680px] flex-col gap-3">
 
               {inFlow && step.key === "bloodResults" && pendingBloodResults && !bloodEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
@@ -1410,7 +1413,7 @@ export default function Home() {
                 </div>
               )}
 
-              {inFlow && step.options.length === 0 && !pendingBloodResults && step.key !== "weight" && (
+              {inFlow && !pendingBloodResults && step.key !== "weight" && (
                 <div className="flex flex-col gap-2.5">
                   <form
                     onSubmit={(event) => {
@@ -1422,7 +1425,11 @@ export default function Home() {
                     <input
                       value={freeInput}
                       onChange={(event) => setFreeInput(event.target.value)}
-                      placeholder="Type your answer, or ask a bone-health question"
+                      placeholder={
+                        step.options.length > 0
+                          ? "Or type your answer here…"
+                          : "Type your answer, or ask a bone-health question"
+                      }
                       aria-label="Answer or ask a bone-health question"
                       disabled={flowQuestionBusy || extracting}
                       className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
