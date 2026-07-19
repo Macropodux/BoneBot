@@ -98,16 +98,15 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   secondaryCondition: "No",
 };
 
-// Fields the 7-question flow never asks about — hormone therapy, parental hip
-// fracture, rheumatoid arthritis, and high alcohol intake aren't part of this
-// flow, so they still use the same illustrative population-average defaults
-// as before (not measurements). vitaminD/calcium (blood-result photo) and
+// Fields the 7-question flow never asks about — hormone therapy, rheumatoid
+// arthritis, and high alcohol intake aren't part of this flow, so they still
+// use the same illustrative population-average defaults as before (not
+// measurements). vitaminD/calcium (blood-result photo) and
 // weightBearingActivity (activity chip, or watch/app screenshot) ARE
 // user-provided when given — see mapAnswersToFeatures() below.
 const FIELD_DEFAULTS = {
   onHormoneTherapy: Boolean(tScoreModel.imputationDefaults.onHormoneTherapy),
   weightBearingActivity: tScoreModel.imputationDefaults.activityLevel,
-  parentalHipFracture: Boolean(tScoreModel.imputationDefaults.parentalHipFracture),
   rheumatoidArthritis: Boolean(tScoreModel.imputationDefaults.rheumatoidArthritis),
   highAlcohol: Boolean(tScoreModel.imputationDefaults.highAlcohol),
   vitaminD: tScoreModel.imputationDefaults.vitaminD,
