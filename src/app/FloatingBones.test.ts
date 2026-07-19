@@ -11,8 +11,8 @@ describe("FloatingBones", () => {
     expect(FLOATING_BONES.some((bone) => bone.tone === "coral")).toBe(true);
   });
 
-  it("mounts the shared motif on landing and questionnaire screens", () => {
+  it("mounts the shared motif on every screen (landing, questionnaire, both results states)", () => {
     const page = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
-    expect(page.match(/<FloatingBones \/>/g)).toHaveLength(2);
+    expect(page.match(/<FloatingBones \/>/g)).toHaveLength(4);
   });
 });

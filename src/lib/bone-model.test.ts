@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { tScoreModel } from "../../model/model-parameters";
 import { adaptiveHalfWidth, type IntervalConfig } from "./bone-model";
 
 // Illustrative variances/coefficients — the test checks the formula's behaviour,
@@ -42,5 +43,11 @@ describe("adaptiveHalfWidth", () => {
     const full = adaptiveHalfWidth([], coefficients, withVariances);
     const missingCalcium = adaptiveHalfWidth(["calcium"], coefficients, withVariances);
     expect(missingCalcium - full).toBeLessThan(0.05);
+  });
+});
+
+describe("trained model direction", () => {
+  it("does not treat current smoking as protective", () => {
+    expect(tScoreModel.coefficients.currentSmoker).toBeLessThanOrEqual(0);
   });
 });
