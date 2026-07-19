@@ -16,6 +16,7 @@
 // flagged there for a clinical sanity-check, not a measurement.
 
 import { useEffect, useRef, useState } from "react";
+import { resolveAmbiguousAnswer } from "@/lib/ambiguity";
 import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model";
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
 import { tScoreModel } from "../../model/model-parameters";
@@ -322,6 +323,7 @@ export default function Home() {
   const [uploadBusy, setUploadBusy] = useState(false);
   const [clarificationCounts, setClarificationCounts] = useState<Partial<Record<StepKey, number>>>({});
   const [unresolvedAnswerCount, setUnresolvedAnswerCount] = useState(0);
+  const [uncertaintyNotes, setUncertaintyNotes] = useState<string[]>([]);
 
   const [qaMessages, setQaMessages] = useState<ChatMessage[]>([]);
   const [qaTyping, setQaTyping] = useState(false);
@@ -443,11 +445,11 @@ export default function Home() {
     setScreen("results");
   }
 
-  function answer(opt: string, display = opt) {
+  function answer(opt: string, display = opt, recordMessage = true) {
     if (typing || flowQuestionBusy) return;
     const step = STEPS[stepIdx];
     const nextAnswers = { ...answers, [step.key]: opt };
-    setMessages((m) => [...m, { role: "user", text: display }]);
+    if (recordMessage) setMessages((m) => [...m, { role: "user", text: display }]);
     setAnswers(nextAnswers);
     setFreeInput("");
     setClarificationCounts((counts) => ({ ...counts, [step.key]: 0 }));
@@ -543,27 +545,29 @@ export default function Home() {
     const step = STEPS[stepIdx];
     if (!raw || !step || flowQuestionBusy) return;
     const value = normaliseFreeAnswer(step.key, raw);
-    if (value) {
+    if (value && value !== "Not sure" && value !== "Unknown") {
       answer(value, raw);
       return;
     }
     const looksLikeQuestion = /\?|^(what|why|how|can|is|are|does|do)\b/i.test(raw);
     if (!looksLikeQuestion) {
       const attempts = clarificationCounts[step.key] ?? 0;
-      if (attempts < 1) {
+      const resolution = resolveAmbiguousAnswer(step.key, attempts);
+      if (resolution.action === "clarify") {
         setClarificationCounts((counts) => ({ ...counts, [step.key]: attempts + 1 }));
         setMessages((items) => [
           ...items,
           { role: "user", text: raw },
-          { role: "bot", text: "I did not get a usable answer for that. Please answer as clearly as you can, or say ‘not sure’ and I will continue without using this input." },
+          { role: "bot", text: resolution.message },
         ]);
         setFreeInput("");
         return;
       }
+      setUncertaintyNotes((notes) => [...notes, resolution.note]);
       setMessages((items) => [
         ...items,
         { role: "user", text: raw },
-        { role: "bot", text: "I will mark that as unknown and continue. The model will use its published default for this input." },
+        { role: "bot", text: "I will mark that as unknown and continue using the model’s published default for this input." },
       ]);
       const nextUnresolvedCount = unresolvedAnswerCount + 1;
       setUnresolvedAnswerCount(nextUnresolvedCount);
@@ -571,7 +575,7 @@ export default function Home() {
         void finishAtGate("BoneBot is not able to create a reliable screening score from the answers provided. For any further questions about your bone health, please reach out to your GP or another clinician.");
         return;
       }
-      answer("Not sure", "Not sure");
+      answer(resolution.storedValue, raw, false);
       return;
     }
     setMessages((items) => [...items, { role: "user", text: raw }]);
@@ -643,6 +647,7 @@ export default function Home() {
     setBloodResults(null);
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
+    setUncertaintyNotes([]);
   }
 
   async function qaAsk(q: string) {
@@ -1056,6 +1061,19 @@ export default function Home() {
                     </div>
                   )}
                 </div>
+
+                {uncertaintyNotes.length > 0 && (
+                  <div className="rounded-2xl border border-[#E6CC89] bg-[#FFF8E8] px-7 py-7 sm:px-8">
+                    <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                      Answers needing clarification
+                    </div>
+                    <ul className="mt-4 flex list-disc flex-col gap-2 pl-5 text-[15px] leading-[1.6] text-[#4A5452]">
+                      {uncertaintyNotes.map((note, index) => (
+                        <li key={`${note}-${index}`}>{note}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
                   <div className="mb-4.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
