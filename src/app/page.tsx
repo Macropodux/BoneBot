@@ -466,7 +466,7 @@ const KNOWN_RISK_FACTORS = [
   "Rheumatoid arthritis",
   "Heavy alcohol use",
   "Low vitamin D",
-  "Certain other conditions, including thyroid disease, coeliac disease, and chronic kidney disease",
+  "Certain other conditions, including thyroid disease and chronic kidney disease",
 ] as const;
 
 type ChatMessage = { role: "bot" | "user"; text: string; kind?: "resources" };
