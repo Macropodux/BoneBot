@@ -1262,10 +1262,12 @@ export default function Home() {
           body.redBloodCellCount !== null ? `RBC ${body.redBloodCellCount}` : null,
         ].filter(Boolean);
         message = extracted.length
-          ? `I read: ${extracted.join(", ")}. That's shown as context only — no vitamin D or calcium value was found to include in your estimate.`
-          : "I could not identify a supported blood-result value in that image. You can still type your answer.";
+          ? `I read: ${extracted.join(", ")}, but no vitamin D or calcium value — those are the two used in your estimate. Try another image, or type the value in below.`
+          : "I could not identify a supported blood-result value in that image. Try another image, or type the value in below.";
         setBloodResults(body);
-        if (STEPS[stepIdx]?.key === "bloodResults") answer("Uploaded", "Blood-result image uploaded");
+        // Deliberately don't advance the flow here — stay on this question so
+        // the upload widget and the free-text field are both still there for
+        // her to try again, instead of silently moving on with nothing scored.
       } else {
         extractedResults = body;
       }
@@ -1290,6 +1292,10 @@ export default function Home() {
       ]
         .filter(Boolean)
         .join(", ");
+      const missing = [
+        extractedResults.vitaminD === null ? "vitamin D" : null,
+        extractedResults.calcium === null ? "calcium" : null,
+      ].filter(Boolean);
       setMessages((items) => [
         ...items,
         {
@@ -1297,6 +1303,9 @@ export default function Home() {
           text:
             `I read ${readText}.` +
             (contextParts.length ? ` Also ${contextParts.join(", ")} (context only, not scored).` : "") +
+            (missing.length
+              ? ` I didn't find a ${missing.join(" or ")} value — upload another image, or tap Edit below to add it.`
+              : "") +
             " Please confirm before I include this in your estimate.",
         },
       ]);
@@ -2024,7 +2033,7 @@ export default function Home() {
                 </form>
               )}
 
-              {inFlow && step.key === "bloodResults" && pendingBloodResults && !bloodEditMode && (
+              {chatReady && step?.key === "bloodResults" && pendingBloodResults && !bloodEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
                   <div className="text-sm font-semibold text-[#15181A]">Confirm blood values</div>
                   <div className="text-sm leading-[1.5] text-[#4A5452]">
@@ -2057,7 +2066,7 @@ export default function Home() {
                 </div>
               )}
 
-              {inFlow && step.key === "bloodResults" && pendingBloodResults && bloodEditMode && (
+              {chatReady && step?.key === "bloodResults" && pendingBloodResults && bloodEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
                   <div className="text-sm font-semibold text-[#15181A]">Edit blood values</div>
                   <div className="flex flex-wrap gap-3">
@@ -2191,7 +2200,7 @@ export default function Home() {
                 </div>
               )}
 
-              {inFlow && isActivityStep(step.key) && pendingActivityResult && !activityEditMode && (
+              {chatReady && step && isActivityStep(step.key) && pendingActivityResult && !activityEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
                   <div className="text-sm font-semibold text-[#15181A]">Confirm activity averages</div>
                   <div className="text-sm leading-[1.5] text-[#4A5452]">
@@ -2226,7 +2235,7 @@ export default function Home() {
                 </div>
               )}
 
-              {inFlow && isActivityStep(step.key) && pendingActivityResult && activityEditMode && (
+              {chatReady && step && isActivityStep(step.key) && pendingActivityResult && activityEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
                   <div className="text-sm font-semibold text-[#15181A]">Edit activity averages</div>
                   <div className="flex flex-wrap gap-3">
