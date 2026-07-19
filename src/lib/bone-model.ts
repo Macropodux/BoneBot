@@ -147,8 +147,12 @@ export function scoreBone(
   else if (estimate >= -1.0) category = "lower";
   else category = "uncertain";
 
+  // Show every factor she actually answered, including ~0 contributions --
+  // "you told us this and it didn't move your score" is itself informative,
+  // and hiding it read as an arbitrary cap. Still excludes anything NOT
+  // provided/answered (imputed defaults are never shown as "her" factors).
   const contributions = terms
-    .filter(([key, , value]) => Math.abs(value) > 1e-3 && (!provided || provided.has(key)))
+    .filter(([key]) => !provided || provided.has(key))
     .map(([, factor, contribution]): FactorContribution => ({
       factor,
       contribution,

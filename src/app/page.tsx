@@ -29,7 +29,7 @@ const ACCENT_HOVER = "#0A5A50";
 const ACCENT_TINT = "#E4F0ED";
 const FRACTURE = "#B0442F";
 
-type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "bloodResults" | "weight" | "activity" | "secondaryCondition";
+type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "smoke" | "steroids" | "bloodResults" | "weight" | "activity" | "secondaryCondition";
 
 type Step = { key: StepKey; q: string; options: string[] };
 
@@ -61,7 +61,6 @@ const STEPS: Step[] = [
   { key: "dxaYear", q: "What year was that scan performed?", options: [] },
   { key: "menopause", q: "At what age did you reach menopause?", options: [] },
   { key: "fracture", q: "Have you broken a bone since age 50, even from a minor fall or bump?", options: [] },
-  { key: "parent", q: "Did either of your parents ever fracture a hip?", options: [] },
   { key: "smoke", q: "Do you currently smoke?", options: [] },
   { key: "steroids", q: "Have you ever taken corticosteroids (like prednisone) for 3 months or more?", options: [] },
   { key: "bloodResults", q: "If you have blood-test results, upload an image now, or tap Skip to continue without one.", options: [] },
@@ -91,7 +90,6 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   dxaYear: "",
   menopause: "40–45",
   fracture: "No",
-  parent: "Yes",
   smoke: "No",
   steroids: "No",
   bloodResults: "Skip",
@@ -100,15 +98,16 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   secondaryCondition: "No",
 };
 
-// Fields the 7-question flow never asks about — hormone therapy, rheumatoid
-// arthritis, and high alcohol intake aren't part of this flow, so they still
-// use the same illustrative population-average defaults as before (not
-// measurements). vitaminD/calcium (blood-result photo) and
+// Fields the 7-question flow never asks about — hormone therapy, parental hip
+// fracture, rheumatoid arthritis, and high alcohol intake aren't part of this
+// flow, so they still use the same illustrative population-average defaults
+// as before (not measurements). vitaminD/calcium (blood-result photo) and
 // weightBearingActivity (activity chip, or watch/app screenshot) ARE
 // user-provided when given — see mapAnswersToFeatures() below.
 const FIELD_DEFAULTS = {
   onHormoneTherapy: Boolean(tScoreModel.imputationDefaults.onHormoneTherapy),
   weightBearingActivity: tScoreModel.imputationDefaults.activityLevel,
+  parentalHipFracture: Boolean(tScoreModel.imputationDefaults.parentalHipFracture),
   rheumatoidArthritis: Boolean(tScoreModel.imputationDefaults.rheumatoidArthritis),
   highAlcohol: Boolean(tScoreModel.imputationDefaults.highAlcohol),
   vitaminD: tScoreModel.imputationDefaults.vitaminD,
@@ -157,7 +156,6 @@ const MAX_IMAGES = 3;
 const SKIPPABLE: Partial<Record<StepKey, true>> = {
   menopause: true,
   fracture: true,
-  parent: true,
   smoke: true,
   steroids: true,
   bloodResults: true,
@@ -208,7 +206,6 @@ function mapAnswersToFeatures(
       ? Math.max(0, age - menopauseAge)
       : tScoreModel.imputationDefaults.yearsSinceMenopause,
     priorFragilityFracture: answerOrDefault(answers.fracture, tScoreModel.imputationDefaults.priorFragilityFracture),
-    parentalHipFracture: answerOrDefault(answers.parent, tScoreModel.imputationDefaults.parentalHipFracture),
     currentSmoker: answerOrDefault(answers.smoke, tScoreModel.imputationDefaults.currentSmoker),
     glucocorticoids: answerOrDefault(answers.steroids, tScoreModel.imputationDefaults.glucocorticoids),
     // BMI computed deterministically from the weight+height step (kg / m^2) —
@@ -226,7 +223,6 @@ function mapAnswersToFeatures(
   const provided: Array<keyof BoneFeatures> = ["age"];
   if (menopauseKnown) provided.push("yearsSinceMenopause");
   if (isYesNo(answers.fracture)) provided.push("priorFragilityFracture");
-  if (isYesNo(answers.parent)) provided.push("parentalHipFracture");
   if (isYesNo(answers.smoke)) provided.push("currentSmoker");
   if (isYesNo(answers.steroids)) provided.push("glucocorticoids");
   if (Number.isFinite(parsedBmi)) provided.push("bmi");
@@ -509,6 +505,9 @@ export default function Home() {
   const [implicationsExplanation, setImplicationsExplanation] = useState("");
   const [reportedDxa, setReportedDxa] = useState<{ score: number; year?: number } | null>(null);
   const [freeInput, setFreeInput] = useState("");
+  const [userName, setUserName] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [awaitingName, setAwaitingName] = useState(false);
   const [flowQuestionBusy, setFlowQuestionBusy] = useState(false);
   const [bloodResults, setBloodResults] = useState<UploadedBloodResults | null>(null);
   const [uploadBusy, setUploadBusy] = useState(false);
@@ -579,10 +578,32 @@ export default function Home() {
     }, delay);
   }
 
+  // Asks her name first, before the real question flow starts (kept
+  // deliberately outside the STEPS state machine -- inserting a step there
+  // would mean renumbering every hardcoded stepIdx branch below). "Try an
+  // example patient" skips this and goes straight to a canned result, so it
+  // never touches userName.
   function start() {
     setScreen("chat");
-    setStepIdx(0);
     setMessages([]);
+    setUserName("");
+    setNameInput("");
+    setAwaitingName(true);
+    botSay("Hi, I'm BoneBot 👋 Before we start — what should I call you?");
+  }
+
+  function submitName() {
+    const name = nameInput.trim();
+    if (!name) return;
+    setMessages((m) => [...m, { role: "user", text: name }]);
+    setUserName(name);
+    setNameInput("");
+    setAwaitingName(false);
+    beginQuestions(name);
+  }
+
+  function beginQuestions(name: string) {
+    setStepIdx(0);
     setAnswers({});
     setReportedDxa(null);
     setFreeInput("");
@@ -606,8 +627,9 @@ export default function Home() {
     setHeightFtInput("");
     setHeightInInput("");
     setBmiError("");
+    const greetingName = name ? `, ${name}` : "";
     botSay(
-      "Hi, I'm BoneBot. I’ll ask four quick questions to check your bone-health risk. If they suggest a closer look could help, I’ll ask a few more. A validated model works out your result — I only explain what it means. This is a screening check, not a diagnosis."
+      `Nice to meet you${greetingName}. I'll ask four quick questions to get a sense of your bone-health risk — if they suggest a closer look could help, I'll ask a few more after that. Just so it's clear: the model does the maths, I only explain what it means. This is a screening check, not a diagnosis.`
     );
     window.setTimeout(() => botSay(STEPS[0].q), 1400);
   }
@@ -728,10 +750,11 @@ export default function Home() {
       // input) still gets asked in the full questionnaire.
       const enteredAge = Number(opt);
       if (Number.isFinite(enteredAge) && enteredAge >= MENOPAUSE_CERTAIN_AGE) {
+        // Menopausal status is inferred silently from age here (not asked,
+        // not shown as a bot message) and just logged into answers.
         setAnswers({ ...nextAnswers, menopauseStatus: "Yes" });
         setStepIdx(3);
-        botSay("At your age, I’ll take it that your periods have stopped for good.");
-        window.setTimeout(() => botSay(STEPS[3].q), 900);
+        botSay(STEPS[3].q);
         return;
       }
     }
@@ -818,7 +841,6 @@ export default function Home() {
     }
     if (/(not sure|don't know|do not know)/.test(lower)) return "Not sure";
     if (key === "fracture" && /\b(broke|broken|fracture)\b/.test(lower)) return "Yes";
-    if (key === "parent" && /\b(mother|father|mum|dad|parent)\b/.test(lower) && /\b(did|had|yes)\b/.test(lower)) return "Yes";
     if (/\b(no|nope|never)\b/.test(lower)) return "No";
     if (/\b(don't|do not|didn't|did not)\b/.test(lower)) return "No";
     if (/\b(yes|yeah|yep|i do|i have)\b/.test(lower)) return "Yes";
@@ -1194,12 +1216,13 @@ export default function Home() {
     const lines = result
       ? [
           `BoneBot screening result: ${catMeta.label}`,
+          ...(userName ? [`For ${userName}`] : []),
           "",
           `Estimated T-score: ${result.estimatedTScore} (likely ${result.tScoreRange[0]} to ${result.tScoreRange[1]})`,
           `Category: ${catMeta.label} (${T_SCORE_BANDS[{ low: 0, moderate: 1, elevated: 2 }[cat]].range})`,
           "",
           "What drove this result:",
-          ...result.contributions.slice(0, 5).map((f) => {
+          ...result.contributions.map((f) => {
             const detail = features ? factorDetail(f.factor, features) : { value: "" };
             const valueNote = detail.value ? ` (${detail.value})` : "";
             return `  ${f.contribution > 0 ? "+" : ""}${f.contribution.toFixed(1)}  ${f.factor}${valueNote}`;
@@ -1277,6 +1300,17 @@ export default function Home() {
     setEmailAddress("");
     setEmailSendState("idle");
     setEmailSendError("");
+    setUserName("");
+    setNameInput("");
+    setAwaitingName(false);
+  }
+
+  // Wordmark click target from chat/results screens. Mid-chat it's the same
+  // "are you sure" gate as the Start over button; from a finished results
+  // screen there's nothing to lose, so it goes straight back.
+  function goToLanding() {
+    if (screen === "chat" && messages.length > 1 && !window.confirm("Start over? This clears your answers so far.")) return;
+    restart();
   }
 
   async function qaAsk(q: string) {
@@ -1317,8 +1351,12 @@ export default function Home() {
 
   const step = STEPS[stepIdx];
   const inFlow = screen === "chat" && step && !typing && messages.length > 1;
-  const progressPct = Math.round((stepIdx / STEPS.length) * 100);
-  const progressLabel = stepIdx < STEPS.length ? `Question ${Math.min(stepIdx + 1, STEPS.length)} of ${STEPS.length}` : "Analyzing…";
+  const progressPct = awaitingName ? 0 : Math.round((stepIdx / STEPS.length) * 100);
+  const progressLabel = awaitingName
+    ? "Getting started"
+    : stepIdx < STEPS.length
+      ? `Question ${Math.min(stepIdx + 1, STEPS.length)} of ${STEPS.length}`
+      : "Analyzing…";
 
   const cat = result ? CATEGORY_MAP[result.category] : "low";
   const catMeta = CAT_META[cat];
@@ -1349,7 +1387,7 @@ export default function Home() {
               Bone-health screening for postmenopausal women
             </div>
             <h1 className="max-w-[880px] text-balance font-[family-name:var(--font-heading)] text-[2.85rem] font-bold leading-[1.02] tracking-[-0.035em] text-[#12211E] sm:text-6xl lg:text-[4.6rem]">
-              Know your bone risk
+              Know your bone fracture risk
               <br className="hidden sm:block" /> before it{" "}
               <span className="relative whitespace-nowrap" style={{ color: FRACTURE }}>
                 breaks
@@ -1364,6 +1402,10 @@ export default function Home() {
             <p className="mt-7 max-w-[600px] text-pretty text-lg leading-[1.6] text-[#41504C] sm:text-[19px]">
               A 3-minute conversational screening. The risk model is trained on NHANES population data. The AI
               explains your result; it never decides it.
+            </p>
+            <p className="mt-3 max-w-[600px] text-pretty text-[15px] leading-[1.6]" style={{ color: ACCENT }}>
+              Most bone-health research and tools were built around men&apos;s bodies. This one starts from yours —
+              tuned for what changes after menopause.
             </p>
             <div className="mt-9 flex flex-wrap justify-center gap-3.5">
               <button
@@ -1406,9 +1448,13 @@ export default function Home() {
       {screen === "chat" && (
         <div className="flex min-h-0 flex-1 flex-col">
           <header className="flex items-center gap-6 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
-            <div className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em]">
+            <button
+              type="button"
+              onClick={goToLanding}
+              className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+            >
               Bone<span style={{ color: ACCENT }}>Bot</span>
-            </div>
+            </button>
             <div className="hidden h-1.5 max-w-[320px] flex-1 overflow-hidden rounded-full bg-[#E3E9E7] sm:block">
               <div
                 className="h-full rounded-full transition-[width] duration-400"
@@ -1460,6 +1506,33 @@ export default function Home() {
           </div>
           <div className="border-t border-[#E3E9E7] bg-white px-6 py-5">
             <div className="mx-auto flex max-w-[680px] flex-col gap-3">
+
+              {awaitingName && (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    submitName();
+                  }}
+                  className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E7C6E]"
+                >
+                  <input
+                    autoFocus
+                    value={nameInput}
+                    onChange={(event) => setNameInput(event.target.value)}
+                    placeholder="Your first name (or a nickname)"
+                    aria-label="What should BoneBot call you?"
+                    className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!nameInput.trim()}
+                    className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
+                    style={{ backgroundColor: ACCENT }}
+                  >
+                    Continue
+                  </button>
+                </form>
+              )}
 
               {inFlow && step.key === "bloodResults" && pendingBloodResults && !bloodEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
@@ -1771,34 +1844,45 @@ export default function Home() {
 
               {inFlow && !pendingBloodResults && step.key !== "weight" && step.key !== "activity" && (
                 <div className="flex flex-col gap-2.5">
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      void submitFreeInput();
-                    }}
-                    className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E7C6E]"
-                  >
-                    <input
-                      value={freeInput}
-                      onChange={(event) => setFreeInput(event.target.value)}
-                      placeholder={
-                        step.options.length > 0
-                          ? "Or type your answer here…"
-                          : "Type your answer, or ask a bone-health question"
-                      }
-                      aria-label="Answer or ask a bone-health question"
-                      disabled={flowQuestionBusy || extracting}
-                      className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
-                    />
-                    <button
-                      type="submit"
-                      disabled={flowQuestionBusy || extracting || !freeInput.trim()}
-                      className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
-                      style={{ backgroundColor: ACCENT }}
+                  {/* Questions with chip options (Yes/No, etc.) are answered
+                      by tapping a chip only — free typing is reserved for
+                      questions that have no chips to pick from. */}
+                  {step.options.length === 0 && (
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void submitFreeInput();
+                      }}
+                      className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E7C6E]"
                     >
-                      Send
-                    </button>
-                  </form>
+                      <input
+                        // Age has no valid non-numeric answer (unlike dxaScore/
+                        // dxaYear/menopause, which also accept a typed "not
+                        // sure"/"unknown"), so it's the one free-text step
+                        // that can safely be restricted to digits only.
+                        type={step.key === "age" ? "number" : "text"}
+                        inputMode={step.key === "age" ? "numeric" : undefined}
+                        value={freeInput}
+                        onChange={(event) => setFreeInput(event.target.value)}
+                        placeholder={
+                          step.key === "age"
+                            ? "Type your age in years"
+                            : "Type your answer, or ask a bone-health question"
+                        }
+                        aria-label="Answer or ask a bone-health question"
+                        disabled={flowQuestionBusy || extracting}
+                        className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-50"
+                      />
+                      <button
+                        type="submit"
+                        disabled={flowQuestionBusy || extracting || !freeInput.trim()}
+                        className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
+                        style={{ backgroundColor: ACCENT }}
+                      >
+                        Send
+                      </button>
+                    </form>
+                  )}
 
                   {SKIPPABLE[step.key] && step.key !== "bloodResults" && (
                     <button
@@ -1904,9 +1988,13 @@ export default function Home() {
       {screen === "results" && !result && (
         <div className="flex min-h-0 flex-1 flex-col">
           <header className="flex items-center gap-6 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
-            <div className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em]">
+            <button
+              type="button"
+              onClick={goToLanding}
+              className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+            >
               Bone<span style={{ color: ACCENT }}>Bot</span>
-            </div>
+            </button>
             <div className="text-[13px] font-medium text-[#5A6462]">Initial screening result</div>
             <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
               Screening flag, not a diagnosis
@@ -1995,9 +2083,13 @@ export default function Home() {
       {screen === "results" && result && (
         <div className="flex min-h-0 flex-1 flex-col">
           <header className="flex items-center gap-6 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
-            <div className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em]">
+            <button
+              type="button"
+              onClick={goToLanding}
+              className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+            >
               Bone<span style={{ color: ACCENT }}>Bot</span>
-            </div>
+            </button>
             <div className="hidden text-[13px] font-medium text-[#5A6462] sm:block">Screening complete</div>
             <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
               Screening flag, not a diagnosis
@@ -2173,8 +2265,8 @@ export default function Home() {
                     })()}
                   </div>
                   <div className="mt-5 text-[13px] leading-[1.5] text-[#5A6462]">
-                    Bars show how much each answer moved your estimated T-score. Only factors that measurably
-                    moved it are listed — anything you skipped uses a population average and isn&apos;t shown here.
+                    Bars show how much each answer moved your estimated T-score, including answers that didn&apos;t
+                    move it at all. Anything you skipped uses a population average and isn&apos;t shown here.
                     Weights follow NHANES-derived clinical risk factors.
                   </div>
                 </div>
