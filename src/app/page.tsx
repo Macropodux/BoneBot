@@ -2533,18 +2533,22 @@ export default function Home() {
       {screen === "chat" && flowMode === "classic" && (
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#FAF7F2]">
           <FloatingBones />
-          <header className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12">
+          <header
+            className="sticky top-0 z-20 flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 sm:px-12"
+            style={{ borderBottom: `1px solid ${LANDING_BORDER}`, backgroundColor: LANDING_BG }}
+          >
             <button
               type="button"
               onClick={goToLanding}
-              className="font-[family-name:var(--font-fraunces)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+              className={`${LANDING_HEADING_FONT} text-[19px] font-bold tracking-[-0.02em] cursor-pointer`}
+              style={{ color: LANDING_INK }}
             >
-              Bone<span style={{ color: ACCENT }}>Bot</span>
+              Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
             </button>
             <div className="hidden h-1.5 max-w-[320px] flex-1 overflow-hidden rounded-full bg-[#E3E9E7] sm:block">
               <div
                 className="h-full rounded-full transition-[width] duration-400"
-                style={{ backgroundColor: ACCENT, width: `${progressPct}%` }}
+                style={{ backgroundColor: LANDING_ACCENT, width: `${progressPct}%` }}
               />
             </div>
             <div className="text-[13px] font-medium text-[#5A6462]">{progressLabel}</div>
@@ -3194,13 +3198,17 @@ export default function Home() {
       {screen === "chat" && flowMode === "conversation" && (
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#FAF7F2]">
           <FloatingBones />
-          <header className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12">
+          <header
+            className="sticky top-0 z-20 flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 sm:px-12"
+            style={{ borderBottom: `1px solid ${LANDING_BORDER}`, backgroundColor: LANDING_BG }}
+          >
             <button
               type="button"
               onClick={goToLanding}
-              className="font-[family-name:var(--font-fraunces)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+              className={`${LANDING_HEADING_FONT} text-[19px] font-bold tracking-[-0.02em] cursor-pointer`}
+              style={{ color: LANDING_INK }}
             >
-              Bone<span style={{ color: ACCENT }}>Bot</span>
+              Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
             </button>
             <div className="text-[13px] font-medium text-[#5A6462]">AI-led conversation</div>
             <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -3508,14 +3516,16 @@ export default function Home() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: EASE_OUT }}
-              className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12"
+              className="sticky top-0 z-20 flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 sm:px-12"
+              style={{ borderBottom: `1px solid ${LANDING_BORDER}`, backgroundColor: LANDING_BG }}
             >
               <button
                 type="button"
                 onClick={goToLanding}
-                className="font-[family-name:var(--font-fraunces)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+                className={`${LANDING_HEADING_FONT} text-[19px] font-bold tracking-[-0.02em] cursor-pointer`}
+                style={{ color: LANDING_INK }}
               >
-                Bone<span style={{ color: ACCENT }}>Bot</span>
+                Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
               </button>
               <div className="text-[13px] font-medium text-[#5A6462]">Initial screening result</div>
               <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -3626,14 +3636,16 @@ export default function Home() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: EASE_OUT }}
-              className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12"
+              className="sticky top-0 z-20 flex flex-wrap items-center gap-x-6 gap-y-2 px-6 py-4 sm:px-12"
+              style={{ borderBottom: `1px solid ${LANDING_BORDER}`, backgroundColor: LANDING_BG }}
             >
               <button
                 type="button"
                 onClick={goToLanding}
-                className="font-[family-name:var(--font-fraunces)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+                className={`${LANDING_HEADING_FONT} text-[19px] font-bold tracking-[-0.02em] cursor-pointer`}
+                style={{ color: LANDING_INK }}
               >
-                Bone<span style={{ color: ACCENT }}>Bot</span>
+                Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
               </button>
               <div className="hidden text-[13px] font-medium text-[#5A6462] sm:block">Screening complete</div>
               <div className="ml-auto flex flex-wrap items-center gap-2">
