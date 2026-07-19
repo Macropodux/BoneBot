@@ -22,6 +22,7 @@ export type FieldStage = "triage" | "deep";
 export type FieldInputType = "text" | "boolean" | "number" | "choice" | "image";
 
 export type FieldKey =
+  | "name"
   | "assignedFemaleAtBirth"
   | "age"
   | "menopauseStatus"
@@ -92,6 +93,17 @@ function parseBoolean(raw: string): ParseResult {
   if (/^(yes|y|true|yeah|yep)$/.test(t)) return { ok: true, value: true };
   if (/^(no|n|false|nope|never)$/.test(t)) return { ok: true, value: false };
   return { ok: false };
+}
+
+// The extraction LLM is instructed to return ONLY the preferred name; this
+// is a guard, not the extractor. A skip word means "no name". Anything
+// longer than a plausible name (or empty) is rejected so the flow re-asks.
+function parseName(raw: string): ParseResult {
+  const t = raw.trim();
+  if (!t) return { ok: false };
+  if (SKIP_RE.test(t.toLowerCase())) return { ok: true, value: null };
+  if (t.length > 40) return { ok: false };
+  return { ok: true, value: t };
 }
 
 function parseSkippableBoolean(raw: string): ParseResult {
@@ -171,6 +183,16 @@ function parseActivity(max: number) {
 export const FIELDS: FieldDef[] = [
   // ---------------- TRIAGE (ordered) ----------------
   // Feeds scoreTriage() + the eligibility gates. Always asked in this order.
+  {
+    key: "name",
+    question: "What should I call you?",
+    inputType: "text",
+    stage: "triage",
+    required: true,
+    skippable: true,
+    hint: "Just her preferred first name or nickname — e.g. 'Francesca' — never the whole sentence.",
+    parse: parseName,
+  },
   {
     key: "assignedFemaleAtBirth",
     question: "Were you assigned female at birth?",
@@ -417,6 +439,8 @@ export type Decision =
 // THE deterministic core: gates, the triage decision, and next-question
 // selection. No LLM call happens anywhere in this function — see AGENTS.md.
 export function decide(collected: Collected): Decision {
+  if (collected.name === undefined) return { kind: "ask", field: getField("name")! };
+
   const assignedFemaleAtBirth = collected.assignedFemaleAtBirth;
   if (assignedFemaleAtBirth === undefined) return { kind: "ask", field: getField("assignedFemaleAtBirth")! };
   if (assignedFemaleAtBirth === false) return { kind: "gateExit", message: SEX_INELIGIBLE_MESSAGE };

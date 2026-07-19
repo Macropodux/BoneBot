@@ -172,7 +172,11 @@ async function runExtraction(
         f.key === "averageDailyActiveMinutes"
           ? ` [a single whole number of minutes/day — e.g. "about 28 minutes" -> 28, "half an hour" -> 30, "an hour" -> 60]`
           : "";
-      return `- ${f.key}: "${f.question}"${optsText}${hint}${currentMark}${answeredMark}${menoMark}${heightMark}${weightMark}${stepsMark}${minutesMark}`;
+      const nameMark =
+        f.key === "name"
+          ? ` [extract ONLY her preferred first name or nickname — e.g. from "yeah so I'm Francesca and I'm 26" extract "Francesca" — never the whole sentence, never extra words, never a number]`
+          : "";
+      return `- ${f.key}: "${f.question}"${optsText}${hint}${currentMark}${answeredMark}${menoMark}${heightMark}${weightMark}${stepsMark}${minutesMark}${nameMark}`;
     })
     .join("\n");
 
@@ -293,6 +297,7 @@ async function runPhrase(field: FieldDef, lastUserText: string, isFirstTurn: boo
 // never validation. Keyed as a Record over the full FieldKey union so
 // forgetting a field is a compile error, not a silent "undefined: value".
 const FIELD_LABELS: Record<FieldKey, string> = {
+  name: "preferred name",
   assignedFemaleAtBirth: "assigned female at birth",
   age: "age",
   menopauseStatus: "periods stopped for good",
