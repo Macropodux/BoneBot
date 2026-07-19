@@ -38,6 +38,7 @@ import type { EvidenceSource } from "@/lib/bone-evidence";
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
 import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-parameters";
 import FloatingBones from "./FloatingBones";
+import FemurGauge from "./FemurGauge";
 import { THEME, HEADING_FONT, BODY_FONT } from "@/lib/editorial-theme";
 
 // "Vital Bloom" brand — Emre, 2026-07-19: magenta/violet rebrand. Being
@@ -2107,6 +2108,7 @@ export default function Home() {
 
     const html = `<!DOCTYPE html>
 <html>
+  <head><title>BoneBot screening result</title></head>
   <body style="margin:0;padding:0;background-color:#F5F7F6;font-family:Arial,Helvetica,sans-serif;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F5F7F6;padding:32px 16px;">
       <tr>
@@ -2188,6 +2190,40 @@ export default function Home() {
       setEmailSendError("Couldn't send that email right now.");
       setEmailSendState("error");
     }
+  }
+
+  // "Save as PDF" — prints the SAME document the email path already builds
+  // (buildResultEmail().html) from a hidden iframe, via the browser's own
+  // print-to-PDF. No new dependency, no fight with the app's overflow-hidden
+  // layout, and the saved copy always matches the emailed one.
+  function saveResultPdf() {
+    if (!result) return;
+    const { html } = buildResultEmail();
+    const frame = document.createElement("iframe");
+    frame.style.position = "fixed";
+    frame.style.right = "0";
+    frame.style.bottom = "0";
+    frame.style.width = "0";
+    frame.style.height = "0";
+    frame.style.border = "0";
+    frame.setAttribute("aria-hidden", "true");
+    document.body.appendChild(frame);
+    const doc = frame.contentDocument;
+    if (!doc) {
+      frame.remove();
+      return;
+    }
+    doc.open();
+    doc.write(html);
+    doc.close();
+    // Give the iframe a beat to lay out before printing; leave it attached
+    // until well after the dialog closes (print is async and detaching too
+    // early cancels it in some browsers).
+    window.setTimeout(() => {
+      frame.contentWindow?.focus();
+      frame.contentWindow?.print();
+      window.setTimeout(() => frame.remove(), 60_000);
+    }, 150);
   }
 
   function restart() {
@@ -3746,6 +3782,15 @@ export default function Home() {
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
                   transition={{ duration: 0.15 }}
+                  onClick={saveResultPdf}
+                  className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                >
+                  <span aria-hidden>⬇️</span> Save as PDF
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
                   onClick={restart}
                   className={`${LANDING_HEADING_FONT} inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
                   style={{ backgroundColor: LANDING_ACCENT }}
@@ -3798,6 +3843,19 @@ export default function Home() {
                             style={{ color: catMeta.color, backgroundColor: catMeta.bg }}
                           >
                             {catMeta.chip}
+                          </motion.div>
+                          <motion.div
+                            initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.45, ease: EASE_OUT, delay: 0.3 }}
+                            className="ml-auto"
+                          >
+                            <FemurGauge
+                              tScore={result.estimatedTScore}
+                              color={catMeta.color}
+                              bandLabel={catMeta.label}
+                              className="h-[104px] w-auto"
+                            />
                           </motion.div>
                         </div>
                         <Markdown text={summaryExplanation || catMeta.desc} className="text-pretty text-base leading-[1.6] text-[#4A5452]" />
