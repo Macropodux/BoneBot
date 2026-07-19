@@ -29,7 +29,7 @@ const ACCENT_HOVER = "#0A5A50";
 const ACCENT_TINT = "#E4F0ED";
 const FRACTURE = "#B0442F";
 
-type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "parent" | "smoke" | "steroids" | "bloodResults" | "weight" | "activity" | "secondaryCondition";
+type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "smoke" | "steroids" | "bloodResults" | "weight" | "activity" | "secondaryCondition";
 
 type Step = { key: StepKey; q: string; options: string[] };
 
@@ -61,7 +61,6 @@ const STEPS: Step[] = [
   { key: "dxaYear", q: "What year was that scan performed?", options: [] },
   { key: "menopause", q: "At what age did you reach menopause?", options: [] },
   { key: "fracture", q: "Have you broken a bone since age 50, even from a minor fall or bump?", options: [] },
-  { key: "parent", q: "Did either of your parents ever fracture a hip?", options: [] },
   { key: "smoke", q: "Do you currently smoke?", options: [] },
   { key: "steroids", q: "Have you ever taken corticosteroids (like prednisone) for 3 months or more?", options: [] },
   { key: "bloodResults", q: "If you have blood-test results, upload an image now, or tap Skip to continue without one.", options: [] },
@@ -91,7 +90,6 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   dxaYear: "",
   menopause: "40–45",
   fracture: "No",
-  parent: "Yes",
   smoke: "No",
   steroids: "No",
   bloodResults: "Skip",
@@ -157,7 +155,6 @@ const MAX_IMAGES = 3;
 const SKIPPABLE: Partial<Record<StepKey, true>> = {
   menopause: true,
   fracture: true,
-  parent: true,
   smoke: true,
   steroids: true,
   bloodResults: true,
@@ -208,7 +205,6 @@ function mapAnswersToFeatures(
       ? Math.max(0, age - menopauseAge)
       : tScoreModel.imputationDefaults.yearsSinceMenopause,
     priorFragilityFracture: answerOrDefault(answers.fracture, tScoreModel.imputationDefaults.priorFragilityFracture),
-    parentalHipFracture: answerOrDefault(answers.parent, tScoreModel.imputationDefaults.parentalHipFracture),
     currentSmoker: answerOrDefault(answers.smoke, tScoreModel.imputationDefaults.currentSmoker),
     glucocorticoids: answerOrDefault(answers.steroids, tScoreModel.imputationDefaults.glucocorticoids),
     // BMI computed deterministically from the weight+height step (kg / m^2) —
@@ -226,7 +222,6 @@ function mapAnswersToFeatures(
   const provided: Array<keyof BoneFeatures> = ["age"];
   if (menopauseKnown) provided.push("yearsSinceMenopause");
   if (isYesNo(answers.fracture)) provided.push("priorFragilityFracture");
-  if (isYesNo(answers.parent)) provided.push("parentalHipFracture");
   if (isYesNo(answers.smoke)) provided.push("currentSmoker");
   if (isYesNo(answers.steroids)) provided.push("glucocorticoids");
   if (Number.isFinite(parsedBmi)) provided.push("bmi");
@@ -335,8 +330,6 @@ function factorDetail(factorLabel: string, f: BoneFeatures): { value: string; re
       return { value: `${activityLabel(f.weightBearingActivity)} activity`, reference: "higher is more protective" };
     case "Current smoker":
       return { value: f.currentSmoker ? "Yes" : "No" };
-    case "Parental hip fracture":
-      return { value: f.parentalHipFracture ? "Yes" : "No" };
     case "Glucocorticoid use":
       return { value: f.glucocorticoids ? "Yes, 3+ months" : "None reported" };
     case "Rheumatoid arthritis":
@@ -818,7 +811,6 @@ export default function Home() {
     }
     if (/(not sure|don't know|do not know)/.test(lower)) return "Not sure";
     if (key === "fracture" && /\b(broke|broken|fracture)\b/.test(lower)) return "Yes";
-    if (key === "parent" && /\b(mother|father|mum|dad|parent)\b/.test(lower) && /\b(did|had|yes)\b/.test(lower)) return "Yes";
     if (/\b(no|nope|never)\b/.test(lower)) return "No";
     if (/\b(don't|do not|didn't|did not)\b/.test(lower)) return "No";
     if (/\b(yes|yeah|yep|i do|i have)\b/.test(lower)) return "Yes";

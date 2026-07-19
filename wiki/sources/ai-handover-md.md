@@ -60,8 +60,8 @@ current smoker, prior fragility fracture, long-term steroids, high alcohol
 intake (3+/day), years since menopause.
 
 **Planned additions — only when included in the trained model:**
-weight-bearing activity, hormone replacement therapy, parental hip fracture,
-rheumatoid arthritis. Explicit rule: never collect a factor and silently use
+weight-bearing activity, hormone replacement therapy, and rheumatoid arthritis.
+Explicit rule: never collect a factor and silently use
 it in a nine-feature model — if collected for future use, label it as such
 and don't let it affect the v1 score.
 

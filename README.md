@@ -27,8 +27,8 @@ needs a scan earlier, from data women already have.
    `docs/TRIAGE_THRESHOLD_AUDIT.md` for the held-out audit.
 2. **T-score estimate** — a fuller model (age, BMI, years since menopause,
    activity, prior fragility fracture, glucocorticoids, smoking, alcohol,
-   vitamin D, calcium, rheumatoid arthritis, hormone therapy, parental hip
-   fracture) produces an estimated T-score with an uncertainty range and
+   vitamin D, calcium, rheumatoid arthritis, and hormone therapy) produces an
+   estimated T-score with an uncertainty range and
    per-factor contributions in T-score units.
 3. **Explanation** — the LLM (via the Vercel AI SDK) explains the model's
    output. It never sets or adjusts the risk itself. Ambiguous answers are

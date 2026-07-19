@@ -13,7 +13,6 @@ export type EvidenceTopic =
   | "bmi"
   | "weight-bearing-activity"
   | "smoking"
-  | "parental-hip-fracture"
   | "glucocorticoids"
   | "rheumatoid-arthritis"
   | "alcohol"
@@ -322,14 +321,6 @@ export const EVIDENCE_CARDS: EvidenceCard[] = [
     sourceIds: ["nhs-dxa", "nogg-2024"],
   },
   {
-    id: "parental-hip-fracture",
-    topic: "parental-hip-fracture",
-    approvedWording:
-      "A family history of hip fracture is one of the risk factors clinicians may take into account when assessing fracture risk.",
-    limits: "Do not say that a family history determines a person's bone density or future fracture.",
-    sourceIds: ["nhs-dxa", "nogg-2024"],
-  },
-  {
     id: "glucocorticoids",
     topic: "glucocorticoids",
     approvedWording:
@@ -440,7 +431,6 @@ const FACTOR_TO_CARD: Record<string, string> = {
   "Body mass index": "bmi",
   "Weight-bearing activity": "weight-bearing-activity",
   "Current smoker": "smoking",
-  "Parental hip fracture": "parental-hip-fracture",
   "Glucocorticoid use": "glucocorticoids",
   "Rheumatoid arthritis": "rheumatoid-arthritis",
   "High alcohol intake": "alcohol",
@@ -463,7 +453,6 @@ const QUESTION_EVIDENCE: [string, RegExp][] = [
   ["bmi", /\b(bmi|weight|body mass)\b/i],
   ["weight-bearing-activity", /\b(exercise|activity|active|weight[- ]bearing|strength|resistance)\b/i],
   ["smoking", /\b(smok|cigarette|vape)\b/i],
-  ["parental-hip-fracture", /\b(parent|family|hip fracture)\b/i],
   ["glucocorticoids", /\b(steroid|prednisone|glucocorticoid)\b/i],
   ["rheumatoid-arthritis", /\b(rheumatoid|arthritis|\bra\b)\b/i],
   ["alcohol", /\b(alcohol|drink)\b/i],

@@ -15,7 +15,6 @@ export type BoneFeatures = {
   bmi: number;
   weightBearingActivity: number;
   currentSmoker: boolean;
-  parentalHipFracture: boolean;
   glucocorticoids: boolean;
   rheumatoidArthritis: boolean;
   highAlcohol: boolean;
@@ -125,7 +124,6 @@ export function scoreBone(
     ["bmi", "Body mass index", c.bmi * features.bmi, "bmi"],
     ["weightBearingActivity", "Weight-bearing activity", c.activityLevel * features.weightBearingActivity, "activityLevel"],
     ["currentSmoker", "Current smoker", c.currentSmoker * binary(features.currentSmoker), "currentSmoker"],
-    ["parentalHipFracture", "Parental hip fracture", c.parentalHipFracture * binary(features.parentalHipFracture), "parentalHipFracture"],
     ["glucocorticoids", "Glucocorticoid use", c.glucocorticoids * binary(features.glucocorticoids), "glucocorticoids"],
     ["rheumatoidArthritis", "Rheumatoid arthritis", c.rheumatoidArthritis * binary(features.rheumatoidArthritis), "rheumatoidArthritis"],
     ["highAlcohol", "High alcohol intake", c.highAlcohol * binary(features.highAlcohol), "highAlcohol"],

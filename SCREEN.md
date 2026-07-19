@@ -121,7 +121,7 @@ Then BoneBot **confirms everything** and estimates.
 |---|---|
 | Vitamin D, calcium — blood test | Years since menopause |
 | Steps / active-minutes — watch | Prior fragility fracture |
-| | Hormone therapy · smoking · parental hip fracture |
+| | Hormone therapy · smoking |
 | | Age · BMI (spoken or typed) |
 
 ### The model's features (what actually moves the number)
@@ -135,7 +135,6 @@ Mapped 1:1 to `BoneFeatures` in `bone-model.ts`:
 | BMI | `bmi` | protective to a point |
 | On hormone therapy? | `onHormoneTherapy` | protective |
 | Prior fragility fracture? | `priorFragilityFracture` | strong known risk factor |
-| Parent broke a hip? | `parentalHipFracture` | known risk factor |
 | Current smoker? | `currentSmoker` | risk factor |
 | Weight-bearing activity | `weightBearingActivity` | 0–1, from the watch photo |
 | Long-term steroids? | `glucocorticoids` | **top drug cause** of bone loss — steroids suppress bone formation (FRAX variable) |

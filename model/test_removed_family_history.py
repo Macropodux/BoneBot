@@ -1,16 +1,20 @@
+import base64
 import pathlib
 import subprocess
 import unittest
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-BANNED = (
-    "parental" + "HipFracture",
-    "parental " + "hip fracture",
-    "parental-" + "hip-fracture",
-    "parents ever " + "fracture a hip",
-    "parents had " + "a hip fracture",
-    "parent broke " + "a hip",
+BANNED = tuple(
+    base64.b64decode(value).decode("utf-8")
+    for value in (
+        "cGFyZW50YWxIaXBGcmFjdHVyZQ==",
+        "cGFyZW50YWwgaGlwIGZyYWN0dXJl",
+        "cGFyZW50YWwtaGlwLWZyYWN0dXJl",
+        "cGFyZW50cyBldmVyIGZyYWN0dXJlIGEgaGlw",
+        "cGFyZW50cyBoYWQgYSBoaXAgZnJhY3R1cmU=",
+        "cGFyZW50IGJyb2tlIGEgaGlw",
+    )
 )
 SKIP = {pathlib.Path(__file__).relative_to(ROOT).as_posix()}
 
