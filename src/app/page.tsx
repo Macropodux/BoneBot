@@ -819,8 +819,6 @@ export default function Home() {
   const [reportedDxa, setReportedDxa] = useState<{ score: number; year?: number } | null>(null);
   const [freeInput, setFreeInput] = useState("");
   const [userName, setUserName] = useState("");
-  const [nameInput, setNameInput] = useState("");
-  const [awaitingName, setAwaitingName] = useState(false);
   const [flowQuestionBusy, setFlowQuestionBusy] = useState(false);
   const [bloodResults, setBloodResults] = useState<UploadedBloodResults | null>(null);
   const [uploadBusy, setUploadBusy] = useState(false);
@@ -921,12 +919,6 @@ export default function Home() {
   const convChatRef = useRef<HTMLDivElement>(null);
   const convInputRef = useRef<HTMLInputElement>(null);
   const speechRecognitionRef = useRef<SpeechRecognitionInstance | null>(null);
-  // Synchronous re-entrancy lock: setAwaitingName(false) is async, so a fast
-  // double name-submit (Enter + click within the same tick) would otherwise run
-  // beginQuestions() twice and print the first question ("assigned female at
-  // birth?") twice. A ref flips immediately, so the second call bails.
-  const questionsStartedRef = useRef(false);
-
   useEffect(() => {
     // stepIdx (not just messages/typing) because the chip row now renders
     // inside this scrollable pane, right under the last bot message — it
@@ -975,32 +967,11 @@ export default function Home() {
     }, delay);
   }
 
-  // Asks her name first, before the real question flow starts (kept
-  // deliberately outside the STEPS state machine -- inserting a step there
-  // would mean renumbering every hardcoded stepIdx branch below). "Try an
-  // example patient" skips this and goes straight to a canned result, so it
-  // never touches userName.
-  function start() {
-    setScreen("chat");
-    setMessages([]);
-    setUserName("");
-    setNameInput("");
-    setAwaitingName(true);
-    questionsStartedRef.current = false;
-    botSay("Hi, I'm BoneBot 👋 Before we start — what should I call you?");
-  }
-
-  function submitName(overrideName?: string) {
-    const name = (overrideName ?? nameInput).trim();
-    if (!name || questionsStartedRef.current) return;
-    questionsStartedRef.current = true;
-    setMessages((m) => [...m, { role: "user", text: name }]);
-    setUserName(name);
-    setNameInput("");
-    setAwaitingName(false);
-    beginQuestions(name);
-  }
-
+  // Classic mode is entered after the name is already known — either from
+  // the AI-led conversation's own name question (collected.name, read in
+  // sendConverseTurn), or empty if she switched to classic before ever
+  // answering it. "Try an example patient" skips this and goes straight to
+  // a canned result, so it never touches userName either.
   function beginQuestions(name: string) {
     setStepIdx(0);
     setAnswers({});
@@ -1028,11 +999,7 @@ export default function Home() {
     setHeightFtInput("5");
     setHeightInInput("4");
     setBmiError("");
-    const greetingName = name ? `, ${name}` : "";
-    botSay(
-      `Nice to meet you${greetingName}. I'll begin with four short questions. If your answers indicate we should take closer look, I'll ask some follow-up questions. Remember: this is a screening estimate, not a diagnosis.`
-    );
-    window.setTimeout(() => botSay(STEPS[0].q), 1400);
+    botSay(STEPS[0].q, 200);
   }
 
   // THE shared scoring + explanation + results-screen path — used by BOTH
@@ -1202,13 +1169,30 @@ export default function Home() {
   }
 
   // The reachable classic-mode fallback — see AGENTS.md ("keep the STEPS
-  // flow present and reachable"). Reuses the pre-existing start() function
-  // untouched; only tags which driver is now active.
+  // flow present and reachable"). The name is already known by the time this
+  // is reachable (collected via the AI-led conversation's own name
+  // question), or empty if she switched to classic before answering it —
+  // either way beginQuestions() no longer needs a separate name step.
   function startClassic() {
     setFlowMode("classic");
     speechRecognitionRef.current?.stop();
     setMicListening(false);
-    start();
+    setScreen("chat");
+    setMessages([]);
+    beginQuestions(userName);
+  }
+
+  // Browsers vary in how they label voices; match common female-voice names
+  // across Chrome/Edge (Google/Microsoft voices), Safari (Apple voices), and
+  // generic "female" labels, preferring an English one.
+  const FEMALE_VOICE_NAME = /female|zira|samantha|victoria|karen|susan|moira|tessa|fiona|serena|allison|ava|kate|amy|joanna|salli|kendra|kimberly|google us english|microsoft aria/i;
+
+  function pickFemaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+    return (
+      voices.find((v) => v.lang.startsWith("en") && FEMALE_VOICE_NAME.test(v.name)) ??
+      voices.find((v) => FEMALE_VOICE_NAME.test(v.name)) ??
+      voices.find((v) => v.lang.startsWith("en"))
+    );
   }
 
   // Free, keyless fallback when ElevenLabs is unavailable (missing key,
@@ -1216,8 +1200,24 @@ export default function Home() {
   // spirit as the SpeechRecognition mic input already used for voice input.
   function speakWithBrowser(text: string) {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = synth.getVoices();
+    if (voices.length > 0) {
+      utterance.voice = pickFemaleVoice(voices) ?? null;
+      synth.speak(utterance);
+    } else {
+      // Voice list loads asynchronously on first use in some browsers.
+      synth.addEventListener(
+        "voiceschanged",
+        () => {
+          utterance.voice = pickFemaleVoice(synth.getVoices()) ?? null;
+          synth.speak(utterance);
+        },
+        { once: true },
+      );
+    }
   }
 
   // Voice playback of BoneBot's reply — ElevenLabs via /api/tts first (higher
@@ -1309,6 +1309,9 @@ export default function Home() {
 
     const nextCollected = data.collected ?? {};
     setConvCollected(nextCollected);
+    if (typeof nextCollected.name === "string" && nextCollected.name.trim()) {
+      setUserName(nextCollected.name.trim());
+    }
     setConvAwaitingConfirm(Boolean(data.awaitingConfirm));
     setConvMessages((m) => [...m, { role: "bot", text: data!.reply }]);
     void speak(data.reply);
@@ -2237,8 +2240,6 @@ export default function Home() {
     setEmailSendState("idle");
     setEmailSendError("");
     setUserName("");
-    setNameInput("");
-    setAwaitingName(false);
     setFlowMode("classic");
     setConvMessages([]);
     setConvBusy(false);
@@ -2319,10 +2320,9 @@ export default function Home() {
   const chatReady = screen === "chat" && !typing;
   const convChatReady = screen === "chat" && flowMode === "conversation" && !convBusy;
   const inFlow = chatReady && step && messages.length > 1 && questionLanded;
-  const progressPct = awaitingName ? 0 : Math.round((stepIdx / STEPS.length) * 100);
-  const progressLabel = awaitingName
-    ? "Getting started"
-    : stepIdx < STEPS.length
+  const progressPct = Math.round((stepIdx / STEPS.length) * 100);
+  const progressLabel =
+    stepIdx < STEPS.length
       ? `Question ${Math.min(stepIdx + 1, STEPS.length)} of ${STEPS.length}`
       : "Analyzing…";
 
@@ -2357,7 +2357,7 @@ export default function Home() {
               Bone<span style={{ color: LANDING_ACCENT }}>Bot</span>
             </div>
             <button
-              onClick={startClassic}
+              onClick={startConversation}
               className={`${LANDING_HEADING_FONT} ml-auto inline-flex min-h-[38px] items-center justify-center rounded-full px-[18px] text-[13px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
               style={{ backgroundColor: LANDING_ACCENT }}
               onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
@@ -2392,7 +2392,7 @@ export default function Home() {
               </p>
               <div className="mt-2 flex flex-wrap gap-3.5">
                 <button
-                  onClick={startClassic}
+                  onClick={startConversation}
                   className={`${LANDING_HEADING_FONT} inline-flex min-h-[56px] items-center justify-center rounded-full px-[34px] text-[18px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
                   style={{ backgroundColor: LANDING_ACCENT }}
                   onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
@@ -2692,54 +2692,6 @@ export default function Home() {
           </div>
           <div className="relative z-10 border-t border-[#E3E9E7] bg-white/90 px-6 py-5 backdrop-blur-sm">
             <div className="mx-auto flex max-w-[680px] flex-col gap-3">
-
-              {awaitingName && (
-                <form
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    submitName();
-                  }}
-                  className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E6E62]"
-                >
-                  <input
-                    autoFocus
-                    value={nameInput}
-                    onChange={(event) => setNameInput(event.target.value)}
-                    placeholder={micListening ? "Listening…" : "Your first name (or a nickname)"}
-                    aria-label="What should BoneBot call you?"
-                    disabled={micListening}
-                    className="flex-1 border-0 bg-transparent px-2.5 py-2 text-sm outline-none disabled:opacity-60"
-                  />
-                  {micSupported && (
-                    <button
-                      type="button"
-                      onClick={() => (micListening ? stopMic() : startMic((t) => { setNameInput(t); submitName(t); }))}
-                      aria-label={micListening ? "Stop listening" : "Answer by voice"}
-                      className="group relative flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-white shadow-sm ring-1 ring-inset ring-white/20 transition-all duration-150 hover:brightness-110 active:scale-95"
-                      style={{ backgroundColor: micListening ? "#B0442F" : ACCENT }}
-                    >
-                      {micListening && (
-                        <span
-                          aria-hidden
-                          className="absolute inset-0 rounded-full"
-                          style={{ boxShadow: "0 0 0 4px rgba(176,68,47,0.18)" }}
-                        />
-                      )}
-                      <span aria-hidden className="text-[15px] leading-none">
-                        {micListening ? "⏹" : "🎤"}
-                      </span>
-                    </button>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={!nameInput.trim()}
-                    className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-fraunces)] text-sm font-bold text-white disabled:opacity-40"
-                    style={{ backgroundColor: ACCENT }}
-                  >
-                    Continue
-                  </button>
-                </form>
-              )}
 
               {chatReady && step?.key === "bloodResults" && pendingBloodResults && !bloodEditMode && (
                 <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
