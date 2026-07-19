@@ -365,6 +365,51 @@ const FACTOR_TO_CARD: Record<string, string> = {
 
 export function selectEvidence(factors: string[]): { cards: EvidenceCard[]; sources: EvidenceSource[] } {
   const cardIds = new Set(["dxa-context", ...factors.map((factor) => FACTOR_TO_CARD[factor]).filter(Boolean)]);
+  return evidenceForCardIds(cardIds);
+}
+
+const QUESTION_EVIDENCE: [string, RegExp][] = [
+  ["dxa-context", /\b(dexa|dxa|scan|t[ -]?score|score|result|screening)\b/i],
+  ["age", /\bage\b/i],
+  ["menopause", /\b(menopause|menopausal|periods?)\b/i],
+  ["hormone-therapy", /\b(hrt|hormone)\b/i],
+  ["prior-fragility-fracture", /\b(fracture|broken bone|break a bone|minor fall)\b/i],
+  ["bmi", /\b(bmi|weight|body mass)\b/i],
+  ["weight-bearing-activity", /\b(exercise|activity|active|weight[- ]bearing|strength|resistance)\b/i],
+  ["smoking", /\b(smok|cigarette|vape)\b/i],
+  ["parental-hip-fracture", /\b(parent|family|hip fracture)\b/i],
+  ["glucocorticoids", /\b(steroid|prednisone|glucocorticoid)\b/i],
+  ["rheumatoid-arthritis", /\b(rheumatoid|arthritis|\bra\b)\b/i],
+  ["alcohol", /\b(alcohol|drink)\b/i],
+  ["vitamin-d", /\b(vitamin d|vitamin-d)\b/i],
+  ["calcium", /\bcalcium\b/i],
+];
+
+const GENERAL_BONE_HEALTH = /\b(bone|osteoporosis|osteopenia|prevent|protect|keep healthy|what can i do)\b/i;
+
+/**
+ * Returns only the clinician-approved cards relevant to a user question. A
+ * missing result deliberately means the question is outside BoneBot's scope.
+ */
+export function selectEvidenceForQuestion(question: string): { cards: EvidenceCard[]; sources: EvidenceSource[] } | null {
+  const text = question.trim();
+  if (!text) return null;
+
+  const cardIds = new Set<string>();
+  for (const [cardId, matcher] of QUESTION_EVIDENCE) {
+    if (matcher.test(text)) cardIds.add(cardId);
+  }
+  if (GENERAL_BONE_HEALTH.test(text)) {
+    cardIds.add("dxa-context");
+    cardIds.add("weight-bearing-activity");
+    cardIds.add("smoking");
+    cardIds.add("alcohol");
+  }
+
+  return cardIds.size ? evidenceForCardIds(cardIds) : null;
+}
+
+function evidenceForCardIds(cardIds: Set<string>): { cards: EvidenceCard[]; sources: EvidenceSource[] } {
   const cards = EVIDENCE_CARDS.filter((card) => cardIds.has(card.id));
   const sourceIds = new Set(cards.flatMap((card) => card.sourceIds));
   const sources = EVIDENCE_SOURCES.filter((source) => sourceIds.has(source.id));

@@ -11,7 +11,7 @@
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import type { BoneFeatures, ModelOutput } from "@/lib/bone-model";
-import { evidencePrompt, selectEvidence } from "@/lib/bone-evidence";
+import { evidencePrompt, selectEvidence, selectEvidenceForQuestion } from "@/lib/bone-evidence";
 import type { TriageOutput } from "@/lib/triage-model";
 
 export const maxDuration = 30;
@@ -24,7 +24,11 @@ type Body = {
   features?: BoneFeatures;
   triage?: TriageOutput;
   question?: string;
+  explanationType?: "score" | "implications";
+  stage?: "questionnaire" | "results";
 };
+
+const OUT_OF_SCOPE_MESSAGE = "BoneBot can only answer questions about this bone-health screening and the evidence it uses.";
 
 const CONSUMER_SYSTEM = `You are BoneBot, a warm, plain-spoken bone-health assistant talking to a postmenopausal woman. Your words will be read ALOUD, so keep sentences short and natural.
 
@@ -62,20 +66,40 @@ Rules:
 - Give only general, evidence-card-backed advice to support bone health: stay active with weight-bearing/resistance activity if safe, avoid smoking, and limit alcohol.
 - Never give medication, supplement-dose, or treatment advice. Never invent a percentage, factor, or medical claim.`;
 
+const SCORE_EXPLANATION_SYSTEM = `You are BoneBot, explaining a deterministic bone-health screening result. Use only the supplied model context and approved evidence cards.
+
+Explain the supplied estimated T-score, its uncertainty range, and what the band means in plain language. Relate the explanation only to the supplied contributing factors. Make clear that this is an estimate, not a DXA measurement or diagnosis. Do not give lifestyle, medicine, or treatment advice.`;
+
+const IMPLICATIONS_SYSTEM = `You are BoneBot, explaining the implications of a deterministic bone-health screening result. Use only the supplied model context and approved evidence cards.
+
+Explain the next step in warm, plain language. The model context supplies the deterministic care route; follow it exactly. If it says to discuss with a GP, encourage a conversation about DXA and wider fracture-risk assessment. If it says routine discussion, do not tell the person they need a GP appointment. Give only the evidence-backed general lifestyle guidance present in the cards. Never give medication, supplement-dose, or treatment advice.`;
+
+const QUESTION_SYSTEM = `You are BoneBot. Answer only the user's bone-health question using the supplied approved evidence cards and model context. If the cards do not support an answer, respond exactly: "${OUT_OF_SCOPE_MESSAGE}" Do not use outside knowledge, make up facts, diagnose, prescribe, or answer unrelated questions.`;
+
 export async function POST(req: Request) {
   if (!process.env.OPENAI_API_KEY) {
     return new Response("BoneBot is unavailable: no API key configured.", { status: 503 });
   }
 
   const body: Body = await req.json();
-  if (!body.result && !body.triage) {
+  if (!body.result && !body.triage && !body.question) {
     return new Response("BoneBot needs a screening result to explain.", { status: 400 });
   }
-  const system = body.triage
-    ? TRIAGE_SYSTEM
-    : body.mode === "clinician"
-      ? CLINICIAN_SYSTEM
-      : CONSUMER_SYSTEM;
+  const questionEvidence = body.question ? selectEvidenceForQuestion(body.question) : null;
+  if (body.question && !questionEvidence) {
+    return Response.json({ text: OUT_OF_SCOPE_MESSAGE, outOfScope: true });
+  }
+  const system = body.question
+    ? QUESTION_SYSTEM
+    : body.triage
+      ? TRIAGE_SYSTEM
+      : body.explanationType === "score"
+        ? SCORE_EXPLANATION_SYSTEM
+        : body.explanationType === "implications"
+          ? IMPLICATIONS_SYSTEM
+          : body.mode === "clinician"
+            ? CLINICIAN_SYSTEM
+            : CONSUMER_SYSTEM;
 
   const context = body.triage
     ? {
@@ -83,16 +107,22 @@ export async function POST(req: Request) {
         fullAssessmentThresholdPercent: body.triage.thresholdPercent,
         validated: body.triage.validated,
       }
-    : {
+    : body.result
+      ? {
         estimatedTScore: body.result!.estimatedTScore,
         range: body.result!.tScoreRange,
         band: body.result!.category,
         validated: body.result!.validated,
         factors: body.result!.contributions.map((c) => ({ factor: c.factor, direction: c.direction })),
+        careRoute: body.result!.category === "lower" ? "routine-discussion-if-relevant" : "discuss-with-gp",
+      }
+      : {
+        stage: body.stage ?? "questionnaire",
       };
-  const evidence = body.triage
-    ? selectEvidence(["Weight-bearing activity", "Current smoker", "High alcohol intake"])
-    : selectEvidence(body.result!.contributions.map((contribution) => contribution.factor));
+  const evidence = questionEvidence
+    ?? (body.triage
+      ? selectEvidence(["Weight-bearing activity", "Current smoker", "High alcohol intake"])
+      : selectEvidence(body.result!.contributions.map((contribution) => contribution.factor)));
 
   const prompt = body.question
     ? `Model context:\n${JSON.stringify(context)}\n\nApproved evidence cards:\n${evidencePrompt(evidence.cards)}\n\nHer question: "${body.question}"\nAnswer only from the model context and approved cards. If they do not answer the question, say so and suggest discussing it with a clinician.`
