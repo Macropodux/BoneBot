@@ -269,7 +269,7 @@ async function runPhrase(field: FieldDef, lastUserText: string, isFirstTurn: boo
       : field.question;
 
   const situation = clarifyNote
-    ? `There is a problem with her last reply: ${clarifyNote} Warmly and briefly point this out (never alarmed or accusing), say it might be a typo or a mis-heard word, and ask her to double-check and tell you again by re-answering the required question below. `
+    ? `About her last reply: ${clarifyNote} Address this warmly and clearly (never alarmed or accusing), then ask her to answer the required question below again. `
     : encourageNote
       ? `She was hesitant, unsure, or questioned whether she needs to answer the previous question. Warmly and briefly explain why it matters — ${encourageNote} — and gently encourage her to answer if she can, while reassuring her it is completely okay to say she is not sure. Then ask the required question below again. `
       : isFirstTurn
@@ -412,6 +412,15 @@ async function runConfirmPhrase(captured: Captured[], lastUserText: string): Pro
     // Degrade gracefully, same principle as runPhrase.
     return fallback;
   }
+}
+
+// Lenient "she's trying to skip / doesn't want to answer" detector — used only
+// to give a clear "this one is required" reply on a MANDATORY field. Broader
+// than intake-fields' anchored SKIP_RE (which must fully match to STORE a skip).
+const SKIP_INTENT_RE =
+  /\b(skip|pass|not sure|unsure|no idea|dunno|don'?t know|do not know|unknown|n\/?a|rather not|prefer not|won'?t say|move on|leave (it|this|that))\b/i;
+function looksLikeSkip(text: string): boolean {
+  return SKIP_INTENT_RE.test(text.trim());
 }
 
 // Deterministic yes/no read of a confirmMode reply — local to this route
@@ -645,6 +654,21 @@ export async function POST(req: Request) {
       // Already nudged once: accept that she's unsure and move on.
       if (v === undefined) collected[currentField.key] = "not-sure";
     }
+  }
+
+  // Mandatory (non-skippable) field that she tried to skip / didn't answer: say
+  // clearly it's required, instead of a vague re-ask. Fields that accept a skip
+  // (skippable ones) or that store "not-sure" (e.g. menopause, handled above)
+  // never reach here, because they'd be captured or handled first.
+  if (
+    currentField &&
+    !currentField.skippable &&
+    collected[currentField.key] === undefined &&
+    looksLikeSkip(lastUserText)
+  ) {
+    const label = FIELD_LABELS[currentField.key] ?? "this question";
+    const clarifyNote = `The previous question (${label}) is a required, mandatory question for BoneBot's screening and cannot be skipped — the estimate genuinely cannot continue without it. Tell her clearly and warmly that this specific question is required (not optional like some later ones), then ask her to please answer it.`;
+    return finishTurn(collected, lastUserText, isFirstTurn, false, clarifyNote, undefined, language);
   }
 
   // The just-asked question got a value that parses but is outside the
