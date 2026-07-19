@@ -1,8 +1,8 @@
-# Floating Bones Questionnaire Background Design
+# Questionnaire Background and Copy Audit Design
 
 ## Goal
 
-Extend the landing page's floating-bone visual identity through the conversational questionnaire without changing its content or interaction model.
+Extend the landing page's floating-bone visual identity through the conversational questionnaire and make every user-facing sentence on the landing and questionnaire screens clear, coherent, consistent, and appropriately supported.
 
 ## Visual Treatment
 
@@ -11,6 +11,19 @@ Extend the landing page's floating-bone visual identity through the conversation
 - Mount the motif once behind the complete questionnaire screen.
 - Keep the chat header, message viewport, progress display, answer controls, upload controls, and footer above the decorative layer.
 - Use slightly translucent questionnaire surfaces where needed so the motifs remain visible while text contrast stays unchanged.
+
+## Copy Audit
+
+- Review the landing headline, supporting copy, buttons, badges, and all three fact cards.
+- Review every questionnaire greeting, question, helper, transition, upload instruction, confirmation, validation message, fallback, progress label, and restart instruction.
+- Correct grammar, unclear antecedents, inconsistent terminology, awkward phrasing, duplicated instructions, and text that does not match the available control.
+- Use “screening estimate, not a diagnosis” consistently and never imply that BoneBot measures bone density or replaces DXA.
+- Check factual/clinical claims against the repository evidence library and authoritative guidance; soften or remove claims that are stronger than their support.
+- Preserve these approved questions verbatim:
+  1. “Over the past 7 days, about how many steps did you average per day?”
+  2. “Over the past 7 days, about how many active or exercise minutes did you average per day?”
+- Keep activity language explicit that steps and active minutes are practical proxies, not equivalent to the MIMS measure used in training.
+- Do not change results-page copy in this pass.
 
 ## Accessibility and Interaction
 
@@ -22,11 +35,13 @@ Extend the landing page's floating-bone visual identity through the conversation
 ## Scope
 
 - Modify only the questionnaire screen composition and any component test needed to prove the reused motif contract.
-- Do not change questions, answers, model features, scoring, APIs, results, or clinical copy.
+- Do not change answers, model features, scoring, APIs, or results-page copy.
+- Copy edits may change landing/questionnaire wording but must not change routing or data semantics.
 - Add no dependency and perform no broad redesign.
 
 ## Verification and Deployment
 
 - Add a failing structural assertion that the questionnaire mounts the shared motif.
+- Add focused assertions for critical approved copy and the absence of superseded or unsupported wording.
 - Run Vitest, TypeScript, lint, and production build.
 - Rebase and push directly to shared `main` without force-pushing.
