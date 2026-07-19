@@ -6,6 +6,7 @@ import {
   type TriageOutput,
 } from "@/lib/triage-model";
 import { tScoreModel } from "../../model/model-parameters";
+import { ACTIVITY_QUESTIONS, activityLevelFromDailyAverages } from "@/lib/activity-input";
 
 // The server owns this state machine. An LLM may explain an outcome, but it
 // must never choose the next question, triage route, or screening result.
@@ -23,7 +24,8 @@ export const IntakeAnswersSchema = z.object({
   priorFragilityFracture: z.boolean().optional(),
   heightCm: z.number().min(100).max(230).optional(),
   weightKg: z.number().min(30).max(250).optional(),
-  averageDailySteps: z.number().min(0).max(100000).optional(),
+  averageDailySteps: z.number().min(0).max(100000).nullable().optional(),
+  averageDailyActiveMinutes: z.number().min(0).max(1440).nullable().optional(),
   currentSmoker: z.boolean().optional(),
 });
 
@@ -229,7 +231,8 @@ function fullAssessmentStep(answers: IntakeAnswers, triage: TriageOutput): Intak
     question("priorFragilityFracture", "Since age 50, have you broken a bone after a minor fall, knock, or injury?", "choice", yesNo),
     question("heightCm", "What is your height in centimetres?", "number", undefined, "For example: 165 cm."),
     question("weightKg", "What is your weight in kilograms?", "number", undefined, "For example: 62 kg."),
-    question("averageDailySteps", "About how many steps do you average each day?", "number", undefined, "Use your watch or phone average if you have it. A rough estimate is fine."),
+    question("averageDailySteps", ACTIVITY_QUESTIONS.steps.question, "number", undefined, ACTIVITY_QUESTIONS.steps.helper, true),
+    question("averageDailyActiveMinutes", ACTIVITY_QUESTIONS.minutes.question, "number", undefined, ACTIVITY_QUESTIONS.minutes.helper, true),
     question("currentSmoker", "Do you currently smoke?", "choice", yesNo),
   ];
 
@@ -246,7 +249,7 @@ function fullAssessmentStep(answers: IntakeAnswers, triage: TriageOutput): Intak
     triage,
     notes: [
       "BMI was calculated from the height and weight you entered.",
-      "Weight-bearing activity was estimated from average daily steps using a provisional rubric: under 3,000 = 0.15; 3,000–4,999 = 0.30; 5,000–7,999 = 0.50; 8,000–9,999 = 0.70; 10,000+ = 0.85.",
+      "Steps and active minutes are practical proxies for the daily wrist-movement measure used in model training. Available values are normalized deterministically and averaged.",
       "The current model uses disclosed default values for glucocorticoid use, rheumatoid arthritis, high alcohol intake, vitamin D, and calcium because this short questionnaire does not collect them.",
     ],
   });
@@ -260,6 +263,7 @@ function requiredFeatureLabels(answers: IntakeAnswers): string[] {
     ["heightCm", "height"],
     ["weightKg", "weight"],
     ["averageDailySteps", "average daily steps"],
+    ["averageDailyActiveMinutes", "average daily active minutes"],
     ["currentSmoker", "current smoking"],
   ];
   return labels.filter(([key]) => answers[key] === undefined).map(([, label]) => label);
@@ -273,7 +277,11 @@ function toBoneFeatures(answers: IntakeAnswers): BoneFeatures {
     onHormoneTherapy: answers.onHormoneTherapy!,
     priorFragilityFracture: answers.priorFragilityFracture!,
     bmi: round1(answers.weightKg! / (heightMetres * heightMetres)),
-    weightBearingActivity: activityFromSteps(answers.averageDailySteps!),
+    weightBearingActivity:
+      activityLevelFromDailyAverages(
+        answers.averageDailySteps ?? null,
+        answers.averageDailyActiveMinutes ?? null,
+      ) ?? tScoreModel.imputationDefaults.activityLevel,
     currentSmoker: answers.currentSmoker!,
     glucocorticoids: Boolean(tScoreModel.imputationDefaults.glucocorticoids),
     rheumatoidArthritis: Boolean(tScoreModel.imputationDefaults.rheumatoidArthritis),
@@ -282,14 +290,6 @@ function toBoneFeatures(answers: IntakeAnswers): BoneFeatures {
     calcium: tScoreModel.imputationDefaults.calcium,
     secondaryCondition: Boolean(tScoreModel.imputationDefaults.secondaryCondition),
   };
-}
-
-function activityFromSteps(steps: number): number {
-  if (steps < 3000) return 0.15;
-  if (steps < 5000) return 0.3;
-  if (steps < 8000) return 0.5;
-  if (steps < 10000) return 0.7;
-  return 0.85;
 }
 
 function interpretDxaTScore(tScore: number, year?: number): DxaAssessment {
