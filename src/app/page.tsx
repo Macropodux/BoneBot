@@ -785,6 +785,7 @@ export default function Home() {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [messages, typing, stepIdx]);
 
+
   useEffect(() => {
     // The free-text input is the same DOM node across consecutive free-text
     // questions (age -> dxaScore -> dxaYear -> ...), so a plain autoFocus
@@ -1858,16 +1859,20 @@ export default function Home() {
   // Several flows chain two botSay() calls with a setTimeout between them
   // (e.g. the name greeting, then the first question, a beat later) — typing
   // is false in that gap, so also require the step's own question to have
-  // actually landed in the transcript before showing its chips/input. Without
-  // this, answer options could flash in right after the FIRST message, before
-  // the question they answer has appeared.
-  const lastMessage = messages[messages.length - 1];
-  const currentQuestionShown = Boolean(step) && lastMessage?.role === "bot" && lastMessage.text === step.q;
+  // actually landed in the transcript before showing its chips/input.
+  // Without this, answer options could flash in right after the FIRST
+  // message, before the question they answer has appeared. Searching the
+  // whole transcript (not just the last message) means a follow-up bot
+  // message that re-asks in its own words (menopause-age outlier reject,
+  // out-of-range age, the clarify loop) doesn't reset this back to false, so
+  // free-text re-entry isn't silently blocked after one of those. STEPS[].q
+  // strings are each unique, so this can't false-match a different step.
+  const questionLanded = Boolean(step) && messages.some((m) => m.role === "bot" && m.text === step.q);
   // Confirm/re-ask prompts (menopause-age outlier, existing-care GP steer,
   // recent-DXA-score check) post their OWN bot message, not step.q — gate
-  // those on chatReady, not inFlow, or currentQuestionShown hides them.
+  // those on chatReady, not inFlow, or questionLanded hides them.
   const chatReady = screen === "chat" && !typing;
-  const inFlow = chatReady && step && messages.length > 1 && currentQuestionShown;
+  const inFlow = chatReady && step && messages.length > 1 && questionLanded;
   const progressPct = awaitingName ? 0 : Math.round((stepIdx / STEPS.length) * 100);
   const progressLabel = awaitingName
     ? "Getting started"
@@ -1880,6 +1885,8 @@ export default function Home() {
   const cat = result ? CATEGORY_MAP[result.category] : "low";
   const catMeta = CAT_META[cat];
   const marker = result ? markerPercent(result.estimatedTScore) : 50;
+  const rangeLeftPct = result ? markerPercent(result.tScoreRange[0]) : 50;
+  const rangeRightPct = result ? markerPercent(result.tScoreRange[1]) : 50;
   const reportedActivitySteps = parseDailyActivity(answers.averageDailySteps ?? "", 100_000);
   const reportedActivityMinutes = parseDailyActivity(answers.averageDailyActiveMinutes ?? "", 1_440);
 
@@ -2989,26 +2996,37 @@ export default function Home() {
                       </>
 
                     <div className="mt-8 mb-2">
-                        <div className="relative">
+                        <div className="relative pt-[26px]">
                           <div className="flex h-3.5 overflow-hidden rounded-full">
                             <div className="w-1/3" style={{ backgroundColor: "#EFC3B8" }} />
                             <div className="w-1/3" style={{ backgroundColor: "#F0DFAE" }} />
                             <div className="w-1/3" style={{ backgroundColor: "#BFDDD3" }} />
                           </div>
+                          {/* Uncertainty range — the shaded area, not just the point estimate */}
+                          <motion.div
+                            initial={reduceMotion ? false : { left: "50%", width: 0, opacity: 0 }}
+                            animate={{
+                              left: `${rangeLeftPct}%`,
+                              width: `${Math.max(3, rangeRightPct - rangeLeftPct)}%`,
+                              opacity: 1,
+                            }}
+                            transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
+                            className="absolute top-[26px] h-3.5 rounded-full border-2 border-[#241436]/50 bg-[#241436]/12"
+                          />
                           <motion.div
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute -top-[26px] -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
+                            className="absolute top-0 -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
                             style={{ backgroundColor: "#7C3AED" }}
                           >
-                            you
+                            {result.estimatedTScore.toFixed(1)}
                           </motion.div>
                           <motion.div
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute top-0 h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#7C3AED]"
+                            className="absolute top-[26px] h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#7C3AED]"
                           />
                         </div>
                         <div className="mt-3.5 flex justify-between gap-2 text-xs font-semibold">
@@ -3020,7 +3038,8 @@ export default function Home() {
                           ))}
                         </div>
                         <p className="mt-4 text-sm leading-[1.6] text-[#4A5452]">
-                          A T-score compares your bone density to a healthy young adult: 0 is average, and lower
+                          The shaded area is the uncertainty range — your true score most likely sits inside it. A
+                          T-score compares your bone density to a healthy young adult: 0 is average, and lower
                           (more negative) means less dense bone.
                         </p>
                       </div>
