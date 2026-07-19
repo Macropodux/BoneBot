@@ -301,8 +301,8 @@ export const FIELDS: FieldDef[] = [
   },
   {
     key: "averageDailySteps",
-    question: ACTIVITY_QUESTIONS.steps.question,
-    inputType: "number",
+    question: `${ACTIVITY_QUESTIONS.steps.question} You can upload a screenshot from your fitness tracker or activity app, or just tell me the number.`,
+    inputType: "image",
     stage: "deep",
     required: true,
     skippable: true,

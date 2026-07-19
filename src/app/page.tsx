@@ -2009,6 +2009,16 @@ export default function Home() {
 
   function useTheseActivityValues() {
     if (!pendingActivityResult) return;
+    if (flowMode === "conversation") {
+      const merged = { ...convCollected };
+      if (pendingActivityResult.estimatedSteps !== null) merged.averageDailySteps = pendingActivityResult.estimatedSteps;
+      if (pendingActivityResult.estimatedActiveMinutes !== null)
+        merged.averageDailyActiveMinutes = pendingActivityResult.estimatedActiveMinutes;
+      setPendingActivityResult(null);
+      setActivityEditMode(false);
+      void sendConverseTurn("I uploaded my activity data.", { collected: merged });
+      return;
+    }
     commitActivityValues(pendingActivityResult, "Use these activity averages");
   }
 
@@ -2016,6 +2026,9 @@ export default function Home() {
     setPendingActivityResult(null);
     setActivityEditMode(false);
     setActivityEditError("");
+    if (flowMode === "conversation") {
+      void sendConverseTurn("Skip — I don't have my activity data.");
+    }
   }
 
   function submitEditedActivityValues() {
@@ -2030,6 +2043,16 @@ export default function Home() {
       estimatedSteps: steps,
       estimatedActiveMinutes: minutes,
     };
+    if (flowMode === "conversation") {
+      const merged = { ...convCollected };
+      if (steps !== null) merged.averageDailySteps = steps;
+      if (minutes !== null) merged.averageDailyActiveMinutes = minutes;
+      setPendingActivityResult(null);
+      setActivityEditMode(false);
+      setActivityEditError("");
+      void sendConverseTurn("I edited my activity averages.", { collected: merged });
+      return;
+    }
     commitActivityValues(edited, "Use these edited activity averages");
   }
 
@@ -3442,7 +3465,179 @@ export default function Home() {
                   </div>
                 )}
 
-              {convChatReady && convField && convInputType === "image" && (
+              {convChatReady && convField === "averageDailySteps" && convInputType === "image" && (
+                <div className="flex flex-col gap-3">
+                  {pendingActivityResult && !activityEditMode && (
+                    <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
+                      <div className="text-sm font-semibold text-[#221B16]">Confirm activity averages</div>
+                      <div className="text-sm leading-[1.5] text-[#4A5452]">
+                        {pendingActivityResult.estimatedSteps !== null &&
+                          `~${pendingActivityResult.estimatedSteps.toLocaleString()} steps/day. `}
+                        {pendingActivityResult.estimatedActiveMinutes !== null &&
+                          `~${pendingActivityResult.estimatedActiveMinutes} active minutes/day. `}
+                      </div>
+                      <div className="flex flex-wrap gap-2.5">
+                        <button
+                          onClick={useTheseActivityValues}
+                          className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
+                          style={{ backgroundColor: ACCENT }}
+                        >
+                          Use these
+                        </button>
+                        <button
+                          onClick={() => setActivityEditMode(true)}
+                          className="rounded-full border-[1.5px] px-5 py-2.5 text-[15px] font-medium transition-colors"
+                          style={{ borderColor: ACCENT, color: ACCENT }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={skipPendingActivityValues}
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {pendingActivityResult && activityEditMode && (
+                    <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
+                      <div className="text-sm font-semibold text-[#221B16]">Edit activity averages</div>
+                      <div className="flex flex-wrap gap-3">
+                        <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
+                          Steps/day
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            value={activityEditSteps}
+                            onChange={(event) => setActivityEditSteps(event.target.value)}
+                            placeholder="e.g. 6500"
+                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
+                          Active minutes/day
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            value={activityEditMinutes}
+                            onChange={(event) => setActivityEditMinutes(event.target.value)}
+                            placeholder="e.g. 30"
+                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
+                          />
+                        </label>
+                      </div>
+                      {activityEditError && <div className="text-[13px] text-[#B0442F]">{activityEditError}</div>}
+                      <div className="flex flex-wrap gap-2.5">
+                        <button
+                          onClick={submitEditedActivityValues}
+                          className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
+                          style={{ backgroundColor: ACCENT }}
+                        >
+                          Save & continue
+                        </button>
+                        <button
+                          onClick={() => setActivityEditMode(false)}
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={skipPendingActivityValues}
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
+                        >
+                          Skip
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {!pendingActivityResult && (
+                    <div className="flex flex-col gap-2.5">
+                      {activityImageFiles.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {activityImageFiles.map((file, index) => (
+                            <div
+                              key={`${file.name}-${index}`}
+                              className="flex items-center gap-1.5 rounded-[10px] border border-[#D5DCDA] bg-white px-2 py-1.5 text-xs"
+                            >
+                              <img src={URL.createObjectURL(file)} alt="" className="h-7 w-7 rounded-[6px] object-cover" />
+                              <span className="max-w-[90px] truncate">{file.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => removeActivityImage(index)}
+                                className="text-[#9AA5A2] hover:text-[#B0442F]"
+                                aria-label={`Remove ${file.name}`}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <label
+                        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E6E62] hover:bg-[#E4F0ED]"
+                        aria-disabled={activityUploadBusy || activityImageFiles.length >= MAX_IMAGES}
+                      >
+                        <span
+                          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-base"
+                          style={{ backgroundColor: ACCENT_TINT, color: ACCENT }}
+                          aria-hidden
+                        >
+                          📎
+                        </span>
+                        <span className="flex flex-col">
+                          <span className="font-semibold text-[#221B16]">
+                            {activityImageFiles.length >= MAX_IMAGES
+                              ? "Maximum 3 photos added"
+                              : "Upload a weekly Apple Health, Watch, or activity-app summary"}
+                          </span>
+                          <span className="text-[13px] text-[#5A6462]">
+                            Up to {MAX_IMAGES} images · {activityImageFiles.length}/{MAX_IMAGES} added.
+                          </span>
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          multiple
+                          className="sr-only"
+                          disabled={activityUploadBusy || activityImageFiles.length >= MAX_IMAGES}
+                          onChange={(event) => {
+                            addActivityImages(event.target.files);
+                            event.currentTarget.value = "";
+                          }}
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-2.5">
+                        {activityImageFiles.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => void uploadActivityImages(activityImageFiles)}
+                            disabled={activityUploadBusy}
+                            className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors disabled:opacity-50"
+                            style={{ backgroundColor: ACCENT }}
+                          >
+                            {activityUploadBusy
+                              ? "Reading your photo(s)…"
+                              : `Analyze ${activityImageFiles.length} photo${activityImageFiles.length > 1 ? "s" : ""}`}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => void sendConverseTurn("Skip — I don't have my activity data.")}
+                          disabled={activityUploadBusy}
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62] disabled:opacity-50"
+                        >
+                          Skip — I don&apos;t have my activity data
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {convChatReady && convField && convField !== "averageDailySteps" && convInputType === "image" && (
                 <div className="flex flex-col gap-3">
                   {pendingBloodResults && !bloodEditMode && (
                     <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
@@ -3974,6 +4169,11 @@ export default function Home() {
                             </span>
                           ))}
                         </div>
+                        <p className="mt-4 text-sm leading-[1.6] text-[#4A5452]">
+                          The shaded area is the 95%-prediction range — your true score most likely sits inside it. A
+                          T-score compares your bone density to a healthy young adult: 0 is average, and lower
+                          (more negative) means less dense bone.
+                        </p>
                       </div>
                   </motion.div>
 
