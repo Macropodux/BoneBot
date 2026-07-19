@@ -8,7 +8,7 @@ describe("FloatingBones", () => {
     expect(FLOATING_BONES).toHaveLength(9);
     expect(new Set(FLOATING_BONES.map((bone) => bone.id)).size).toBe(9);
     expect(FLOATING_BONES.every((bone) => bone.opacity <= 0.16)).toBe(true);
-    expect(FLOATING_BONES.some((bone) => bone.tone === "coral")).toBe(true);
+    expect(FLOATING_BONES.every((bone) => bone.tone === "teal")).toBe(true);
   });
 
   it("mounts the shared motif on both chat variants (AI-led + classic STEPS fallback) and both results states (landing's editorial redesign has no decorative motif)", () => {

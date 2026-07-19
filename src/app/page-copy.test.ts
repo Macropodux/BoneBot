@@ -11,7 +11,7 @@ describe("landing and questionnaire copy", () => {
     expect(page).toContain("Three minutes. An NHANES-trained model does the maths. AI turns the result into plain English.");
     expect(page).toContain("Designed around bone changes after menopause. A bone-health tool built with women in mind.");
     expect(page).toContain(
-      '{ num: "03", title: "Adaptive", body: "Only 4 initial questions, with follow-ups only when a closer look may help. No account needed." }',
+      '{ num: "03", title: "The AI explains", body: "The AI only puts that result into plain English. It never sets or changes your score." }',
     );
     expect(page).not.toContain("bone fraction risk");
     expect(page).not.toContain("Most bone-health research and tools were built around men");
