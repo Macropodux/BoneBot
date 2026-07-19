@@ -39,9 +39,33 @@ import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-para
 import FloatingBones from "./FloatingBones";
 
 const ACCENT = "#0E7C6E";
-const ACCENT_HOVER = "#0A5A50";
 const ACCENT_TINT = "#E4F0ED";
-const FRACTURE = "#B0442F";
+
+// Editorial redesign palette — scoped to the landing screen only (see the
+// `screen === "landing"` block below). Kept separate from ACCENT above,
+// which chat and results still use, so this restyle can't bleed into either
+// of those screens.
+const LANDING_BG = "#FAF7F2";
+const LANDING_BAND_BG = "#F5F0E7";
+const LANDING_BORDER = "#E7DFD3";
+const LANDING_BORDER_INPUT = "#E0D6C6";
+const LANDING_BORDER_SECONDARY = "#C9BFAF";
+const LANDING_INK = "#221B16";
+const LANDING_BODY = "#55493E";
+const LANDING_MUTED = "#8A7E6E";
+const LANDING_ORNAMENT = "#B3A692";
+const LANDING_ACCENT = "#0E6E62";
+const LANDING_ACCENT_HOVER = "#0A5148";
+const LANDING_DISCLAIMER_BG = "#2A2320";
+const LANDING_DISCLAIMER_SUB = "#BFB4A4";
+const LANDING_HEADING_FONT = "font-[family-name:var(--font-fraunces)]";
+const LANDING_BODY_FONT = "font-[family-name:var(--font-source-sans)]";
+
+const LANDING_WHY_TRUST_IT = [
+  { num: "01", title: "Often silent", body: "Bone loss may cause no symptoms until a fracture occurs." },
+  { num: "02", title: "Model-led", body: "A model trained on NHANES data produces the estimate. AI only explains it." },
+  { num: "03", title: "Adaptive", body: "Only 4 initial questions, with follow-ups only when a closer look may help. No account needed." },
+] as const;
 
 type StepKey = "assignedFemale" | "age" | "menopauseStatus" | "existingCare" | "knowsDxa" | "dxaScore" | "dxaYear" | "menopause" | "fracture" | "smoke" | "steroids" | "bloodResults" | "weight" | "averageDailySteps" | "averageDailyActiveMinutes" | "secondaryCondition";
 
@@ -1868,114 +1892,263 @@ export default function Home() {
       <style>{`@keyframes bw-blink { 0%,80%,100% { opacity: .25; } 40% { opacity: 1; } }`}</style>
 
       {screen === "landing" && (
-        <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
-          <FloatingBones />
-          <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-12">
-            <div className="font-[family-name:var(--font-heading)] text-[22px] font-bold tracking-[-0.02em]">
-              Bone<span style={{ color: ACCENT }}>Bot</span>
+        <div
+          className={`flex flex-1 flex-col overflow-y-auto overflow-x-hidden ${LANDING_BODY_FONT} text-[18px] leading-[1.6]`}
+          style={{ backgroundColor: LANDING_BG, color: "#2A2320" }}
+        >
+          {/* Top bar */}
+          <header
+            className="flex flex-wrap items-center gap-5 px-5 py-[18px] sm:px-16"
+            style={{ borderBottom: `1px solid ${LANDING_BORDER}` }}
+          >
+            <div className={`${LANDING_HEADING_FONT} text-[24px] font-semibold tracking-[-0.01em]`} style={{ color: LANDING_INK }}>
+              BoneBot
             </div>
-            <div className="rounded-full border border-[#D5DCDA] bg-white/70 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-[#5A6462] backdrop-blur-sm">
+            <div
+              className="pl-5 text-[13px] font-semibold uppercase tracking-[0.14em]"
+              style={{ color: LANDING_MUTED, borderLeft: `1px solid ${LANDING_BORDER}` }}
+            >
               Hack-Nation · Challenge 05
             </div>
+            <button
+              onClick={start}
+              className={`${LANDING_HEADING_FONT} ml-auto inline-flex min-h-[48px] items-center justify-center rounded-full px-[26px] text-[16px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
+              style={{ backgroundColor: LANDING_ACCENT }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT)}
+            >
+              Start screening
+            </button>
           </header>
-          <main className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 pb-16 pt-8 text-center">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-[#CDE0DB] bg-white/70 px-4 py-1.5 text-[12.5px] font-semibold uppercase tracking-[0.13em] backdrop-blur-sm" style={{ color: ACCENT }}>
-              <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ACCENT }} />
-              Bone-health screening for postmenopausal women
-            </div>
-            <h1 className="max-w-[880px] font-[family-name:var(--font-heading)] text-[2.85rem] font-bold leading-[1.02] tracking-[-0.035em] text-[#12211E] sm:text-6xl lg:text-[4.6rem]">
-              <span className="block">
-                Know your bone{" "}
-                <span className="relative whitespace-nowrap" style={{ color: FRACTURE }}>
-                  fracture
-                  <span
-                    aria-hidden
-                    className="absolute inset-x-0 -bottom-1 h-[3px] rounded-full"
-                    style={{ backgroundColor: FRACTURE, opacity: 0.35 }}
-                  />
-                </span>{" "}
-                risk
-              </span>
-              <span className="block">before you break something.</span>
-            </h1>
-            <p className="mt-7 max-w-[600px] text-pretty text-lg leading-[1.6] text-[#41504C] sm:text-[19px]">
-              <span className="block">Three minutes. An NHANES-trained model does the maths.</span>
-              <span className="block">AI turns the result into plain English.</span>
-            </p>
-            <p className="mt-3 max-w-[600px] text-pretty text-[15px] leading-[1.6]" style={{ color: ACCENT }}>
-              <span className="block">Designed around bone changes after menopause.</span>
-              <span className="block">A bone-health tool built with women in mind.</span>
-            </p>
-            <div className="mt-9 flex flex-wrap justify-center gap-3.5">
-              <button
-                onClick={start}
-                className="rounded-[10px] px-8 py-4 font-[family-name:var(--font-heading)] text-[17px] font-bold text-white transition-colors"
-                style={{ backgroundColor: ACCENT }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = ACCENT_HOVER)}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = ACCENT)}
+
+          {/* Hero */}
+          <section className="mx-auto w-full max-w-[1240px] px-5 pt-[clamp(56px,9vw,120px)] pb-[clamp(48px,7vw,96px)] sm:px-16">
+            <div className="flex max-w-[880px] flex-col gap-7">
+              <p
+                className="m-0 flex items-center gap-3 text-[14px] font-semibold uppercase tracking-[0.16em]"
+                style={{ color: LANDING_ACCENT }}
               >
-                Start screening
-              </button>
-              <button
-                onClick={() => setShowExampleMenu((v) => !v)}
-                className="rounded-[10px] border-[1.5px] border-[#C6CFCC] px-8 py-4 font-[family-name:var(--font-heading)] text-[17px] font-bold text-[#15181A] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                <span className="inline-block h-px w-7" style={{ backgroundColor: LANDING_ACCENT }} />
+                Bone-health screening for postmenopausal women
+              </p>
+              <h1
+                className={`${LANDING_HEADING_FONT} text-balance text-[clamp(42px,6.5vw,84px)] font-[480] leading-[1.04] tracking-[-0.015em]`}
+                style={{ color: LANDING_INK, fontOpticalSizing: "auto" }}
               >
-                Try an example
-              </button>
-            </div>
-            {showExampleMenu && (
-              <motion.div
-                initial={reduceMotion ? false : { opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, ease: EASE_OUT }}
-                className="mt-4 flex flex-wrap justify-center gap-2.5"
-              >
-                {EXAMPLE_PATIENTS.map((patient) => {
-                  const isLoading = loadingExampleId === patient.id;
-                  return (
-                    <motion.button
-                      key={patient.id}
-                      whileHover={loadingExampleId ? {} : { scale: 1.03 }}
-                      whileTap={loadingExampleId ? {} : { scale: 0.96 }}
-                      transition={{ duration: 0.15 }}
-                      onClick={() => void tryExample(patient.id, patient.answers, patient.name)}
-                      disabled={loadingExampleId !== null}
-                      className="flex flex-col items-start gap-0.5 rounded-[10px] border-[1.5px] border-[#C6CFCC] bg-white px-4 py-2.5 text-left transition-colors hover:border-[#0E7C6E] disabled:cursor-default disabled:opacity-60"
-                    >
-                      <span className="flex items-center gap-1.5 font-[family-name:var(--font-heading)] text-[14px] font-bold text-[#15181A]">
-                        {isLoading && (
-                          <span
-                            aria-hidden
-                            className="h-3 w-3 animate-spin rounded-full border-2 border-[#C6CFCC]"
-                            style={{ borderTopColor: ACCENT }}
-                          />
-                        )}
-                        {patient.label}
-                      </span>
-                      <span className="text-[12px] text-[#5A6462]">{isLoading ? "Loading…" : patient.blurb}</span>
-                    </motion.button>
-                  );
-                })}
-              </motion.div>
-            )}
-            <div className="mt-16 grid max-w-[920px] grid-cols-1 gap-4 sm:grid-cols-3">
-              {[
-                { stat: "Often silent", body: "Bone loss may cause no symptoms until a fracture occurs." },
-                { stat: "Model-led", body: "A model trained on NHANES data produces the estimate. AI only explains it." },
-                { stat: "Adaptive", body: "Only 4 initial questions, with follow-ups only when a closer look may help. No account needed." },
-              ].map((c) => (
-                <div
-                  key={c.stat}
-                  className="rounded-[16px] border border-[#E1EAE7] bg-white/85 px-6 py-6 text-left shadow-[0_1px_2px_rgba(16,60,54,0.04)] backdrop-blur-sm"
+                Know your bone risk{" "}
+                <em style={{ color: LANDING_ACCENT }}>before</em> you break something.
+              </h1>
+              <p className="m-0 max-w-[620px] text-pretty text-[clamp(19px,1.6vw,22px)] leading-[1.6]" style={{ color: LANDING_BODY }}>
+                Three minutes. An NHANES-trained model does the maths. AI turns the result into plain English.
+              </p>
+              <p className="m-0 max-w-[620px] text-pretty text-[clamp(19px,1.6vw,22px)] leading-[1.6]" style={{ color: LANDING_BODY }}>
+                Designed around bone changes after menopause. A bone-health tool built with women in mind.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-3.5">
+                <button
+                  onClick={start}
+                  className={`${LANDING_HEADING_FONT} inline-flex min-h-[56px] items-center justify-center rounded-full px-[34px] text-[18px] font-semibold text-[#FAF7F2] transition-colors duration-150`}
+                  style={{ backgroundColor: LANDING_ACCENT }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT_HOVER)}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = LANDING_ACCENT)}
                 >
-                  <div className="font-[family-name:var(--font-heading)] text-[30px] font-bold leading-none tracking-[-0.02em]" style={{ color: ACCENT }}>
-                    {c.stat}
-                  </div>
-                  <div className="mt-2.5 text-sm leading-[1.5] text-[#41504C]">{c.body}</div>
-                </div>
-              ))}
+                  Start screening
+                </button>
+                <button
+                  onClick={() => setShowExampleMenu((v) => !v)}
+                  className={`${LANDING_HEADING_FONT} inline-flex min-h-[56px] items-center justify-center rounded-full border-[1.5px] px-[34px] text-[18px] font-semibold transition-colors duration-150`}
+                  style={{ borderColor: LANDING_BORDER_SECONDARY, color: LANDING_INK }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = LANDING_ACCENT;
+                    e.currentTarget.style.color = LANDING_ACCENT;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = LANDING_BORDER_SECONDARY;
+                    e.currentTarget.style.color = LANDING_INK;
+                  }}
+                >
+                  Try an example
+                </button>
+              </div>
+              <p className="m-0 text-[15px]" style={{ color: LANDING_MUTED }}>
+                No account. No forms. About 3 minutes.
+              </p>
+              {showExampleMenu && (
+                <motion.div
+                  initial={reduceMotion ? false : { opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, ease: EASE_OUT }}
+                  className="-mt-2 flex flex-wrap gap-2.5"
+                >
+                  {EXAMPLE_PATIENTS.map((patient) => {
+                    const isLoading = loadingExampleId === patient.id;
+                    return (
+                      <motion.button
+                        key={patient.id}
+                        whileHover={loadingExampleId ? {} : { scale: 1.03 }}
+                        whileTap={loadingExampleId ? {} : { scale: 0.96 }}
+                        transition={{ duration: 0.15 }}
+                        onClick={() => void tryExample(patient.id, patient.answers, patient.name)}
+                        disabled={loadingExampleId !== null}
+                        className="flex flex-col items-start gap-0.5 rounded-[14px] border-[1.5px] bg-white px-4 py-2.5 text-left transition-colors disabled:cursor-default disabled:opacity-60"
+                        style={{ borderColor: LANDING_BORDER_SECONDARY }}
+                      >
+                        <span className={`${LANDING_HEADING_FONT} flex items-center gap-1.5 text-[14px] font-semibold`} style={{ color: LANDING_INK }}>
+                          {isLoading && (
+                            <span
+                              aria-hidden
+                              className="h-3 w-3 animate-spin rounded-full border-2"
+                              style={{ borderColor: LANDING_BORDER_SECONDARY, borderTopColor: LANDING_ACCENT }}
+                            />
+                          )}
+                          {patient.label}
+                        </span>
+                        <span className="text-[12px]" style={{ color: LANDING_MUTED }}>
+                          {isLoading ? "Loading…" : patient.blurb}
+                        </span>
+                      </motion.button>
+                    );
+                  })}
+                </motion.div>
+              )}
             </div>
-          </main>
+          </section>
+
+          {/* Stat moment */}
+          <section style={{ backgroundColor: LANDING_BAND_BG, borderTop: `1px solid ${LANDING_BORDER}`, borderBottom: `1px solid ${LANDING_BORDER}` }}>
+            <div className="mx-auto flex w-full max-w-[1240px] flex-wrap items-end gap-[clamp(24px,5vw,72px)] px-5 py-[clamp(56px,8vw,110px)] sm:px-16">
+              <div
+                className={`${LANDING_HEADING_FONT} whitespace-nowrap text-[clamp(110px,17vw,230px)] font-normal leading-[0.85] tracking-[-0.03em]`}
+                style={{ color: LANDING_ACCENT, fontOpticalSizing: "auto" }}
+              >
+                1<span className="mx-[0.08em] text-[0.42em] italic">in</span>2
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-3.5 pb-[clamp(4px,1vw,14px)]" style={{ flexBasis: "260px" }}>
+                <p className={`${LANDING_HEADING_FONT} m-0 max-w-[26ch] text-pretty text-[clamp(22px,2.2vw,30px)] leading-[1.3]`} style={{ color: LANDING_INK }}>
+                  women over 50 will fracture a bone due to osteoporosis.
+                </p>
+                <p className="m-0 max-w-[44ch] text-pretty text-[16px] leading-[1.6]" style={{ color: LANDING_BODY }}>
+                  Most are never screened until something breaks. Bone loss after menopause is usually silent —
+                  screening earlier is how you get ahead of it.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Why trust it */}
+          <section className="mx-auto w-full max-w-[1240px] px-5 py-[clamp(56px,8vw,110px)] sm:px-16">
+            <div className="grid gap-[clamp(28px,5vw,80px)]" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))" }}>
+              <div className="max-w-[420px]">
+                <p className="m-0 text-[14px] font-semibold uppercase tracking-[0.16em]" style={{ color: LANDING_ACCENT }}>
+                  Why trust it
+                </p>
+                <h2 className={`${LANDING_HEADING_FONT} m-0 mt-3.5 text-balance text-[clamp(28px,3vw,40px)] font-[480] leading-[1.15]`} style={{ color: LANDING_INK }}>
+                  The model predicts. The AI only explains.
+                </h2>
+              </div>
+              <div className="flex flex-col">
+                {LANDING_WHY_TRUST_IT.map((pt) => (
+                  <div key={pt.num} className="grid items-baseline gap-5 py-[26px]" style={{ gridTemplateColumns: "64px 1fr", borderTop: `1px solid ${LANDING_BORDER}` }}>
+                    <div className={`${LANDING_HEADING_FONT} text-[22px] italic`} style={{ color: LANDING_ORNAMENT }}>
+                      {pt.num}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <h3 className={`${LANDING_HEADING_FONT} m-0 text-[22px] font-semibold`} style={{ color: LANDING_INK }}>
+                        {pt.title}
+                      </h3>
+                      <p className="m-0 max-w-[58ch] text-pretty text-[17px] leading-[1.6]" style={{ color: LANDING_BODY }}>
+                        {pt.body}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Chat preview */}
+          <section style={{ backgroundColor: LANDING_BAND_BG, borderTop: `1px solid ${LANDING_BORDER}` }}>
+            <div
+              className="mx-auto grid w-full max-w-[1240px] items-center gap-[clamp(32px,5vw,80px)] px-5 py-[clamp(56px,8vw,110px)] sm:px-16"
+              style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))" }}
+            >
+              <div className="flex flex-col gap-[18px]">
+                <p className="m-0 text-[14px] font-semibold uppercase tracking-[0.16em]" style={{ color: LANDING_ACCENT }}>
+                  The screening
+                </p>
+                <h2 className={`${LANDING_HEADING_FONT} m-0 text-balance text-[clamp(28px,3vw,40px)] font-[480] leading-[1.15]`} style={{ color: LANDING_INK }}>
+                  A conversation, not a questionnaire.
+                </h2>
+                <p className="m-0 text-pretty text-[18px] leading-[1.65]" style={{ color: LANDING_BODY }}>
+                  Four quick questions decide whether a closer look is worth your time. If it is, BoneBot asks a
+                  little more — in plain language, one question at a time. Answer with a tap or in your own words.
+                </p>
+              </div>
+              <div
+                className="overflow-hidden rounded-[18px]"
+                style={{ backgroundColor: LANDING_BG, border: `1px solid ${LANDING_BORDER_INPUT}`, boxShadow: "0 2px 6px rgba(60,46,32,0.05), 0 18px 40px -24px rgba(60,46,32,0.18)" }}
+              >
+                <div className="flex items-center gap-3 px-[22px] py-3.5" style={{ borderBottom: `1px solid ${LANDING_BORDER}` }}>
+                  <span className={`${LANDING_HEADING_FONT} text-[17px] font-semibold`} style={{ color: LANDING_INK }}>
+                    BoneBot
+                  </span>
+                  <span
+                    className="ml-auto rounded-full px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.06em]"
+                    style={{ color: LANDING_MUTED, border: `1px solid ${LANDING_BORDER_INPUT}` }}
+                  >
+                    Screening flag, not a diagnosis
+                  </span>
+                </div>
+                <div className="flex flex-col gap-3.5 px-[22px] pb-[26px] pt-6">
+                  <div
+                    className="max-w-[82%] self-start rounded-[14px_14px_14px_4px] bg-white px-4 py-3 text-[16px] leading-[1.55]"
+                    style={{ border: `1px solid ${LANDING_BORDER}`, color: "#2A2320" }}
+                  >
+                    Have your periods stopped for good?
+                  </div>
+                  <div className="max-w-[82%] self-end rounded-[14px_14px_4px_14px] px-4 py-3 text-[16px] leading-[1.55] text-[#FAF7F2]" style={{ backgroundColor: LANDING_ACCENT }}>
+                    Yes
+                  </div>
+                  <div
+                    className="max-w-[82%] self-start rounded-[14px_14px_14px_4px] bg-white px-4 py-3 text-[16px] leading-[1.55]"
+                    style={{ border: `1px solid ${LANDING_BORDER}`, color: "#2A2320" }}
+                  >
+                    Since age 50, have you broken a bone after a minor fall or bump?
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2.5">
+                    {["Yes", "No"].map((opt) => (
+                      <span
+                        key={opt}
+                        className="inline-flex min-h-[44px] items-center rounded-full border-[1.5px] px-[22px] text-[15px] font-semibold"
+                        style={{ borderColor: LANDING_ACCENT, color: LANDING_ACCENT }}
+                      >
+                        {opt}
+                      </span>
+                    ))}
+                    <span
+                      className="inline-flex min-h-[44px] items-center rounded-full border-[1.5px] px-[22px] text-[15px] font-semibold"
+                      style={{ borderColor: LANDING_BORDER_SECONDARY, color: LANDING_MUTED }}
+                    >
+                      Not sure
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Disclaimer band */}
+          <section style={{ backgroundColor: LANDING_DISCLAIMER_BG }}>
+            <div className="mx-auto flex w-full max-w-[1240px] flex-col gap-2.5 px-5 py-[clamp(40px,5vw,64px)] sm:px-16">
+              <p className={`${LANDING_HEADING_FONT} m-0 max-w-[34em] text-pretty text-[clamp(20px,2vw,26px)] leading-[1.4]`} style={{ color: LANDING_BG }}>
+                BoneBot is a screening flag, not a diagnosis.
+              </p>
+              <p className="m-0 max-w-[40em] text-pretty text-[17px] leading-[1.6]" style={{ color: LANDING_DISCLAIMER_SUB }}>
+                It does not provide medical advice — discuss results with your clinician. Only a DXA scan measures
+                bone density.
+              </p>
+            </div>
+          </section>
         </div>
       )}
 
@@ -2839,16 +3012,15 @@ export default function Home() {
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute -top-[26px] -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
-                            style={{ backgroundColor: "#15181A" }}
+                            className="absolute -top-[24px] -translate-x-1/2 rounded-md border border-[#D8DFDD] bg-white px-1.5 py-0.5 text-[10px] font-bold text-[#4A5452] shadow-sm"
                           >
-                            you
+                            {result.estimatedTScore.toFixed(1)}
                           </motion.div>
                           <motion.div
                             initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
                             animate={{ left: `${marker}%`, opacity: 1 }}
                             transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
-                            className="absolute top-0 h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#15181A]"
+                            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-[#4A5452] shadow-[0_0_0_1px_rgba(74,84,82,0.25)]"
                           />
                         </div>
                         <div className="mt-3.5 flex justify-between gap-2 text-xs font-semibold">
@@ -2864,6 +3036,12 @@ export default function Home() {
                           T-score compares your bone density to a healthy young adult: 0 is average, and lower (more
                           negative) means less dense bone.
                         </p>
+                        {result.validated && (
+                          <p className="mt-2 text-xs text-[#9AA5A2]">
+                            Validated on NHANES: mean error ±{result.mae} T-score units; the 95% range captured the
+                            true score 94.6% of the time in held-out testing (target 95%).
+                          </p>
+                        )}
                       </div>
                   </motion.div>
 
