@@ -3153,13 +3153,13 @@ export default function Home() {
       )}
 
       {screen === "chat" && flowMode === "conversation" && (
-        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#FFF3F9] via-[#FBF3FF] to-[#F3F0FF]">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#FAF7F2]">
           <FloatingBones />
           <header className="relative z-10 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12">
             <button
               type="button"
               onClick={goToLanding}
-              className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+              className="font-[family-name:var(--font-fraunces)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
             >
               Bone<span style={{ color: ACCENT }}>Bot</span>
             </button>
@@ -3171,7 +3171,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={startClassic}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
               >
                 Classic mode
               </button>
@@ -3179,7 +3179,7 @@ export default function Home() {
                 onClick={() => {
                   if (convMessages.length <= 1 || window.confirm("Start over? This clears your answers so far.")) restart();
                 }}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#E11D74] hover:text-[#E11D74]"
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E6E62] hover:text-[#0E6E62]"
               >
                 Start over
               </button>
@@ -3245,7 +3245,7 @@ export default function Home() {
                 <div className="flex flex-col gap-3">
                   {pendingBloodResults && !bloodEditMode && (
                     <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                      <div className="text-sm font-semibold text-[#241436]">Confirm blood values</div>
+                      <div className="text-sm font-semibold text-[#221B16]">Confirm blood values</div>
                       <div className="text-sm leading-[1.5] text-[#4A5452]">
                         {pendingBloodResults.vitaminD !== null && `Vitamin D: ${pendingBloodResults.vitaminD} nmol/L. `}
                         {pendingBloodResults.calcium !== null && `Calcium: ${pendingBloodResults.calcium} mmol/L. `}
@@ -3268,7 +3268,7 @@ export default function Home() {
                         </button>
                         <button
                           onClick={skipPendingBloodValues}
-                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                         >
                           Skip
                         </button>
@@ -3278,7 +3278,7 @@ export default function Home() {
 
                   {pendingBloodResults && bloodEditMode && (
                     <div className="flex flex-col gap-3 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white px-4 py-3.5">
-                      <div className="text-sm font-semibold text-[#241436]">Edit blood values</div>
+                      <div className="text-sm font-semibold text-[#221B16]">Edit blood values</div>
                       <div className="flex flex-wrap gap-3">
                         <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
                           Vitamin D (nmol/L)
@@ -3288,7 +3288,7 @@ export default function Home() {
                             value={bloodEditVitaminD}
                             onChange={(event) => setBloodEditVitaminD(event.target.value)}
                             placeholder="e.g. 55"
-                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                           />
                         </label>
                         <label className="flex flex-col gap-1 text-xs font-medium text-[#5A6462]">
@@ -3300,7 +3300,7 @@ export default function Home() {
                             value={bloodEditCalcium}
                             onChange={(event) => setBloodEditCalcium(event.target.value)}
                             placeholder="e.g. 2.3"
-                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#E11D74]"
+                            className="w-32 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-2.5 py-1.5 text-sm outline-none focus:border-[#0E6E62]"
                           />
                         </label>
                       </div>
@@ -3315,13 +3315,13 @@ export default function Home() {
                         </button>
                         <button
                           onClick={() => setBloodEditMode(false)}
-                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={skipPendingBloodValues}
-                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74]"
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62]"
                         >
                           Skip
                         </button>
@@ -3353,7 +3353,7 @@ export default function Home() {
                         </div>
                       )}
                       <label
-                        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#E11D74] hover:bg-[#FCE7F1]"
+                        className="flex cursor-pointer items-center gap-3 rounded-[12px] border-[1.5px] border-dashed border-[#C6CFCC] bg-[#F5F7F6] px-4 py-3 text-sm transition-colors hover:border-[#0E6E62] hover:bg-[#E4F0ED]"
                         aria-disabled={uploadBusy || bloodImageFiles.length >= MAX_IMAGES}
                       >
                         <span
@@ -3364,7 +3364,7 @@ export default function Home() {
                           📎
                         </span>
                         <span className="flex flex-col">
-                          <span className="font-semibold text-[#241436]">
+                          <span className="font-semibold text-[#221B16]">
                             {bloodImageFiles.length >= MAX_IMAGES
                               ? "Maximum 3 photos added"
                               : "Attach a photo of your blood-test results"}
@@ -3403,7 +3403,7 @@ export default function Home() {
                           type="button"
                           onClick={() => void sendConverseTurn("Skip — I don't have blood-test results.")}
                           disabled={uploadBusy}
-                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#E11D74] hover:text-[#E11D74] disabled:opacity-50"
+                          className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E6E62] hover:text-[#0E6E62] disabled:opacity-50"
                         >
                           Skip — I don&apos;t have blood-test results
                         </button>
@@ -3421,7 +3421,7 @@ export default function Home() {
                       event.preventDefault();
                       if (convInput.trim()) void sendConverseTurn(convInput.trim());
                     }}
-                    className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#E11D74]"
+                    className="flex gap-2 rounded-[12px] border-[1.5px] border-[#D5DCDA] bg-white p-1.5 focus-within:border-[#0E6E62]"
                   >
                     <input
                       ref={convInputRef}
@@ -3437,7 +3437,7 @@ export default function Home() {
                     <button
                       type="submit"
                       disabled={convBusy || !convInput.trim()}
-                      className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-40"
+                      className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-fraunces)] text-sm font-bold text-white disabled:opacity-40"
                       style={{ backgroundColor: ACCENT }}
                     >
                       Send
