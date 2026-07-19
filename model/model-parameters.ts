@@ -1,5 +1,5 @@
 // AUTO-GENERATED from model/train_bonebot.ipynb (NHANES 2013-2014). Do not edit by hand.
-// Regenerate whenever the model changes. 13 features incl. RA, HRT, parental hip fracture.
+// Regenerate whenever the model changes.
 
 export const triage = {
   intercept: -4.638858,
@@ -12,6 +12,12 @@ export const triage = {
   threshold: 0.02,
   auc: 0.8666,
 } as const;
+
+// When true, the "secondary osteoporosis" question (thyroid / coeliac / CKD) is
+// asked and its coefficient is used. Keep FALSE until the model is retrained
+// with the feature and the real coefficient + variance below are filled in by
+// the notebook. Shipping a fabricated coefficient would break the honesty rule.
+export const SECONDARY_CONDITION_TRAINED = false;
 
 export const tScoreModel = {
   intercept: -3.114305,
@@ -29,6 +35,9 @@ export const tScoreModel = {
     rheumatoidArthritis: -0.003796,
     onHormoneTherapy: 0.109861,
     parentalHipFracture: -0.240893,
+    // PENDING RETRAIN: thyroid/CKD "secondary osteoporosis" flag. 0 has no
+    // effect until SECONDARY_CONDITION_TRAINED flips true with a real value.
+    secondaryCondition: 0,
   },
   imputationDefaults: {
     bmi: 28.1000,
@@ -43,7 +52,20 @@ export const tScoreModel = {
     rheumatoidArthritis: 0.0000,
     onHormoneTherapy: 0.0000,
     parentalHipFracture: 0.0000,
+    secondaryCondition: 0.0000,
   },
   intervalHalfWidth: 0.9467,
   mae: 0.7226,
+  // Per-person prediction interval. `residualStd` is the complete-data residual
+  // SD; `z` its multiplier (so z * residualStd == intervalHalfWidth). When a
+  // feature is not supplied at inference we impute its mean, so its variance is
+  // added back: extra variance = coefficient^2 * featureVariances[feature],
+  // summed over imputed features (see scoreBone). `featureVariances` are the
+  // training-set variances; leave the object empty until the notebook exports
+  // them, in which case the band falls back to the fixed intervalHalfWidth.
+  intervals: {
+    residualStd: 0.4830,
+    z: 1.96,
+    featureVariances: {} as Partial<Record<string, number>>,
+  },
 } as const;
