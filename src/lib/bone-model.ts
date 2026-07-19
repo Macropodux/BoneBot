@@ -42,25 +42,36 @@ export type ModelOutput = {
 const round1 = (value: number) => Math.round(value * 10) / 10;
 const binary = (value: boolean) => (value ? 1 : 0);
 
-export function scoreBone(features: BoneFeatures): ModelOutput {
+// `providedFeatures`, when given, lists the feature keys the user actually
+// supplied. Missing features are still imputed (a linear model has to plug in
+// *some* value — the population mean is the neutral choice that adds no
+// information above or below baseline; dropping the term is arithmetically
+// "impute 0", which for e.g. calcium is nonsense). So the estimate always uses
+// all features, but only user-supplied ones are surfaced as "what drove this
+// result" — we never present an imputed default as one of her personal factors.
+// Omit the argument to show every non-zero factor (legacy behaviour).
+export function scoreBone(
+  features: BoneFeatures,
+  providedFeatures?: ReadonlyArray<keyof BoneFeatures>,
+): ModelOutput {
   const c = tScoreModel.coefficients;
-  const terms: [string, number][] = [
-    ["Age", c.age * features.age],
-    ["Years since menopause", c.yearsSinceMenopause * features.yearsSinceMenopause],
-    ["Hormone therapy", c.onHormoneTherapy * binary(features.onHormoneTherapy)],
-    ["Prior fragility fracture", c.priorFragilityFracture * binary(features.priorFragilityFracture)],
-    ["Body mass index", c.bmi * features.bmi],
-    ["Weight-bearing activity", c.activityLevel * features.weightBearingActivity],
-    ["Current smoker", c.currentSmoker * binary(features.currentSmoker)],
-    ["Parental hip fracture", c.parentalHipFracture * binary(features.parentalHipFracture)],
-    ["Glucocorticoid use", c.glucocorticoids * binary(features.glucocorticoids)],
-    ["Rheumatoid arthritis", c.rheumatoidArthritis * binary(features.rheumatoidArthritis)],
-    ["High alcohol intake", c.highAlcohol * binary(features.highAlcohol)],
-    ["Vitamin D", c.vitaminD * features.vitaminD],
-    ["Serum calcium", c.calcium * features.calcium],
+  const terms: [keyof BoneFeatures, string, number][] = [
+    ["age", "Age", c.age * features.age],
+    ["yearsSinceMenopause", "Years since menopause", c.yearsSinceMenopause * features.yearsSinceMenopause],
+    ["onHormoneTherapy", "Hormone therapy", c.onHormoneTherapy * binary(features.onHormoneTherapy)],
+    ["priorFragilityFracture", "Prior fragility fracture", c.priorFragilityFracture * binary(features.priorFragilityFracture)],
+    ["bmi", "Body mass index", c.bmi * features.bmi],
+    ["weightBearingActivity", "Weight-bearing activity", c.activityLevel * features.weightBearingActivity],
+    ["currentSmoker", "Current smoker", c.currentSmoker * binary(features.currentSmoker)],
+    ["parentalHipFracture", "Parental hip fracture", c.parentalHipFracture * binary(features.parentalHipFracture)],
+    ["glucocorticoids", "Glucocorticoid use", c.glucocorticoids * binary(features.glucocorticoids)],
+    ["rheumatoidArthritis", "Rheumatoid arthritis", c.rheumatoidArthritis * binary(features.rheumatoidArthritis)],
+    ["highAlcohol", "High alcohol intake", c.highAlcohol * binary(features.highAlcohol)],
+    ["vitaminD", "Vitamin D", c.vitaminD * features.vitaminD],
+    ["calcium", "Serum calcium", c.calcium * features.calcium],
   ];
 
-  const estimate = tScoreModel.intercept + terms.reduce((sum, [, value]) => sum + value, 0);
+  const estimate = tScoreModel.intercept + terms.reduce((sum, [, , value]) => sum + value, 0);
   const low = estimate - tScoreModel.intervalHalfWidth;
   const high = estimate + tScoreModel.intervalHalfWidth;
 
@@ -69,9 +80,10 @@ export function scoreBone(features: BoneFeatures): ModelOutput {
   else if (estimate >= -1.0) category = "lower";
   else category = "uncertain";
 
+  const provided = providedFeatures ? new Set(providedFeatures) : null;
   const contributions = terms
-    .filter(([, value]) => Math.abs(value) > 1e-3)
-    .map(([factor, contribution]): FactorContribution => ({
+    .filter(([key, , value]) => Math.abs(value) > 1e-3 && (!provided || provided.has(key)))
+    .map(([, factor, contribution]): FactorContribution => ({
       factor,
       contribution,
       direction: contribution > 0 ? "raises" : "lowers",
