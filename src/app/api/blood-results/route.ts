@@ -4,7 +4,11 @@ import { z } from "zod";
 
 export const maxDuration = 30;
 
-const MODEL = process.env.OPENAI_MODEL ?? "gpt-5-nano";
+// Lab-photo OCR needs a stronger model than the nano text model — gpt-5-nano's
+// extraction was reported unreliable on real blood-result photos. Kept as its
+// own env var so it can be tuned independently of OPENAI_MODEL (the text-only
+// routes). No temperature override: leave the model's default.
+const VISION_MODEL = process.env.OPENAI_VISION_MODEL ?? "gpt-5-mini";
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
@@ -33,7 +37,7 @@ export async function POST(req: Request) {
 
   try {
     const { object } = await generateObject({
-      model: openai(MODEL),
+      model: openai(VISION_MODEL),
       schema: BloodResultsSchema,
       system:
         "You extract laboratory values from an uploaded blood-result image. Extract only values that are clearly visible with the exact labels and units below. Do not estimate, convert units, interpret, diagnose, or give advice. Return null for a missing, unclear, differently-unit-ed, or out-of-range value.",
