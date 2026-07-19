@@ -33,7 +33,29 @@ type Body = {
   // Optional preferred name for personalization only — never used to change
   // the score or any factual content, just how the response addresses her.
   name?: string;
+  // Optional reply language from the client's fixed picker. Validated against
+  // SUPPORTED_LANGUAGES below; anything else (or English) is a no-op.
+  language?: string;
 };
+
+// Multilingual mode: the model context, evidence wording, and every rule stay
+// in English — only the LANGUAGE THE REPLY IS WRITTEN IN changes. The value
+// must match the client picker's fixed list, so free text can never reach the
+// system prompt.
+const SUPPORTED_LANGUAGES = new Set([
+  "Spanish",
+  "French",
+  "German",
+  "Italian",
+  "Portuguese",
+  "Turkish",
+  "Chinese",
+]);
+function languageInstruction(language?: string): string {
+  return language && SUPPORTED_LANGUAGES.has(language)
+    ? `\n\nWrite your entire reply in natural, plain-spoken ${language}. Keep every number, threshold, factor, and rule exactly as supplied; standard clinical abbreviations like DXA and T-score may stay as-is. Every rule above still applies.`
+    : "";
+}
 
 // Warm but firm: acknowledges the question was heard, still declines to answer
 // it, and points her somewhere useful (her GP or scan provider) rather than a
@@ -180,7 +202,7 @@ export async function POST(req: Request) {
   if (!body.result && !body.triage && !body.question) {
     return new Response("BoneBot needs a screening result to explain.", { status: 400 });
   }
-  const system = body.question
+  const baseSystem = body.question
     ? QUESTION_SYSTEM
     : body.triage
       ? TRIAGE_SYSTEM
@@ -193,6 +215,7 @@ export async function POST(req: Request) {
             : body.mode === "clinician"
               ? CLINICIAN_SYSTEM
               : CONSUMER_SYSTEM;
+  const system = baseSystem + languageInstruction(body.language);
 
   // Borderline near-normal: an "uncertain"-band estimate that actually sits
   // close to (or whose range reaches into) the normal range (T >= -1.0). A firm
