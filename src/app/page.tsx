@@ -2710,63 +2710,6 @@ export default function Home() {
                     )}
                   </motion.div>
 
-                  <motion.div variants={reveal} ref={emailSectionRef} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-6 sm:px-8">
-                    <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
-                      Keep a copy of this result
-                    </div>
-                    <div className="mt-0.5 text-[13px] text-[#5A6462]">
-                      We&apos;ll email it to you. Bring it to your GP appointment.
-                    </div>
-
-                    {emailSendState === "sent" ? (
-                      <motion.p
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.3, ease: EASE_OUT }}
-                        className="mt-4 flex items-center gap-2 text-sm font-semibold"
-                        style={{ color: ACCENT }}
-                      >
-                        <span aria-hidden>✓</span> Sent to {emailAddress}.
-                      </motion.p>
-                    ) : (
-                      <form
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          void sendResultEmail();
-                        }}
-                        className="mt-4 flex flex-col gap-2 sm:flex-row"
-                      >
-                        <input
-                          type="email"
-                          required
-                          value={emailAddress}
-                          onChange={(event) => {
-                            setEmailAddress(event.target.value);
-                            if (emailSendState === "error") setEmailSendState("idle");
-                          }}
-                          placeholder="you@example.com"
-                          aria-label="Your email address"
-                          disabled={emailSendState === "sending"}
-                          className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E] disabled:opacity-50"
-                        />
-                        <motion.button
-                          whileHover={emailSendState === "sending" ? {} : { scale: 1.02 }}
-                          whileTap={emailSendState === "sending" ? {} : { scale: 0.98 }}
-                          transition={{ duration: 0.15 }}
-                          type="submit"
-                          disabled={emailSendState === "sending" || !emailAddress.trim()}
-                          className="flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] px-5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-50"
-                          style={{ backgroundColor: ACCENT }}
-                        >
-                          <span aria-hidden>✉️</span> {emailSendState === "sending" ? "Sending…" : "Email this result"}
-                        </motion.button>
-                      </form>
-                    )}
-                    {emailSendState === "error" && (
-                      <p className="mt-2 text-sm text-[#B0442F]">{emailSendError || "Couldn't send that email right now."}</p>
-                    )}
-                  </motion.div>
-
                   {uncertaintyNotes.length > 0 && (
                     <motion.div variants={reveal} className="rounded-2xl border border-[#E6CC89] bg-[#FFF8E8] px-7 py-7 sm:px-8">
                       <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
@@ -2971,6 +2914,63 @@ export default function Home() {
                       </div>
                     </motion.div>
                   )}
+
+                  <motion.div variants={reveal} ref={emailSectionRef} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-6 sm:px-8">
+                    <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
+                      Keep a copy of this result
+                    </div>
+                    <div className="mt-0.5 text-[13px] text-[#5A6462]">
+                      We&apos;ll email it to you. Bring it to your GP appointment.
+                    </div>
+
+                    {emailSendState === "sent" ? (
+                      <motion.p
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, ease: EASE_OUT }}
+                        className="mt-4 flex items-center gap-2 text-sm font-semibold"
+                        style={{ color: ACCENT }}
+                      >
+                        <span aria-hidden>✓</span> Sent to {emailAddress}.
+                      </motion.p>
+                    ) : (
+                      <form
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void sendResultEmail();
+                        }}
+                        className="mt-4 flex flex-col gap-2 sm:flex-row"
+                      >
+                        <input
+                          type="email"
+                          required
+                          value={emailAddress}
+                          onChange={(event) => {
+                            setEmailAddress(event.target.value);
+                            if (emailSendState === "error") setEmailSendState("idle");
+                          }}
+                          placeholder="you@example.com"
+                          aria-label="Your email address"
+                          disabled={emailSendState === "sending"}
+                          className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E] disabled:opacity-50"
+                        />
+                        <motion.button
+                          whileHover={emailSendState === "sending" ? {} : { scale: 1.02 }}
+                          whileTap={emailSendState === "sending" ? {} : { scale: 0.98 }}
+                          transition={{ duration: 0.15 }}
+                          type="submit"
+                          disabled={emailSendState === "sending" || !emailAddress.trim()}
+                          className="flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] px-5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-50"
+                          style={{ backgroundColor: ACCENT }}
+                        >
+                          <span aria-hidden>✉️</span> {emailSendState === "sending" ? "Sending…" : "Email this result"}
+                        </motion.button>
+                      </form>
+                    )}
+                    {emailSendState === "error" && (
+                      <p className="mt-2 text-sm text-[#B0442F]">{emailSendError || "Couldn't send that email right now."}</p>
+                    )}
+                  </motion.div>
 
                   <motion.div variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
                     <div className="mb-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
