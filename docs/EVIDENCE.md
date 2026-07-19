@@ -8,6 +8,25 @@ those cards and the model output; it must not introduce new clinical claims.
 The team wiki indexes this register at
 [`wiki/sources/clinical-evidence-library.md`](../wiki/sources/clinical-evidence-library.md).
 
+## T-score definition
+
+A T-score expresses a person's measured bone mineral density (BMD) as the number
+of standard deviations (SD) it lies above or below the mean BMD of a healthy
+young-adult reference population of the same sex:
+
+```
+T-score = (measured BMD − young-adult reference mean BMD) / young-adult reference SD
+```
+
+Per WHO diagnostic criteria (as codified in current clinical guidance), at the hip
+or spine: **T-score <= -2.5** defines osteoporosis, **-2.5 < T-score < -1.0**
+defines osteopenia (low bone mass), and **T-score >= -1.0** is normal. A T-score is
+distinct from a **Z-score**, which compares BMD to an age-matched (not
+young-adult) reference and is used clinically to flag secondary causes of bone
+loss, not to diagnose postmenopausal osteoporosis. BoneBot's `estimatedTScore` is
+a model-estimated approximation of this same DXA-scale statistic — it is never a
+substitute for a measured DXA T-score. Source: `bhof-clinicians-guide-2022`.
+
 ## Clinical boundaries
 
 - BoneBot estimates a DXA-scale T-score; it does not measure bone density,
@@ -44,6 +63,7 @@ The team wiki indexes this register at
 
 | ID | Evidence role | Source |
 | --- | --- | --- |
+| `bhof-clinicians-guide-2022` | Current clinical guideline formally defining T-score/Z-score calculation and WHO diagnostic thresholds (normal / osteopenia / osteoporosis). | [LeBoff et al., 2022, "The clinician's guide to prevention and treatment of osteoporosis" (Osteoporos Int)](https://link.springer.com/article/10.1007/s00198-021-05900-y) |
 | `nhs-dxa` | UK patient explanation of DXA, its limits, and clinical risk factors (including prior fracture, smoking, family history, low BMI and glucocorticoids). | [NHS: Bone density scan—when it is used](https://www.nhs.uk/tests-and-treatments/dexa-scan/why-its-done/) |
 | `nogg-2024` | UK guideline for fracture-risk assessment, DXA, lifestyle and clinical management. | [NOGG 2024 guideline](https://www.nogg.org.uk/sites/nogg/download/NOGG-Guideline-2024.pdf) |
 | `uspstf-2025` | Screening context: all women 65+ and postmenopausal women under 65 at increased risk; not a recommendation for people with known fragility fracture or secondary osteoporosis. | [USPSTF clinical summary](https://www.uspreventiveservicestaskforce.org/uspstf/document/ClinicalSummaryFinal/osteoporosis-screening) |
