@@ -23,6 +23,7 @@ import { resolveAmbiguousAnswer } from "@/lib/ambiguity";
 import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model";
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
 import { tScoreModel, SECONDARY_CONDITION_TRAINED } from "../../model/model-parameters";
+import FloatingBones from "./FloatingBones";
 
 const ACCENT = "#0E7C6E";
 const ACCENT_HOVER = "#0A5A50";
@@ -1370,6 +1371,7 @@ export default function Home() {
 
       {screen === "landing" && (
         <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
+          <FloatingBones />
           <header className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-12">
             <div className="font-[family-name:var(--font-heading)] text-[22px] font-bold tracking-[-0.02em]">
               Bone<span style={{ color: ACCENT }}>Bot</span>
