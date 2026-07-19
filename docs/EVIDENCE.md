@@ -25,7 +25,9 @@ distinct from a **Z-score**, which compares BMD to an age-matched (not
 young-adult) reference and is used clinically to flag secondary causes of bone
 loss, not to diagnose postmenopausal osteoporosis. BoneBot's `estimatedTScore` is
 a model-estimated approximation of this same DXA-scale statistic — it is never a
-substitute for a measured DXA T-score. Source: `bhof-clinicians-guide-2022`.
+substitute for a measured DXA T-score. Sources: `bhof-clinicians-guide-2022`,
+`looker-tscore-reference-1998` (the NHANES III young-adult reference population
+the T-score is computed against).
 
 ## Clinical boundaries
 
@@ -101,6 +103,30 @@ substitute for a measured DXA T-score. Source: `bhof-clinicians-guide-2022`.
 | `coeliac-osteoporosis-cohort-2018` | Prospective cohort of newly diagnosed adult coeliac patients: bone mineral density alterations in 60.3%, with osteoporosis in roughly half of affected patients. | [Risk factors associated with osteoporosis in a cohort of prospectively diagnosed adult coeliac patients (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC6169042/) |
 | `ckd-fracture-review-2025` | Review: fracture risk is markedly elevated in chronic kidney disease, particularly stages G3–G5D, and is an overlooked complication. | [Fracture Risk in Chronic Kidney Disease (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC12298187/) |
 | `ckd-osteoporosis-systematic-review-2020` | Systematic review: 18–32% of CKD patients also have osteoporosis, with fracture risk over 2.5x that of people without CKD. | [Osteoporosis in Patients with Chronic Kidney Diseases (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC7555655/) |
+| `glow-care-gaps-2022` | Global review: the large majority of postmenopausal women received no osteoporosis treatment in the period following a fragility fracture (GLOW and related cohorts). | [Osteoporosis in 2022: care gaps to screening and personalised medicine (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC7614114/) |
+| `eu-primary-care-gap-2020` | European primary-care cohort: about 75% of elderly women at high fracture risk received no osteoporosis treatment. | [Osteoporosis treatment gap in European primary care, Osteoporos Int 2020](https://link.springer.com/article/10.1007/s00198-020-05557-z) |
+| `intl-fracture-care-gap` | Cross-national review describing the fragility-fracture treatment gap as a persistent international phenomenon. | [Fragility fractures and the osteoporosis care gap: an international phenomenon](https://www.sciencedirect.com/science/article/abs/pii/S0049017205002143) |
+| `frax-sensitivity-2015` | Comparative review reporting FRAX sensitivity of only ~33% for DXA-defined osteoporosis in women aged 50–64 at a 10-year major-fracture threshold of 9.3%. | [Risk assessment tools for screening, Curr Osteoporos Rep 2015](https://link.springer.com/article/10.1007/s11914-015-0282-z) |
+| `screening-tools-network-meta-2025` | Network meta-analysis comparing OST, ORAI, SCORE, OSIRIS and FRAX, grouping SCORE/ORAI/OST as higher-sensitivity and FRAX/OSIRIS as higher-specificity. | [Comparative accuracy of screening tools for osteoporosis, Int J Nurs Stud 2025](https://www.sciencedirect.com/science/article/abs/pii/S0020748925000380) |
+| `ost-performance-review` | Performance review of the age + weight-only OST screening tool. | [OST performance review (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC6068473/) |
+| `screening-tools-meta-2015` | Systematic review and meta-analysis of clinical risk-assessment instruments, reporting pooled OST sensitivity ~89% / specificity ~41%. | [Systematic review & meta-analysis of clinical risk-assessment instruments, Osteoporos Int 2015](https://link.springer.com/article/10.1007/s00198-015-3025-1) |
+| `nhanes-ml-karaismailoglu-2025` | NHANES machine-learning model for low bone density (12,108 adults ≥50); sex-stratified analysis shows age+BMI dominate in women, and menopause status and physical activity were excluded for missing data. | [Karaismailoglu & Karaismailoglu, Risk prediction of low bone density with ML, Balkan Med J 2025 (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC12576511/) |
+| `accelerometry-bmd-nhanes-2019` | NHANES 2005–2006 accelerometer study linking objectively measured activity to higher bone density and trabecular bone score in older adults. | [Accelerometry, BMD and trabecular bone score, NHANES 2005-2006, Arch Osteoporos 2019](https://link.springer.com/article/10.1007/s11657-019-0583-4) |
+| `activity-spine-bmd-nhanes-2023` | NHANES 2007–2018 analysis: ≥38 MET-hours/week of activity was linked to lower osteoporosis risk in post-menopausal women. | [Physical activity and spine BMD in post-menopausal women, NHANES 2007-2018, J Orthop Surg Res 2023](https://link.springer.com/article/10.1186/s13018-023-03976-2) |
+| `ukb-brief-activity-bone-2017` | UK Biobank study: even brief bouts of higher-intensity activity predicted bone health in pre- and post-menopausal women. | [Brief high-intensity activity and bone health, UK Biobank, Int J Epidemiol 2017](https://academic.oup.com/ije/article/46/6/1847/3902973) |
+| `wearable-ownership-bias-2025` | Demographic/socioeconomic analysis of Fitbit ownership showing wearable data skews toward younger, more active, more affluent people. | [Demographic/socioeconomic factors in Fitbit ownership, IJERPH 2025](https://doi.org/10.3390/ijerph23070839) |
+| `wearable-surveillance-representativeness-2019` | UK analysis of physical-activity surveillance via apps/wearables and how representative that data is of the general population. | [Physical activity surveillance via apps/wearables: representativeness in the UK, JMIR 2019 (PMC)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6371078/) |
+| `wearable-social-determinant-2019` | Commentary on wearable-device access becoming a social determinant of health. | [Access to wearables as a social determinant of health, Healthcare IT News](https://www.healthcareitnews.com/news/access-wearables-could-become-social-determinant-health-researchers-warn) |
+| `health-literacy-digital-divide-2016` | Review of health literacy and health-IT/digital-health adoption (the "digital divide"). | [Health literacy and health-IT adoption (PMC)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5069402/) |
+| `fall-risk-ml-comparison-2025` | Machine-learning comparison of accelerometric versus non-accelerometric factors for predicting fall risk in older adults. | [Predicting fall risk in older adults: ML comparison, Digit Health 2025 (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC11951886/) |
+| `fall-risk-wearable-2021` | Wearable-sensor gait study reporting ~81.6% accuracy classifying future fallers in community-dwelling older adults. | [Prediction of fall risk using a wearable system (PMC)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8545936/) |
+| `looker-tscore-reference-1998` | Source of the NHANES III young-adult proximal-femur BMD reference data used to derive T-scores. | Looker et al., "Updated data on proximal femur bone mineral levels of US adults", Osteoporos Int 1998. |
+| `adherence-mayo-2011` | Review of osteoporosis treatment outcomes: real-world medication adherence ~60%, ~70% discontinue within a year, and physicians overestimate adherence (perceived 69% vs actual <49%). | [A New Look at Osteoporosis Outcomes, Mayo Clin Proc](https://www.mayoclinicproceedings.org/article/S0025-6196(11)61200-7/fulltext) |
+| `adherence-economics-2011` | Review of the economic case for improving osteoporosis medication adherence. | [The Economics of Improving Medication Adherence in Osteoporosis (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC3167669/) |
+| `exercise-adherence-older-women-2010` | Community-based cohort of sedentary women 70+: only 17% reached recommended activity levels in a walking programme. | [Predictors of Long-term Exercise Adherence in Older Women (PMC)](https://pmc.ncbi.nlm.nih.gov/articles/PMC2828261/) |
+| `resistance-app-adherence-2023` | Cohort of mobile resistance-training app users: only 18.1% of beginners remained adherent at 6 months. | [Predictors of long-term resistance exercise adherence among beginners (SportRxiv)](https://sportrxiv.org/index.php/server/preprint/view/709) |
+| `osteoporosis-cost-policy-2019` | US healthcare-cost projection: osteoporotic fracture costs rising from ~$57B (2018) to over $95B/year by 2040 as fracture counts rise from 1.9M to 3.2M/year. | [Healthcare Policy Changes in Osteoporosis Can Improve Outcomes and Reduce Costs, JBMR Plus (PMC)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6808223/) |
+| `fracture-economic-burden-2020` | US postmenopausal cohort: a single fracture is linked to roughly $30,000 in all-cause healthcare costs in the following year. | [Long-term economic burden of osteoporotic fracture in US postmenopausal women, Osteoporos Int 2020](https://link.springer.com/article/10.1007/s00198-020-05769-3) |
 
 ## Source use and limits
 
@@ -211,3 +237,61 @@ or advise on its treatment. That rule holds regardless of the model-input
 distinction above — even once `SECONDARY_CONDITION_TRAINED` is true and
 thyroid/CKD feed `secondaryCondition`, the per-condition chat cards still may
 not diagnose or give dosing/treatment advice.
+
+### Motivation-context cards: why screening, activity monitoring, and adherence matter
+
+`MOTIVATION.md` cites a further ~20 sources that establish *why* BoneBot exists
+(the screening care gap, how existing tools compare, why an objective activity
+signal was chosen, why NHANES over consumer wearables, and the adherence and
+cost case for early identification) rather than *how* to weigh an individual
+factor. These are added as chat-only evidence cards — like the secondary-cause
+cards above, none are `BoneFeatures` model inputs or carry a model coefficient.
+They exist so BoneBot can answer "why should I bother getting screened?", "how
+is this different from other risk calculators?", "why does this app use a
+wearable?", or "what about falls?" with an approved, sourced answer instead of
+declining or improvising.
+
+- **Care gap** (`care-gap`). Even after a fragility fracture, most women are
+  never started on osteoporosis treatment (`glow-care-gaps-2022`,
+  `eu-primary-care-gap-2020`, `intl-fracture-care-gap`). Context for why
+  earlier screening matters; must not be used to claim an individual person
+  has been under-treated.
+- **Screening-tool comparison** (`screening-tool-comparison`). Existing
+  clinical tools (OST, ORAI, SCORE, OSIRIS, FRAX) trade sensitivity against
+  specificity and mostly reduce to age and weight; a recent NHANES ML model
+  shows the same pattern (`frax-sensitivity-2015`,
+  `screening-tools-network-meta-2025`, `ost-performance-review`,
+  `screening-tools-meta-2015`, `nhanes-ml-karaismailoglu-2025`). BoneBot must
+  not claim to outperform these tools clinically or use this card to suggest
+  it replaces validated calculators.
+- **Wearable activity evidence** (`wearable-activity-evidence`). Objectively
+  measured activity (accelerometery) has been linked to bone density and
+  fracture-relevant outcomes in older and post-menopausal women
+  (`accelerometry-bmd-nhanes-2019`, `activity-spine-bmd-nhanes-2023`,
+  `ukb-brief-activity-bone-2017`). Supports why BoneBot asks about activity;
+  must not be used to promise that a change in activity will change a
+  person's estimated score.
+- **Wearable data bias** (`wearable-data-bias`). Consumer wearable/fitness-app
+  data over-represents younger, more active, more affluent users, so BoneBot
+  trains on NHANES's provisioned research-grade accelerometer data instead
+  (`wearable-ownership-bias-2025`, `wearable-surveillance-representativeness-2019`,
+  `wearable-social-determinant-2019`, `health-literacy-digital-divide-2016`).
+  Explains a design choice; not a statement about any individual's own device
+  or data.
+- **Fall risk** (`fall-risk`). Gait and movement patterns measured by
+  wearables have been used in research to help flag people at higher risk of
+  a fall, which is what turns low bone density into a fracture
+  (`fall-risk-ml-comparison-2025`, `fall-risk-wearable-2021`). BoneBot must
+  state plainly that it does not assess fall risk or gait today, and direct
+  any fall concerns to a clinician or falls-prevention service.
+- **Treatment and exercise adherence** (`treatment-adherence`). Even once
+  diagnosed and prescribed medication or exercise, real-world adherence is
+  often poor (`adherence-mayo-2011`, `adherence-economics-2011`,
+  `exercise-adherence-older-women-2010`, `resistance-app-adherence-2023`).
+  General context only — never personalised adherence coaching or a
+  treatment/exercise plan.
+- **Economic burden** (`economic-burden`). Osteoporotic fractures carry a
+  large, rising healthcare cost, and a single fracture is linked to roughly
+  $30,000 in the following year's care (`osteoporosis-cost-policy-2019`,
+  `fracture-economic-burden-2020`). Population-level context; no individual
+  cost, insurance, or billing advice.

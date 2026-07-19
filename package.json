@@ -13,7 +13,6 @@
     "@ai-sdk/anthropic": "^4.0.15",
     "@ai-sdk/openai": "^4.0.16",
     "@ai-sdk/react": "^4.0.33",
-    "@supabase/supabase-js": "^2.110.7",
     "ai": "^7.0.30",
     "framer-motion": "^12.42.2",
     "next": "16.2.10",
