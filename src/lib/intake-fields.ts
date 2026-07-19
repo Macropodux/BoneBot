@@ -299,6 +299,29 @@ export const FIELDS: FieldDef[] = [
     hint: "A height in centimetres, roughly 100-230.",
     parse: parseNumber(100, 230, {}, true),
   },
+  // ---------- DEEP: blood test (asked before the wearable questions) ----------
+  // vitaminD is prompted (photo upload or typed); calcium is optional and is
+  // captured from the same blood photo, so it is never a separate question.
+  {
+    key: "vitaminD",
+    question: "Do you have a recent vitamin D blood-test result? You can upload a photo, or tell me the number.",
+    inputType: "image",
+    stage: "deep",
+    required: true,
+    skippable: true,
+    hint: `A vitamin D value in nmol/L, roughly ${VITAMIN_D_RANGE.min}-${VITAMIN_D_RANGE.max}.`,
+    parse: parseNumber(VITAMIN_D_RANGE.min, VITAMIN_D_RANGE.max, {}, true),
+  },
+  {
+    key: "calcium",
+    question: "Do you have a recent calcium blood-test result?",
+    inputType: "image",
+    stage: "deep",
+    required: false,
+    skippable: true,
+    hint: `A serum calcium value in mmol/L, roughly ${CALCIUM_RANGE.min}-${CALCIUM_RANGE.max}.`,
+    parse: parseNumber(CALCIUM_RANGE.min, CALCIUM_RANGE.max, {}, true),
+  },
   {
     key: "averageDailySteps",
     question: `${ACTIVITY_QUESTIONS.steps.question} You can upload a screenshot from your fitness tracker or activity app, or just tell me the number.`,
@@ -335,34 +358,6 @@ export const FIELDS: FieldDef[] = [
         },
       ]
     : []),
-
-  // ---------- DEEP, optional (never actively asked) ----------
-  // Mirrors FIELD_DEFAULTS / SKIPPABLE in page.tsx: blood-test values are
-  // user-provided only when given (typically via the existing photo-upload
-  // route, which the client can use to pre-populate `collected` before/between
-  // /api/converse turns) — this endpoint never prompts for them itself, so it
-  // never needs to handle image bytes. Still declared here (inputType
-  // "image") so a client knows how to collect them if it chooses to.
-  {
-    key: "vitaminD",
-    question: "Do you have a recent vitamin D blood-test result? You can upload a photo, or tell me the number.",
-    inputType: "image",
-    stage: "deep",
-    required: true,
-    skippable: true,
-    hint: `A vitamin D value in nmol/L, roughly ${VITAMIN_D_RANGE.min}-${VITAMIN_D_RANGE.max}.`,
-    parse: parseNumber(VITAMIN_D_RANGE.min, VITAMIN_D_RANGE.max, {}, true),
-  },
-  {
-    key: "calcium",
-    question: "Do you have a recent calcium blood-test result?",
-    inputType: "image",
-    stage: "deep",
-    required: false,
-    skippable: true,
-    hint: `A serum calcium value in mmol/L, roughly ${CALCIUM_RANGE.min}-${CALCIUM_RANGE.max}.`,
-    parse: parseNumber(CALCIUM_RANGE.min, CALCIUM_RANGE.max, {}, true),
-  },
 ];
 
 const FIELD_MAP = new Map(FIELDS.map((f) => [f.key, f]));
