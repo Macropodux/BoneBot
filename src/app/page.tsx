@@ -132,8 +132,28 @@ const CAT_META = {
     color: "#B0442F",
     bg: "#F9E7E2",
     desc: "Several of your answers match strong clinical risk factors. A screening flag is not a diagnosis — but this profile is exactly what DEXA referral guidelines are designed to catch. Please raise it with your GP.",
+    extended:
+      "A DEXA (or DXA) scan measures bone mineral density directly with a low-dose X-ray, and is the only way to confirm osteoporosis — this screening estimate is a prompt to get that conversation started, not a substitute for it. Osteoporosis itself is very manageable once it's known: your GP can discuss monitoring, bone-protective lifestyle changes, and, if appropriate, medication that reduces fracture risk. Bringing this result — the estimated T-score, range, and the factors behind it — to that appointment gives your clinician a concrete starting point.",
   },
 } as const;
+
+// Paula, 2026-07-19: standard clinical T-score bands (same scale a DXA scan
+// reports on), shown as a legend so the raw number is legible on its own.
+const T_SCORE_BANDS = [
+  { label: "Normal", range: "−1.0 or above", color: "#0E7C6E" },
+  { label: "Osteopenia (low bone mass)", range: "−1.0 to −2.5", color: "#A06D14" },
+  { label: "Osteoporosis", range: "−2.5 or below", color: "#B0442F" },
+] as const;
+
+// Shown on every band, before the DEXA next-step banner — the modifiable
+// side of the picture (SCREEN.md's "lifestyle strand"), not routed through
+// the LLM so it's always present even without an API key.
+const IMPROVEMENT_TIPS = [
+  "Weight-bearing and muscle-strengthening exercise (brisk walking, dancing, resistance training) helps slow bone loss.",
+  "Aim for enough calcium (about 700mg/day for most adults) and vitamin D (10 micrograms/day in the UK) — through diet, sunlight, or a supplement if your GP recommends one.",
+  "Stop smoking and keep alcohol within recommended limits — both accelerate bone loss.",
+  "Reduce fall risk at home: good lighting, clear walkways, and reviewing any medication that affects balance.",
+] as const;
 
 const TABS = [
   { id: "category", label: "Category" },
@@ -166,27 +186,47 @@ function bandColor(tScore: number): string {
   return "#A06D14"; // uncertain
 }
 
+// Same clinical thresholds as scoreBone()'s category logic, applied to a
+// REPORTED (not estimated) T-score — from an uploaded DXA report or typed in.
+function bandKnownTScore(tScore: number): keyof typeof CAT_META {
+  if (tScore <= -2.5) return "elevated";
+  if (tScore >= -1.0) return "low";
+  return "moderate";
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1] ?? "");
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 // Five reputable, evidence-based patient resources — shown as static links,
 // never routed through the LLM (no risk of a hallucinated URL).
 const RESOURCES = [
   {
     name: "Royal Osteoporosis Society (UK)",
-    url: "https://theros.org.uk",
+    url: "https://theros.org.uk/information-and-support/",
     note: "Patient guides on bone density, calcium & vitamin D, exercise, and a helpline.",
   },
   {
     name: "International Osteoporosis Foundation",
-    url: "https://osteoporosis.foundation",
+    url: "https://www.osteoporosis.foundation/educational-hub",
     note: "Global patient resources and the “Are you at risk?” screening quiz.",
   },
   {
     name: "NIH Osteoporosis and Related Bone Diseases Resource Center",
-    url: "https://bones.nih.gov",
+    url: "https://www.niams.nih.gov/health-topics/bone-health-and-osteoporosis",
     note: "US government-run, plain-language info on prevention, diagnosis, and menopause-related bone loss.",
   },
   {
     name: "Bone Health & Osteoporosis Foundation",
-    url: "https://bonehealthandosteoporosis.org",
+    url: "https://www.bonehealthandosteoporosis.org/preventing-fractures/",
     note: "Clinician-vetted guidance on FRAX risk scoring, DEXA scans, and treatment options.",
   },
   {
@@ -282,6 +322,11 @@ export default function Home() {
   const [result, setResult] = useState<ModelOutput | null>(null);
   const [triageResult, setTriageResult] = useState<TriageOutput | null>(null);
   const [routeMessage, setRouteMessage] = useState("");
+  const [existingCareMode, setExistingCareMode] = useState(false);
+  const [knownTScore, setKnownTScore] = useState<number | null>(null);
+  const [tScoreInput, setTScoreInput] = useState("");
+  const [documentBusy, setDocumentBusy] = useState(false);
+  const [documentNote, setDocumentNote] = useState("");
 
   const [qaMessages, setQaMessages] = useState<ChatMessage[]>([]);
   const [qaTyping, setQaTyping] = useState(false);
@@ -368,7 +413,13 @@ export default function Home() {
         return;
       }
       if (nextAnswers.existingCare === "Yes") {
-        void finishAtGate("Because you may already have a scan result, diagnosis, or treatment plan, BoneBot will not replace it with an estimate. Please ask your GP or scan provider for your most recent DXA report and recommended follow-up.");
+        setRouteMessage(
+          "Because you may already have a scan result, diagnosis, or treatment plan, BoneBot won't replace it with an estimate — share your most recent DXA T-score (upload the report or type the number) and BoneBot will explain what it means instead."
+        );
+        setTriageResult(null);
+        setResult(null);
+        setExistingCareMode(true);
+        setScreen("results");
         return;
       }
       const triage = scoreTriage({
@@ -411,6 +462,10 @@ export default function Home() {
     setFeatures(null);
     setTriageResult(null);
     setRouteMessage("");
+    setExistingCareMode(false);
+    setKnownTScore(null);
+    setTScoreInput("");
+    setDocumentNote("");
   }
 
   async function qaAsk(q: string) {
@@ -431,6 +486,47 @@ export default function Home() {
     }
     setQaTyping(false);
     setQaMessages((m) => [...m, { role: "bot", text }]);
+  }
+
+  function submitKnownTScore(raw: string) {
+    const value = parseFloat(raw);
+    if (Number.isNaN(value) || value < -5.0 || value > 3.0) {
+      setDocumentNote("That doesn't look like a T-score (usually a small number like -2.1). Try again, or upload the report instead.");
+      return;
+    }
+    setDocumentNote("");
+    setKnownTScore(value);
+  }
+
+  // Reads an uploaded DXA report or blood test and extracts only what's
+  // explicitly printed on it — never invented. She still sees the extracted
+  // value before it's used (SCREEN.md's confirm-before-scoring guardrail).
+  async function handlePdfUpload(file: File) {
+    setDocumentBusy(true);
+    setDocumentNote("");
+    try {
+      const pdfBase64 = await fileToBase64(file);
+      const r = await fetch("/api/document", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ pdfBase64 }),
+      });
+      if (!r.ok) {
+        setDocumentNote("BoneBot couldn't read that document right now — you can type your T-score instead.");
+        return;
+      }
+      const extracted = await r.json();
+      if (extracted.tScore != null) {
+        setDocumentNote(`From your document: ${extracted.summary}`);
+        setKnownTScore(extracted.tScore);
+      } else {
+        setDocumentNote(`${extracted.summary} You can type your T-score instead if you know it.`);
+      }
+    } catch {
+      setDocumentNote("BoneBot couldn't read that document right now — you can type your T-score instead.");
+    } finally {
+      setDocumentBusy(false);
+    }
   }
 
   // Static, non-LLM: the chat directing her to reputable external resources
@@ -587,7 +683,7 @@ export default function Home() {
             <div className="flex w-full max-w-2xl flex-col gap-5">
               <section className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
                 <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
-                  Your initial screening estimate
+                  {existingCareMode ? "Your reported T-score" : "Your initial screening estimate"}
                 </div>
                 {triageResult && (
                   <>
@@ -607,6 +703,98 @@ export default function Home() {
                   </>
                 )}
                 <p className="mt-6 text-base leading-[1.6] text-[#4A5452]">{routeMessage}</p>
+
+                {existingCareMode && knownTScore == null && (
+                  <div className="mt-6 flex flex-col gap-4">
+                    <div>
+                      <label className="mb-1.5 block text-sm font-semibold text-[#15181A]" htmlFor="dxa-upload">
+                        Upload your DXA report or blood test (PDF)
+                      </label>
+                      <input
+                        id="dxa-upload"
+                        type="file"
+                        accept="application/pdf"
+                        disabled={documentBusy}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) void handlePdfUpload(file);
+                          e.target.value = "";
+                        }}
+                        className="block w-full text-sm text-[#4A5452] file:mr-3 file:cursor-pointer file:rounded-lg file:border-0 file:bg-[#0E7C6E] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white disabled:opacity-50"
+                      />
+                      {documentBusy && <p className="mt-2 text-sm text-[#5A6462]">Reading your document…</p>}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-[#9AA5A2]">
+                      <div className="h-px flex-1 bg-[#E3E9E7]" />
+                      or
+                      <div className="h-px flex-1 bg-[#E3E9E7]" />
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        value={tScoreInput}
+                        onChange={(e) => setTScoreInput(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && submitKnownTScore(tScoreInput)}
+                        placeholder="Type your T-score, e.g. -2.1"
+                        aria-label="Type your T-score"
+                        className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E]"
+                      />
+                      <button
+                        onClick={() => submitKnownTScore(tScoreInput)}
+                        className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white"
+                        style={{ backgroundColor: ACCENT }}
+                      >
+                        Use this
+                      </button>
+                    </div>
+                    {documentNote && <p className="text-sm text-[#5A6462]">{documentNote}</p>}
+                  </div>
+                )}
+
+                {existingCareMode && knownTScore != null && (
+                  <>
+                    {documentNote && <p className="mt-4 text-sm text-[#5A6462]">{documentNote}</p>}
+                    <div className="mt-4 flex flex-wrap items-center gap-5">
+                      <div
+                        className="font-[family-name:var(--font-heading)] text-[52px] font-bold tracking-[-0.02em]"
+                        style={{ color: CAT_META[bandKnownTScore(knownTScore)].color }}
+                      >
+                        {CAT_META[bandKnownTScore(knownTScore)].label}
+                      </div>
+                      <span className="font-mono text-lg text-[#5A6462]">T-score {knownTScore.toFixed(1)}</span>
+                    </div>
+                    <p className="mt-4 text-pretty text-base leading-[1.6] text-[#4A5452]">
+                      {CAT_META[bandKnownTScore(knownTScore)].desc}
+                    </p>
+                    <div className="mt-5 rounded-xl bg-[#F5F7F6] p-4">
+                      <ul className="flex flex-col gap-1.5">
+                        {T_SCORE_BANDS.map((b) => (
+                          <li key={b.label} className="flex items-center gap-2 text-[13px]">
+                            <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ backgroundColor: b.color }} />
+                            <span className="font-semibold text-[#15181A]">{b.label}</span>
+                            <span className="text-[#5A6462]">{b.range}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="mt-5 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">
+                      <h2 className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
+                        Things you can do now
+                      </h2>
+                      <ul className="mt-3 flex flex-col gap-2">
+                        {IMPROVEMENT_TIPS.map((tip) => (
+                          <li key={tip} className="flex items-start gap-2.5">
+                            <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ backgroundColor: ACCENT }} />
+                            {tip}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <p className="mt-4 text-xs text-[#9AA5A2]">
+                      This reflects the T-score you reported — BoneBot did not measure or estimate it.
+                    </p>
+                  </>
+                )}
+
                 {qaMessages[0]?.text && (
                   <div className="mt-6 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">
                     {qaMessages[0].text}
@@ -725,6 +913,9 @@ export default function Home() {
                         </div>
                       </div>
                       <p className="text-pretty text-base leading-[1.6] text-[#4A5452]">{catMeta.desc}</p>
+                      {"extended" in catMeta && (
+                        <p className="mt-3 text-pretty text-base leading-[1.6] text-[#4A5452]">{catMeta.extended}</p>
+                      )}
                     </>
                   )}
 
@@ -746,10 +937,23 @@ export default function Home() {
                         <span>Moderate</span>
                         <span>Elevated</span>
                       </div>
-                      <div className="mt-3 text-sm text-[#4A5452]">
-                        Estimated T-score: <strong>{result.estimatedTScore}</strong> (likely {result.tScoreRange[0]}
-                        {" … "}
-                        {result.tScoreRange[1]})
+
+                      <div className="mt-4 rounded-xl bg-[#F5F7F6] p-4">
+                        <p className="text-sm leading-[1.6] text-[#4A5452]">
+                          Your <strong>estimated T-score is {result.estimatedTScore}</strong>, likely somewhere
+                          between {result.tScoreRange[0]} and {result.tScoreRange[1]}. A T-score compares your bone
+                          density to a healthy young adult: 0 is average, and lower (more negative) means less
+                          dense bone.
+                        </p>
+                        <ul className="mt-3 flex flex-col gap-1.5">
+                          {T_SCORE_BANDS.map((b) => (
+                            <li key={b.label} className="flex items-center gap-2 text-[13px]">
+                              <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ backgroundColor: b.color }} />
+                              <span className="font-semibold text-[#15181A]">{b.label}</span>
+                              <span className="text-[#5A6462]">{b.range}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     </div>
                   )}
@@ -781,6 +985,20 @@ export default function Home() {
                     Weights follow established clinical and NHANES-derived risk factors — only the factors that
                     measurably moved this estimate are shown above.
                   </div>
+                </div>
+
+                <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                  <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                    Things you can do now
+                  </div>
+                  <ul className="flex flex-col gap-2.5">
+                    {IMPROVEMENT_TIPS.map((tip) => (
+                      <li key={tip} className="flex items-start gap-2.5 text-[15px] leading-[1.5]">
+                        <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full" style={{ backgroundColor: ACCENT }} />
+                        {tip}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
 
                 <div
