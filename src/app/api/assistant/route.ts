@@ -98,7 +98,7 @@ The supplied factors and profile are her own answers — a factor is only ever s
 
 What her estimated T-score means: the clinical DXA scale runs normal at -1.0 or above, osteopenia between -2.5 and -1.0, and osteoporosis at -2.5 or below. State which band her estimate falls in (the supplied "band") and what that means, in plain words.
 
-How confident to be: the model context supplies a ready-made uncertainty read ("uncertainty") — say it in your own words. If it says the range is wide or crosses into the osteoporosis range, say plainly that this makes it harder to be sure, and that a DXA scan is the way to know for certain. If it says fairly confident, say so, while still making clear this remains an estimate, not a diagnosis.
+How confident to be: the model context supplies a ready-made uncertainty read ("uncertainty") — say it in your own words. If it says the range is wide or crosses into the osteoporosis range, say plainly that this makes it harder to be sure, and that a DXA scan is the way to know for certain. If it says fairly confident, say so, while still making clear this remains an estimate, not a diagnosis. If the model context includes "estimateCloseToNormal", make clear that although her band is "uncertain", her estimate actually sits close to the normal range — say that plainly and reassuringly — while still being honest that the width of the range means it is not certain and that a DXA scan is the way to confirm.
 
 Make clear throughout that this is an estimate, not a DXA measurement or diagnosis. Do not give lifestyle, medicine, or treatment advice — that belongs to a different explanation.
 
@@ -111,6 +111,7 @@ const IMPLICATIONS_SYSTEM = `You are BoneBot, explaining what a deterministic bo
 First, when to see a GP. The model context supplies the deterministic care route ("careRoute") — follow it exactly, never soften or escalate it:
 - "discuss-with-gp": tell her plainly to have a conversation with her GP about a DXA scan and a wider fracture-risk assessment, and briefly say why, tied to her band and range.
 - "routine-discussion-if-relevant": this estimate is reassuring; do not tell her she needs a GP appointment. Say it doesn't call for immediate DXA follow-up, and that osteoporosis screening is a normal thing to mention at a routine visit if age or other risk factors make that relevant later.
+- "consider-dxa-if-gp-agrees": her estimate sits close to the normal range. Reassure her it is near normal, and frame a DXA scan as a reasonable option she could consider — worth raising with her GP, who can weigh whether it is warranted given her age and other risk factors — rather than an urgent or definite need. Still make clear this remains an estimate with a range, not a measurement.
 
 If you refer to what any factor is doing to her estimate specifically, describe only what the model itself shows for her — its supplied direction and contribution — using plain, unambiguous language. The model's supplied "direction" is "raises" or "lowers" the underlying T-score number, but translate rather than repeat that: a "raises" factor SUPPORTS/PROTECTS her bone health (a good sign) — describe it as moving her estimate toward the healthy, normal range, toward stronger, denser bone; a "lowers" factor is a RISK that WEAKENS her bones — describe it as moving her estimate toward lower bone density, in the osteopenia/osteoporosis direction. Never phrase a factor's effect as "raising" or "lowering" her T-score, or as the number going up or down — T-scores are negative, so that reads backwards to a lay reader; a LOWER (more negative) T-score means LESS dense bone, and make that plain if you mention the number itself. Say plainly whether a factor supports her bones or raises her risk — never ambiguous or contradictory phrasing like "raises your estimate" left unexplained, "contributes positively to your risk," or "positive/negative contribution." If a factor's contribution is negligible (rounds to 0.0), say it has little or no effect on her number rather than forcing it into a supports/risk framing either way.
 
@@ -135,7 +136,7 @@ Write exactly 2-3 short sentences, as plain prose — never a list, never number
 
 First, name her actual top one or two contributing factors — the model context's "factors" list is ordered largest-impact first, so use the first one or two. Each factor carries the model's own "direction" and "contribution" size; never invent, reorder, or drop what is given, and never add outside clinical claims about a factor beyond what its own number shows for her. Use plain, unambiguous language: a "raises" factor SUPPORTS or PROTECTS her bone health — say it moves her estimate toward the healthy, normal range, toward stronger, denser bone. A "lowers" factor is a RISK that WEAKENS her bones — say it moves her estimate toward lower bone density, in the osteopenia/osteoporosis direction. Never phrase a factor's effect as "raising" or "lowering" her T-score, or as the number going up or down — T-scores are negative, so that reads backwards to a lay reader; a LOWER (more negative) T-score means LESS dense bone, and make that plain if you mention the number itself. Never use ambiguous or contradictory phrasing such as "raises your estimate" left unexplained, "contributes positively to your risk," or "positive/negative contribution" — always say plainly whether the factor supports her bones or raises her risk. If the top factor's contribution is negligible (rounds to 0.0), say plainly that it had little or no effect rather than forcing it into a supports/risk framing. These are her own answers — a factor is only ever supplied because it applies to her — so state it directly and definitively ("you smoke, so…"), never conditionally ("if you smoke").
 
-Second, give the appropriate next step from the supplied deterministic care route ("careRoute"), followed exactly, never softened or escalated: "discuss-with-gp" means tell her plainly to speak with her GP about a DXA scan; "routine-discussion-if-relevant" means say this estimate is reassuring and doesn't call for immediate GP follow-up.
+Second, give the appropriate next step from the supplied deterministic care route ("careRoute"), followed exactly, never softened or escalated: "discuss-with-gp" means tell her plainly to speak with her GP about a DXA scan; "routine-discussion-if-relevant" means say this estimate is reassuring and doesn't call for immediate GP follow-up. "consider-dxa-if-gp-agrees" means say her estimate is close to normal and a DXA scan could be considered if her GP agrees it is worthwhile.
 
 Third, close with one brief, warm clause or short sentence letting her know that more detail about her result, and practical tips on what she can do, are further down the page — for example, in your own words along the lines of "You'll find more detail and practical tips further down this page." Keep this closing short and natural; it is a pointer, not new content, so do not use it to restate numbers or add guidance that belongs further down.
 
@@ -193,6 +194,16 @@ export async function POST(req: Request) {
               ? CLINICIAN_SYSTEM
               : CONSUMER_SYSTEM;
 
+  // Borderline near-normal: an "uncertain"-band estimate that actually sits
+  // close to (or whose range reaches into) the normal range (T >= -1.0). A firm
+  // "see your GP about a DXA" over-directs here — soften the care route and tell
+  // her plainly the estimate is close to normal, while staying honest about the
+  // range. Threshold is deliberately conservative and easy to tune.
+  const borderlineNearNormal =
+    !!body.result &&
+    body.result.category === "uncertain" &&
+    (body.result.estimatedTScore >= -1.5 || body.result.tScoreRange[1] >= -1.0);
+
   const resultContext = body.triage
     ? {
         initialScreeningProbabilityPercent: body.triage.probabilityPercent,
@@ -215,7 +226,13 @@ export async function POST(req: Request) {
         })),
         factorsOrderedBy: "largest absolute contribution to the estimate first",
         uncertainty: describeRangeUncertainty(body.result!.tScoreRange),
-        careRoute: body.result!.category === "lower" ? "routine-discussion-if-relevant" : "discuss-with-gp",
+        careRoute:
+          body.result!.category === "lower"
+            ? "routine-discussion-if-relevant"
+            : borderlineNearNormal
+              ? "consider-dxa-if-gp-agrees"
+              : "discuss-with-gp",
+        ...(borderlineNearNormal ? { estimateCloseToNormal: true } : {}),
       }
       : {
         stage: body.stage ?? "questionnaire",
