@@ -160,7 +160,7 @@ Document the seven-day average inputs, screenshot option, deterministic `10,000 
 
 ```bash
 npm test
-/Library/Frameworks/Python.framework/Versions/3.10/bin/python3 -m unittest model/test_triage_audit.py model/test_removed_family_history.py
+python3.10 -m unittest model/test_triage_audit.py model/test_removed_family_history.py
 npx tsc --noEmit
 npm run lint
 npm run build
