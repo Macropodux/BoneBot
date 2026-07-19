@@ -19,6 +19,14 @@
 // sanity-check, not a measurement.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  motion,
+  AnimatePresence,
+  MotionConfig,
+  useReducedMotion,
+  animate,
+  type Variants,
+} from "framer-motion";
 import { resolveAmbiguousAnswer } from "@/lib/ambiguity";
 import {
   ACTIVITY_QUESTIONS,
@@ -105,6 +113,64 @@ const EXAMPLE_ANSWERS: Record<StepKey, string> = {
   averageDailyActiveMinutes: "30",
   secondaryCondition: "No",
 };
+
+// Demo-only canned profiles for "Try an example" — one per risk band, so a
+// judge/reviewer can see all three result screens without answering 14
+// questions three times. Never used outside the landing page's example flow.
+const EXAMPLE_PATIENTS: { id: string; label: string; blurb: string; answers: Record<StepKey, string> }[] = [
+  {
+    id: "low",
+    label: "Low risk",
+    blurb: "55, active, no major risk factors",
+    answers: {
+      assignedFemale: "Yes",
+      age: "55",
+      menopauseStatus: "Yes",
+      existingCare: "No",
+      knowsDxa: "No",
+      dxaScore: "",
+      dxaYear: "",
+      menopause: "50",
+      fracture: "No",
+      smoke: "No",
+      steroids: "No",
+      bloodResults: "Skip",
+      weight: "23",
+      averageDailySteps: "9000",
+      averageDailyActiveMinutes: "45",
+      secondaryCondition: "No",
+    },
+  },
+  {
+    id: "moderate",
+    label: "Moderate risk",
+    blurb: "67, a few contributing factors",
+    answers: EXAMPLE_ANSWERS,
+  },
+  {
+    id: "elevated",
+    label: "Elevated risk",
+    blurb: "78, prior fracture, smoker, low activity",
+    answers: {
+      assignedFemale: "Yes",
+      age: "78",
+      menopauseStatus: "Yes",
+      existingCare: "No",
+      knowsDxa: "No",
+      dxaScore: "",
+      dxaYear: "",
+      menopause: "45",
+      fracture: "Yes",
+      smoke: "Yes",
+      steroids: "Yes",
+      bloodResults: "Skip",
+      weight: "19",
+      averageDailySteps: "2000",
+      averageDailyActiveMinutes: "5",
+      secondaryCondition: "Yes",
+    },
+  },
+];
 
 // Fields the short flow never asks about — hormone therapy, rheumatoid
 // arthritis, and high alcohol intake aren't part of this flow, so they still
@@ -534,8 +600,56 @@ function TypingDots({ small }: { small?: boolean }) {
   );
 }
 
+// Results-screen motion: shared easing curve (ease-out-expo-ish, no bounce)
+// and reveal variants for the staggered card cascade. Kept in one place so
+// every card on the results screen animates in with the same feel.
+const EASE_OUT = [0.16, 1, 0.3, 1] as const;
+
+const revealContainer: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.07, delayChildren: 0.05 } },
+};
+
+const revealItem: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE_OUT } },
+};
+
+const revealItemReduced: Variants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.2 } },
+};
+
+// Counts up from 0 to `value` once on mount/change — used for the headline
+// score numbers so the result reads as computed, not just printed. Falls back
+// to an instant, unanimated value when the OS-level reduced-motion setting is
+// on (checked once by the caller via useReducedMotion()).
+function AnimatedNumber({
+  value,
+  decimals = 0,
+  reduceMotion,
+}: {
+  value: number;
+  decimals?: number;
+  reduceMotion: boolean;
+}) {
+  const [display, setDisplay] = useState(reduceMotion ? value : 0);
+
+  useEffect(() => {
+    const controls = animate(0, value, {
+      duration: reduceMotion ? 0 : 0.9,
+      ease: EASE_OUT,
+      onUpdate: (v) => setDisplay(v),
+    });
+    return () => controls.stop();
+  }, [value, reduceMotion]);
+
+  return <>{display.toFixed(decimals)}</>;
+}
+
 export default function Home() {
   const [screen, setScreen] = useState<"landing" | "chat" | "results">("landing");
+  const [showExampleMenu, setShowExampleMenu] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typing, setTyping] = useState(false);
@@ -604,9 +718,9 @@ export default function Home() {
   const [weightInput, setWeightInput] = useState("60");
   const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg");
   const [heightUnit, setHeightUnit] = useState<"cm" | "ftin">("cm");
-  const [heightCmInput, setHeightCmInput] = useState("");
-  const [heightFtInput, setHeightFtInput] = useState("");
-  const [heightInInput, setHeightInInput] = useState("");
+  const [heightCmInput, setHeightCmInput] = useState("162");
+  const [heightFtInput, setHeightFtInput] = useState("5");
+  const [heightInInput, setHeightInInput] = useState("4");
   const [bmiError, setBmiError] = useState("");
 
   const [qaMessages, setQaMessages] = useState<ChatMessage[]>([]);
@@ -682,9 +796,9 @@ export default function Home() {
     setWeightInput("60");
     setWeightUnit("kg");
     setHeightUnit("cm");
-    setHeightCmInput("");
-    setHeightFtInput("");
-    setHeightInInput("");
+    setHeightCmInput("162");
+    setHeightFtInput("5");
+    setHeightInInput("4");
     setBmiError("");
     const greetingName = name ? `, ${name}` : "";
     botSay(
@@ -934,6 +1048,28 @@ export default function Home() {
     return null;
   }
 
+  // Lets her type "vitamin D 55, calcium 2.3" directly instead of only
+  // accepting a photo upload for the blood-results step. Same valid ranges as
+  // the image-extraction path and the manual edit form (VITAMIN_D_RANGE /
+  // CALCIUM_RANGE below) — an out-of-range number is treated as not found
+  // rather than silently accepted.
+  function parseBloodResultsText(raw: string): UploadedBloodResults | null {
+    const lower = raw.toLowerCase();
+    const vitaminDMatch = lower.match(/vit(?:amin)?\s*d[^\d]{0,10}(\d+(?:\.\d+)?)/);
+    const calciumMatch = lower.match(/calcium[^\d]{0,10}(\d+(?:\.\d+)?)/);
+    const vitaminD = vitaminDMatch ? Number(vitaminDMatch[1]) : null;
+    const calcium = calciumMatch ? Number(calciumMatch[1]) : null;
+    const vitaminDValid = vitaminD !== null && vitaminD >= 10 && vitaminD <= 250;
+    const calciumValid = calcium !== null && calcium >= 1.5 && calcium <= 3.5;
+    if (!vitaminDValid && !calciumValid) return null;
+    return {
+      vitaminD: vitaminDValid ? vitaminD : null,
+      calcium: calciumValid ? calcium : null,
+      alkalinePhosphatase: null,
+      redBloodCellCount: null,
+    };
+  }
+
   // Feature 2 — LLM fallback for an otherwise-unparseable free-text answer.
   // Proposes a single candidate value via /api/extract, then re-validates it
   // through the SAME deterministic normaliseFreeAnswer() before it's ever
@@ -962,6 +1098,15 @@ export default function Home() {
     const raw = freeInput.trim();
     const step = STEPS[stepIdx];
     if (!raw || !step || flowQuestionBusy || extracting) return;
+    if (step.key === "bloodResults") {
+      const parsedBloodResults = parseBloodResultsText(raw);
+      if (parsedBloodResults) {
+        setMessages((items) => [...items, { role: "user", text: raw }]);
+        setFreeInput("");
+        setPendingBloodResults(parsedBloodResults);
+        return;
+      }
+    }
     const value = normaliseFreeAnswer(step.key, raw);
     if (value && value !== "Not sure" && value !== "Unknown") {
       if (step.key === "menopause") {
@@ -1376,8 +1521,9 @@ export default function Home() {
     answer(bmi.toFixed(1), `${weightInput} ${weightUnit}, ${heightDisplay} (BMI ${bmi.toFixed(1)})`);
   }
 
-  function tryExample() {
-    runModel(EXAMPLE_ANSWERS);
+  function tryExample(answers: Record<StepKey, string>) {
+    setShowExampleMenu(false);
+    runModel(answers);
   }
 
   function buildResultEmail(): { subject: string; text: string } {
@@ -1467,9 +1613,9 @@ export default function Home() {
     setWeightInput("60");
     setWeightUnit("kg");
     setHeightUnit("cm");
-    setHeightCmInput("");
-    setHeightFtInput("");
-    setHeightInInput("");
+    setHeightCmInput("162");
+    setHeightFtInput("5");
+    setHeightInInput("4");
     setBmiError("");
     setEmailAddress("");
     setEmailSendState("idle");
@@ -1545,6 +1691,8 @@ export default function Home() {
       ? `Question ${Math.min(stepIdx + 1, STEPS.length)} of ${STEPS.length}`
       : "Analyzing…";
 
+  const reduceMotion = Boolean(useReducedMotion());
+  const reveal = reduceMotion ? revealItemReduced : revealItem;
   const cat = result ? CATEGORY_MAP[result.category] : "low";
   const catMeta = CAT_META[cat];
   const marker = result ? markerPercent(result.estimatedTScore) : 50;
@@ -1608,12 +1756,28 @@ export default function Home() {
                 Start screening
               </button>
               <button
-                onClick={tryExample}
+                onClick={() => setShowExampleMenu((v) => !v)}
                 className="rounded-[10px] border-[1.5px] border-[#C6CFCC] px-8 py-4 font-[family-name:var(--font-heading)] text-[17px] font-bold text-[#15181A] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
               >
                 Try an example
               </button>
             </div>
+            {showExampleMenu && (
+              <div className="mt-4 flex flex-wrap justify-center gap-2.5">
+                {EXAMPLE_PATIENTS.map((patient) => (
+                  <button
+                    key={patient.id}
+                    onClick={() => tryExample(patient.answers)}
+                    className="flex flex-col items-start gap-0.5 rounded-[10px] border-[1.5px] border-[#C6CFCC] bg-white px-4 py-2.5 text-left transition-colors hover:border-[#0E7C6E]"
+                  >
+                    <span className="font-[family-name:var(--font-heading)] text-[14px] font-bold text-[#15181A]">
+                      {patient.label}
+                    </span>
+                    <span className="text-[12px] text-[#5A6462]">{patient.blurb}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="mt-16 grid max-w-[920px] grid-cols-1 gap-4 sm:grid-cols-3">
               {[
                 { stat: "Often silent", body: "Bone loss may cause no symptoms until a fracture occurs." },
@@ -2265,524 +2429,643 @@ export default function Home() {
       )}
 
       {screen === "results" && !result && (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
-            <button
-              type="button"
-              onClick={goToLanding}
-              className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+        <MotionConfig reducedMotion="user">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <motion.header
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: EASE_OUT }}
+              className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12"
             >
-              Bone<span style={{ color: ACCENT }}>Bot</span>
-            </button>
-            <div className="text-[13px] font-medium text-[#5A6462]">Initial screening result</div>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              <div className="rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
-                Screening flag, not a diagnosis
-              </div>
               <button
-                onClick={restart}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                type="button"
+                onClick={goToLanding}
+                className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
               >
-                Start over
+                Bone<span style={{ color: ACCENT }}>Bot</span>
               </button>
-            </div>
-          </header>
-          <div className="flex flex-1 items-start justify-center overflow-y-auto px-6 py-10">
-            <div className="flex w-full max-w-2xl flex-col gap-5">
-              <section className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
-                  Your initial screening estimate
+              <div className="text-[13px] font-medium text-[#5A6462]">Initial screening result</div>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <div className="rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
+                  Screening flag, not a diagnosis
                 </div>
-                {triageResult && (
-                  <>
-                    <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#15181A]">
-                      Very low initial risk
-                    </h1>
-                    <p
-                      className="mt-4 font-[family-name:var(--font-heading)] text-6xl font-bold tracking-[-0.02em]"
-                      style={{ color: ACCENT }}
-                    >
-                      {triageResult.probabilityPercent}%
-                    </p>
-                  </>
-                )}
-                {reportedDxa && (
-                  <>
-                    <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#15181A]">
-                      Reported T-score {reportedDxa.score.toFixed(1)}
-                    </h1>
-                    <p className="mt-2 text-sm text-[#5A6462]">
-                      {reportedDxa.score <= -2.5
-                        ? "This reported score is in the osteoporosis range."
-                        : reportedDxa.score < -1
-                          ? "This reported score is in the low bone-density range."
-                          : "This reported score is in the normal bone-density range."}
-                      {reportedDxa.year ? ` Reported from ${reportedDxa.year}.` : ""}
-                    </p>
-                  </>
-                )}
-                <p className="mt-6 text-base leading-[1.6] text-[#4A5452]">{routeMessage}</p>
-                {qaMessages[0]?.text && (
-                  <div className="mt-6 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">
-                    {qaMessages[0].text}
-                  </div>
-                )}
-                {triageResult && (
-                  <div className="mt-4 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">
-                    <h2 className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
-                      Keep it that way
-                    </h2>
-                    <ul className="mt-3 list-disc space-y-2 pl-5">
-                      {LOW_RISK_GUIDANCE.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                    <p className="mt-4">This is a screening estimate, not a diagnosis or a bone-density measurement.</p>
-                  </div>
-                )}
-              </section>
-
-              <section className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                <div className="mb-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
-                  Trusted resources
-                </div>
-                <TrustedResources />
-              </section>
-
-              <button
-                onClick={restart}
-                className="self-start rounded-[10px] px-5 py-3 font-[family-name:var(--font-heading)] font-bold text-white"
-                style={{ backgroundColor: ACCENT }}
-              >
-                Start over
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {screen === "results" && result && (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
-            <button
-              type="button"
-              onClick={goToLanding}
-              className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
-            >
-              Bone<span style={{ color: ACCENT }}>Bot</span>
-            </button>
-            <div className="hidden text-[13px] font-medium text-[#5A6462] sm:block">Screening complete</div>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-              <div className="rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
-                Screening flag, not a diagnosis
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={restart}
+                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                >
+                  Start over
+                </motion.button>
               </div>
-              <button
-                onClick={() => emailSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
-                className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+            </motion.header>
+            <div className="flex flex-1 items-start justify-center overflow-y-auto px-6 py-10">
+              <motion.div
+                variants={revealContainer}
+                initial="hidden"
+                animate="visible"
+                className="flex w-full max-w-2xl flex-col gap-5"
               >
-                <span aria-hidden>✉️</span> Email this result
-              </button>
-              <button
-                onClick={restart}
-                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
-              >
-                Start over
-              </button>
-            </div>
-          </header>
-
-          <div className="flex-1 overflow-y-auto px-6 py-8 sm:px-12">
-            <div className="mx-auto grid max-w-[1140px] grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_420px] 2xl:max-w-[1360px] 2xl:grid-cols-[1fr_460px]">
-              <div className="flex flex-col gap-5">
-                {!result.validated && (
-                  <p className="rounded-[14px] border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-700">
-                    ⚠️ Illustrative: coefficients not yet trained on NHANES. Do not present these numbers as real.
-                  </p>
-                )}
-
-                <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                  <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-                    <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
-                      {userName ? `${userName}'s screening result` : "Your screening result"}
-                    </div>
-                    <div className="flex gap-1 rounded-[9px] bg-[#EEF2F0] p-1">
-                      {TABS.map((t) => (
-                        <button
-                          key={t.id}
-                          onClick={() => setTab(t.id)}
-                          className={`rounded-md px-3.5 py-1.5 text-[13px] font-semibold ${
-                            tab === t.id ? "bg-white text-[#15181A]" : "bg-transparent text-[#5A6462]"
-                          }`}
-                        >
-                          {t.label}
-                        </button>
-                      ))}
-                    </div>
+                <motion.section variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                  <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                    Your initial screening estimate
                   </div>
-
-                  {tab !== "meter" && (
+                  {triageResult && (
                     <>
-                      <div className="mb-5 flex flex-wrap items-center gap-5">
-                        <div
-                          className="font-[family-name:var(--font-heading)] text-[52px] font-bold tracking-[-0.02em]"
-                          style={{ color: catMeta.color }}
-                        >
-                          {catMeta.label}
-                        </div>
-                        <div
-                          className="rounded-full px-3.5 py-1.5 text-[13px] font-semibold"
-                          style={{ color: catMeta.color, backgroundColor: catMeta.bg }}
-                        >
-                          {catMeta.chip}
-                        </div>
-                      </div>
-                      <Markdown text={summaryExplanation || catMeta.desc} className="text-pretty text-base leading-[1.6] text-[#4A5452]" />
+                      <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#15181A]">
+                        Very low initial risk
+                      </h1>
+                      <p
+                        className="mt-4 font-[family-name:var(--font-heading)] text-6xl font-bold tracking-[-0.02em]"
+                        style={{ color: ACCENT }}
+                      >
+                        <AnimatedNumber value={triageResult.probabilityPercent} reduceMotion={reduceMotion} />%
+                      </p>
                     </>
                   )}
-
-                  {tab !== "category" && (
-                    <div className="mt-8 mb-2">
-                      <div className="relative">
-                        <div className="flex h-3.5 overflow-hidden rounded-full">
-                          <div className="w-1/3" style={{ backgroundColor: "#EFC3B8" }} />
-                          <div className="w-1/3" style={{ backgroundColor: "#F0DFAE" }} />
-                          <div className="w-1/3" style={{ backgroundColor: "#BFDDD3" }} />
-                        </div>
-                        {/* Uncertainty range — the box, not just the point estimate */}
-                        <div
-                          className="absolute top-0 h-3.5 rounded-full border-2 border-dashed border-[#4A5452]"
-                          style={{
-                            left: `${rangeLeftPct}%`,
-                            width: `${Math.max(3, rangeRightPct - rangeLeftPct)}%`,
-                          }}
-                        />
-                        <div
-                          className="absolute -top-[26px] -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
-                          style={{ backgroundColor: "#15181A", left: `${marker}%` }}
-                        >
-                          you
-                        </div>
-                        <div
-                          className="absolute top-0 h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#15181A]"
-                          style={{ left: `${marker}%` }}
-                        />
-                      </div>
-                      <div className="mt-3.5 flex justify-between gap-2 text-xs font-semibold">
-                        {[...T_SCORE_BANDS].reverse().map((b) => (
-                          <span key={b.label}>
-                            <span style={{ color: b.color }}>{b.label.replace(" (low bone mass)", "")}</span>{" "}
-                            <span className="font-normal text-[#9AA5A2]">{b.range}</span>
-                          </span>
-                        ))}
-                      </div>
-                      <p className="mt-4 text-sm leading-[1.6] text-[#4A5452]">
-                        The dashed box is the uncertainty range — your true score most likely sits inside it. A
-                        T-score compares your bone density to a healthy young adult: 0 is average, and lower (more
-                        negative) means less dense bone.
+                  {reportedDxa && (
+                    <>
+                      <h1 className="mt-3 font-[family-name:var(--font-heading)] text-3xl font-bold text-[#15181A]">
+                        Reported T-score{" "}
+                        <AnimatedNumber value={reportedDxa.score} decimals={1} reduceMotion={reduceMotion} />
+                      </h1>
+                      <p className="mt-2 text-sm text-[#5A6462]">
+                        {reportedDxa.score <= -2.5
+                          ? "This reported score is in the osteoporosis range."
+                          : reportedDxa.score < -1
+                            ? "This reported score is in the low bone-density range."
+                            : "This reported score is in the normal bone-density range."}
+                        {reportedDxa.year ? ` Reported from ${reportedDxa.year}.` : ""}
                       </p>
+                    </>
+                  )}
+                  <p className="mt-6 text-base leading-[1.6] text-[#4A5452]">{routeMessage}</p>
+                  {qaMessages[0]?.text && (
+                    <div className="mt-6 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">
+                      {qaMessages[0].text}
                     </div>
                   )}
-                </div>
-
-                {uncertaintyNotes.length > 0 && (
-                  <div className="rounded-2xl border border-[#E6CC89] bg-[#FFF8E8] px-7 py-7 sm:px-8">
-                    <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
-                      Answers needing clarification
+                  {triageResult && (
+                    <div className="mt-4 rounded-xl bg-[#F5F7F6] p-5 text-sm leading-[1.6] text-[#4A5452]">
+                      <h2 className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
+                        Keep it that way
+                      </h2>
+                      <ul className="mt-3 list-disc space-y-2 pl-5">
+                        {LOW_RISK_GUIDANCE.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                      <p className="mt-4">This is a screening estimate, not a diagnosis or a bone-density measurement.</p>
                     </div>
-                    <ul className="mt-4 flex list-disc flex-col gap-2 pl-5 text-[15px] leading-[1.6] text-[#4A5452]">
-                      {uncertaintyNotes.map((note, index) => (
-                        <li key={`${note}-${index}`}>{note}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                  <div className="mb-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
-                    What drove this result
-                  </div>
-                  <div className="mb-3 flex items-center justify-between text-[12px] font-semibold">
-                    <span style={{ color: "#B0442F" }}>← Pulls your estimate down</span>
-                    <span style={{ color: ACCENT }}>Supports your bones →</span>
-                  </div>
-                  <div className="flex flex-col gap-3.5">
-                    {(() => {
-                      const maxAbs = Math.max(...result.contributions.map((f) => Math.abs(f.contribution)), 0.1);
-                      return result.contributions.map((f) => {
-                        const isPositive = f.direction === "raises";
-                        const halfWidthPct = Math.max(3, Math.round((Math.abs(f.contribution) / maxAbs) * 50));
-                        const detail = features ? factorDetail(f.factor, features) : { value: "" };
-                        return (
-                          <div key={f.factor} className="flex items-center gap-3">
-                            <div className="w-[110px] flex-shrink-0 sm:w-[150px]">
-                              <div className="truncate text-[13px] text-[#15181A]" title={f.factor}>
-                                {f.factor}
-                              </div>
-                              {detail.value && (
-                                <div className="truncate text-[11px] text-[#9AA5A2]" title={detail.value}>
-                                  {detail.value}
-                                </div>
-                              )}
-                            </div>
-                            <div className="relative h-2.5 flex-1 overflow-visible rounded-full bg-[#F0F2F1]">
-                              <div className="absolute inset-y-0 left-1/2 w-px bg-[#D5DCDA]" />
-                              <div
-                                className="absolute top-0 h-full rounded-full"
-                                style={
-                                  isPositive
-                                    ? { left: "50%", width: `${halfWidthPct}%`, backgroundColor: ACCENT }
-                                    : { right: "50%", width: `${halfWidthPct}%`, backgroundColor: "#B0442F" }
-                                }
-                              />
-                            </div>
-                            <div
-                              className="w-10 flex-shrink-0 text-right font-[family-name:var(--font-heading)] text-[13px] font-bold"
-                              style={{ color: isPositive ? ACCENT : "#B0442F" }}
-                            >
-                              {f.contribution > 0 ? "+" : ""}
-                              {f.contribution.toFixed(1)}
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                  <div className="mt-5 text-[13px] leading-[1.5] text-[#5A6462]">
-                    Bars show how much each answer moved your estimated T-score, including answers that didn&apos;t
-                    move it at all. Anything you skipped uses a population average and isn&apos;t shown here.
-                    Weights follow NHANES-derived clinical risk factors.
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                  <div className="flex items-center gap-2.5">
-                    <span
-                      className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]"
-                    >
-                      Understanding your estimated T-score
-                    </span>
-                    <AIWrittenBadge />
-                  </div>
-                  <Markdown text={scoreExplanation} className="mt-4 text-[15px] leading-[1.65] text-[#4A5452]" />
-                </div>
-
-                <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
-                      What this means for you
-                    </span>
-                    <AIWrittenBadge />
-                  </div>
-                  <Markdown text={implicationsExplanation} className="mt-4 text-[15px] leading-[1.65] text-[#4A5452]" />
-                </div>
-
-                {bloodResults && (
-                  <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                    <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">Uploaded blood results</div>
-                    <p className="mt-3 text-sm leading-[1.6] text-[#4A5452]">
-                      {bloodResults.vitaminD !== null && `Vitamin D: ${bloodResults.vitaminD} nmol/L. `}
-                      {bloodResults.calcium !== null && `Calcium: ${bloodResults.calcium} mmol/L. `}
-                      {bloodResults.alkalinePhosphatase !== null && `ALP: ${bloodResults.alkalinePhosphatase} U/L. `}
-                      {bloodResults.redBloodCellCount !== null && `RBC: ${bloodResults.redBloodCellCount}. `}
-                      Vitamin D and calcium are included in the current estimate; ALP and RBC are contextual only.
-                    </p>
-                  </div>
-                )}
-
-                {(reportedActivitySteps !== null || reportedActivityMinutes !== null) && (
-                  <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                    <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">Activity input</div>
-                    <p className="mt-3 text-sm leading-[1.6] text-[#4A5452]">
-                      {reportedActivitySteps !== null && `~${reportedActivitySteps.toLocaleString()} steps/day. `}
-                      {reportedActivityMinutes !== null && `~${reportedActivityMinutes} active minutes/day. `}
-                      Used as an approximate proxy for the daily wrist-movement measure in the training data.
-                    </p>
-                  </div>
-                )}
-
-                {result.category !== "lower" && <div
-                  className="flex flex-col items-start justify-between gap-5 rounded-2xl px-7 py-6 sm:flex-row sm:items-center sm:px-8"
-                  style={{ backgroundColor: ACCENT }}
-                >
-                  <div>
-                    <div className="font-[family-name:var(--font-heading)] text-[19px] font-bold text-white">
-                      Next step: talk to your GP about a DXA scan
-                    </div>
-                    <div className="mt-1 text-sm text-[#CBE6E0]">
-                      A DXA scan is the actual diagnostic test. This screening tells you whether it&apos;s worth
-                      asking for one.
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => qaAsk("What's a DXA scan?")}
-                    className="whitespace-nowrap rounded-[9px] bg-white px-5 py-3 font-[family-name:var(--font-heading)] text-sm font-bold hover:bg-[#E4F0ED]"
-                    style={{ color: ACCENT }}
-                  >
-                    What&apos;s a DXA scan?
-                  </button>
-                </div>}
-
-                {features && (
-                  <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
-                    <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
-                      How your estimate changes with age
-                    </div>
-                    <p className="mt-1.5 text-[13px] leading-[1.5] text-[#5A6462]">
-                      Same profile, run through the model at each age bracket, with everything else held fixed. Your
-                      answer is highlighted.
-                    </p>
-                    <div className="mt-6 flex h-[150px] items-end gap-1.5 sm:gap-2.5">
-                      {AGE_BRACKETS.map((bracket) => {
-                        const projected = scoreBone({ ...features, age: AGE_MIDPOINT[bracket] });
-                        const isYours = AGE_MIDPOINT[bracket] === features.age;
-                        return (
-                          <div key={bracket} className="flex flex-1 flex-col items-center gap-1.5">
-                            <div
-                              className="text-[11px] font-semibold"
-                              style={{ color: isYours ? ACCENT : "#5A6462" }}
-                            >
-                              {projected.estimatedTScore}
-                            </div>
-                            <div className="flex h-[100px] w-full items-end">
-                              <div
-                                className="w-full rounded-t-[4px] transition-[height]"
-                                style={{
-                                  height: `${Math.max(6, barHeightPercent(projected.estimatedTScore))}%`,
-                                  backgroundColor: isYours ? ACCENT : bandColor(projected.estimatedTScore) + "70",
-                                }}
-                                title={`${bracket}: estimated T-score ${projected.estimatedTScore}`}
-                              />
-                            </div>
-                            <div
-                              className="text-center text-[10px] leading-tight"
-                              style={{ color: isYours ? ACCENT : "#9AA5A2", fontWeight: isYours ? 700 : 400 }}
-                            >
-                              {bracket}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div ref={emailSectionRef} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-6 sm:px-8">
-                  <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
-                    Keep a copy of this result
-                  </div>
-                  <div className="mt-0.5 text-[13px] text-[#5A6462]">
-                    We&apos;ll email it to you. Bring it to your GP appointment.
-                  </div>
-
-                  {emailSendState === "sent" ? (
-                    <p className="mt-4 flex items-center gap-2 text-sm font-semibold" style={{ color: ACCENT }}>
-                      <span aria-hidden>✓</span> Sent to {emailAddress}.
-                    </p>
-                  ) : (
-                    <form
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        void sendResultEmail();
-                      }}
-                      className="mt-4 flex flex-col gap-2 sm:flex-row"
-                    >
-                      <input
-                        type="email"
-                        required
-                        value={emailAddress}
-                        onChange={(event) => {
-                          setEmailAddress(event.target.value);
-                          if (emailSendState === "error") setEmailSendState("idle");
-                        }}
-                        placeholder="you@example.com"
-                        aria-label="Your email address"
-                        disabled={emailSendState === "sending"}
-                        className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E] disabled:opacity-50"
-                      />
-                      <button
-                        type="submit"
-                        disabled={emailSendState === "sending" || !emailAddress.trim()}
-                        className="flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] px-5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-50"
-                        style={{ backgroundColor: ACCENT }}
-                      >
-                        <span aria-hidden>✉️</span> {emailSendState === "sending" ? "Sending…" : "Email this result"}
-                      </button>
-                    </form>
                   )}
-                  {emailSendState === "error" && (
-                    <p className="mt-2 text-sm text-[#B0442F]">{emailSendError || "Couldn't send that email right now."}</p>
-                  )}
-                </div>
+                </motion.section>
 
-                <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                <motion.section variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
                   <div className="mb-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
                     Trusted resources
                   </div>
                   <TrustedResources />
-                </div>
-              </div>
+                </motion.section>
 
-              {/* Fixed height on mobile (stacks below the report); on large
-                  screens it pins alongside the long left column and grows to
-                  fill the viewport instead of leaving a short, dead panel. */}
-              <div className="flex h-[640px] flex-col rounded-2xl border border-[#E3E9E7] bg-white lg:sticky lg:top-8 lg:h-[calc(100vh-8.5rem)] lg:min-h-[420px]">
-                <div className="border-b border-[#E3E9E7] px-6 py-[18px]">
-                  <div className="font-[family-name:var(--font-heading)] text-base font-bold">Ask about your result</div>
-                  <div className="mt-0.5 text-[13px] text-[#5A6462]">The AI explains; it never changes your score.</div>
+                <motion.button
+                  variants={reveal}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={restart}
+                  className="self-start rounded-[10px] px-5 py-3 font-[family-name:var(--font-heading)] font-bold text-white"
+                  style={{ backgroundColor: ACCENT }}
+                >
+                  Start over
+                </motion.button>
+              </motion.div>
+            </div>
+          </div>
+        </MotionConfig>
+      )}
+
+      {screen === "results" && result && (
+        <MotionConfig reducedMotion="user">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <motion.header
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: EASE_OUT }}
+              className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12"
+            >
+              <button
+                type="button"
+                onClick={goToLanding}
+                className="font-[family-name:var(--font-heading)] text-[19px] font-bold tracking-[-0.02em] cursor-pointer"
+              >
+                Bone<span style={{ color: ACCENT }}>Bot</span>
+              </button>
+              <div className="hidden text-[13px] font-medium text-[#5A6462] sm:block">Screening complete</div>
+              <div className="ml-auto flex flex-wrap items-center gap-2">
+                <div className="rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
+                  Screening flag, not a diagnosis
                 </div>
-                <div ref={qaRef} className="flex flex-1 flex-col gap-3 overflow-y-auto px-6 py-5">
-                  {qaMessages.map((m, i) => {
-                    if (m.kind === "resources") return <ResourcesCard key={i} />;
-                    return m.role === "bot" ? (
-                      <BotBubble key={i} text={m.text} small />
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={() => emailSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                  className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                >
+                  <span aria-hidden>✉️</span> Email this result
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={restart}
+                  className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                >
+                  Start over
+                </motion.button>
+              </div>
+            </motion.header>
+
+            <div className="flex-1 overflow-y-auto px-6 py-8 sm:px-12">
+              <div className="mx-auto grid max-w-[1140px] grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_420px] 2xl:max-w-[1360px] 2xl:grid-cols-[1fr_460px]">
+                <motion.div
+                  variants={revealContainer}
+                  initial="hidden"
+                  animate="visible"
+                  className="flex flex-col gap-5"
+                >
+                  {!result.validated && (
+                    <motion.p
+                      variants={reveal}
+                      className="rounded-[14px] border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-700"
+                    >
+                      ⚠️ Illustrative: coefficients not yet trained on NHANES. Do not present these numbers as real.
+                    </motion.p>
+                  )}
+
+                  <motion.div variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                    <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                      <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                        {userName ? `${userName}'s screening result` : "Your screening result"}
+                      </div>
+                      <div className="relative flex gap-1 rounded-[9px] bg-[#EEF2F0] p-1">
+                        {TABS.map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => setTab(t.id)}
+                            className={`relative z-10 rounded-md px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+                              tab === t.id ? "text-[#15181A]" : "bg-transparent text-[#5A6462]"
+                            }`}
+                          >
+                            {tab === t.id && (
+                              <motion.div
+                                layoutId="tabPill"
+                                className="absolute inset-0 -z-10 rounded-md bg-white shadow-sm"
+                                transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                              />
+                            )}
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {tab !== "meter" && (
+                      <>
+                        <div className="mb-5 flex flex-wrap items-center gap-5">
+                          <motion.div
+                            initial={reduceMotion ? false : { opacity: 0, scale: 0.92 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.4, ease: EASE_OUT, delay: 0.1 }}
+                            className="font-[family-name:var(--font-heading)] text-[52px] font-bold tracking-[-0.02em]"
+                            style={{ color: catMeta.color }}
+                          >
+                            {catMeta.label}
+                          </motion.div>
+                          <motion.div
+                            initial={reduceMotion ? false : { opacity: 0, scale: 0.85 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.35, ease: EASE_OUT, delay: 0.22 }}
+                            className="rounded-full px-3.5 py-1.5 text-[13px] font-semibold"
+                            style={{ color: catMeta.color, backgroundColor: catMeta.bg }}
+                          >
+                            {catMeta.chip}
+                          </motion.div>
+                        </div>
+                        <Markdown text={summaryExplanation || catMeta.desc} className="text-pretty text-base leading-[1.6] text-[#4A5452]" />
+                      </>
+                    )}
+
+                    {tab !== "category" && (
+                      <div className="mt-8 mb-2">
+                        <div className="relative">
+                          <div className="flex h-3.5 overflow-hidden rounded-full">
+                            <div className="w-1/3" style={{ backgroundColor: "#EFC3B8" }} />
+                            <div className="w-1/3" style={{ backgroundColor: "#F0DFAE" }} />
+                            <div className="w-1/3" style={{ backgroundColor: "#BFDDD3" }} />
+                          </div>
+                          {/* Uncertainty range — the box, not just the point estimate. Draws in
+                              from the centre so the meter visibly resolves to your result. */}
+                          <motion.div
+                            initial={reduceMotion ? false : { left: "50%", width: 0, opacity: 0 }}
+                            animate={{
+                              left: `${rangeLeftPct}%`,
+                              width: `${Math.max(3, rangeRightPct - rangeLeftPct)}%`,
+                              opacity: 1,
+                            }}
+                            transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
+                            className="absolute top-0 h-3.5 rounded-full border-2 border-dashed border-[#4A5452]"
+                          />
+                          <motion.div
+                            initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
+                            animate={{ left: `${marker}%`, opacity: 1 }}
+                            transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
+                            className="absolute -top-[26px] -translate-x-1/2 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-white"
+                            style={{ backgroundColor: "#15181A" }}
+                          >
+                            you
+                          </motion.div>
+                          <motion.div
+                            initial={reduceMotion ? false : { left: "50%", opacity: 0 }}
+                            animate={{ left: `${marker}%`, opacity: 1 }}
+                            transition={{ duration: 0.7, ease: EASE_OUT, delay: 0.15 }}
+                            className="absolute top-0 h-3.5 w-[3px] -translate-x-1/2 rounded-sm bg-[#15181A]"
+                          />
+                        </div>
+                        <div className="mt-3.5 flex justify-between gap-2 text-xs font-semibold">
+                          {[...T_SCORE_BANDS].reverse().map((b) => (
+                            <span key={b.label}>
+                              <span style={{ color: b.color }}>{b.label.replace(" (low bone mass)", "")}</span>{" "}
+                              <span className="font-normal text-[#9AA5A2]">{b.range}</span>
+                            </span>
+                          ))}
+                        </div>
+                        <p className="mt-4 text-sm leading-[1.6] text-[#4A5452]">
+                          The dashed box is the uncertainty range — your true score most likely sits inside it. A
+                          T-score compares your bone density to a healthy young adult: 0 is average, and lower (more
+                          negative) means less dense bone.
+                        </p>
+                      </div>
+                    )}
+                  </motion.div>
+
+                  <motion.div variants={reveal} ref={emailSectionRef} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-6 sm:px-8">
+                    <div className="font-[family-name:var(--font-heading)] text-base font-bold text-[#15181A]">
+                      Keep a copy of this result
+                    </div>
+                    <div className="mt-0.5 text-[13px] text-[#5A6462]">
+                      We&apos;ll email it to you. Bring it to your GP appointment.
+                    </div>
+
+                    {emailSendState === "sent" ? (
+                      <motion.p
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, ease: EASE_OUT }}
+                        className="mt-4 flex items-center gap-2 text-sm font-semibold"
+                        style={{ color: ACCENT }}
+                      >
+                        <span aria-hidden>✓</span> Sent to {emailAddress}.
+                      </motion.p>
                     ) : (
-                      <UserBubble key={i} text={m.text} small />
-                    );
-                  })}
-                  {qaTyping && <TypingDots small />}
-                </div>
-                <div className="flex flex-col gap-2.5 border-t border-[#E3E9E7] px-5 py-3.5">
-                  <div className="flex flex-wrap gap-2">
-                    {[`Why is my risk ${cat}?`, "What is a DXA scan?", "What can I do now?"].map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => qaAsk(s)}
+                      <form
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void sendResultEmail();
+                        }}
+                        className="mt-4 flex flex-col gap-2 sm:flex-row"
+                      >
+                        <input
+                          type="email"
+                          required
+                          value={emailAddress}
+                          onChange={(event) => {
+                            setEmailAddress(event.target.value);
+                            if (emailSendState === "error") setEmailSendState("idle");
+                          }}
+                          placeholder="you@example.com"
+                          aria-label="Your email address"
+                          disabled={emailSendState === "sending"}
+                          className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E] disabled:opacity-50"
+                        />
+                        <motion.button
+                          whileHover={emailSendState === "sending" ? {} : { scale: 1.02 }}
+                          whileTap={emailSendState === "sending" ? {} : { scale: 0.98 }}
+                          transition={{ duration: 0.15 }}
+                          type="submit"
+                          disabled={emailSendState === "sending" || !emailAddress.trim()}
+                          className="flex items-center justify-center gap-2 whitespace-nowrap rounded-[9px] px-5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white disabled:opacity-50"
+                          style={{ backgroundColor: ACCENT }}
+                        >
+                          <span aria-hidden>✉️</span> {emailSendState === "sending" ? "Sending…" : "Email this result"}
+                        </motion.button>
+                      </form>
+                    )}
+                    {emailSendState === "error" && (
+                      <p className="mt-2 text-sm text-[#B0442F]">{emailSendError || "Couldn't send that email right now."}</p>
+                    )}
+                  </motion.div>
+
+                  {uncertaintyNotes.length > 0 && (
+                    <motion.div variants={reveal} className="rounded-2xl border border-[#E6CC89] bg-[#FFF8E8] px-7 py-7 sm:px-8">
+                      <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                        Answers needing clarification
+                      </div>
+                      <ul className="mt-4 flex list-disc flex-col gap-2 pl-5 text-[15px] leading-[1.6] text-[#4A5452]">
+                        {uncertaintyNotes.map((note, index) => (
+                          <li key={`${note}-${index}`}>{note}</li>
+                        ))}
+                      </ul>
+                    </motion.div>
+                  )}
+
+                  <motion.div variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                    <div className="mb-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                      What drove this result
+                    </div>
+                    <div className="mb-3 flex items-center justify-between text-[12px] font-semibold">
+                      <span style={{ color: "#B0442F" }}>← Pulls your estimate down</span>
+                      <span style={{ color: ACCENT }}>Supports your bones →</span>
+                    </div>
+                    <div className="flex flex-col gap-3.5">
+                      {(() => {
+                        const maxAbs = Math.max(...result.contributions.map((f) => Math.abs(f.contribution)), 0.1);
+                        return result.contributions.map((f, index) => {
+                          const isPositive = f.direction === "raises";
+                          const halfWidthPct = Math.max(3, Math.round((Math.abs(f.contribution) / maxAbs) * 50));
+                          const detail = features ? factorDetail(f.factor, features) : { value: "" };
+                          return (
+                            <motion.div
+                              key={f.factor}
+                              initial={reduceMotion ? false : { opacity: 0, x: -8 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ duration: 0.4, ease: EASE_OUT, delay: index * 0.05 }}
+                              className="flex items-center gap-3"
+                            >
+                              <div className="w-[110px] flex-shrink-0 sm:w-[150px]">
+                                <div className="truncate text-[13px] text-[#15181A]" title={f.factor}>
+                                  {f.factor}
+                                </div>
+                                {detail.value && (
+                                  <div className="truncate text-[11px] text-[#9AA5A2]" title={detail.value}>
+                                    {detail.value}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="relative h-2.5 flex-1 overflow-visible rounded-full bg-[#F0F2F1]">
+                                <div className="absolute inset-y-0 left-1/2 w-px bg-[#D5DCDA]" />
+                                <motion.div
+                                  initial={reduceMotion ? false : { width: 0 }}
+                                  animate={{ width: `${halfWidthPct}%` }}
+                                  transition={{ duration: 0.5, ease: EASE_OUT, delay: index * 0.05 + 0.1 }}
+                                  className="absolute top-0 h-full rounded-full"
+                                  style={
+                                    isPositive
+                                      ? { left: "50%", backgroundColor: ACCENT }
+                                      : { right: "50%", backgroundColor: "#B0442F" }
+                                  }
+                                />
+                              </div>
+                              <div
+                                className="w-10 flex-shrink-0 text-right font-[family-name:var(--font-heading)] text-[13px] font-bold"
+                                style={{ color: isPositive ? ACCENT : "#B0442F" }}
+                              >
+                                {f.contribution > 0 ? "+" : ""}
+                                <AnimatedNumber value={f.contribution} decimals={1} reduceMotion={reduceMotion} />
+                              </div>
+                            </motion.div>
+                          );
+                        });
+                      })()}
+                    </div>
+                    <div className="mt-5 text-[13px] leading-[1.5] text-[#5A6462]">
+                      Bars show how much each answer moved your estimated T-score, including answers that didn&apos;t
+                      move it at all. Anything you skipped uses a population average and isn&apos;t shown here.
+                      Weights follow NHANES-derived clinical risk factors.
+                    </div>
+                  </motion.div>
+
+                  <motion.div variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]"
+                      >
+                        Understanding your estimated T-score
+                      </span>
+                      <AIWrittenBadge />
+                    </div>
+                    <Markdown text={scoreExplanation} className="mt-4 text-[15px] leading-[1.65] text-[#4A5452]" />
+                  </motion.div>
+
+                  <motion.div variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                        What this means for you
+                      </span>
+                      <AIWrittenBadge />
+                    </div>
+                    <Markdown text={implicationsExplanation} className="mt-4 text-[15px] leading-[1.65] text-[#4A5452]" />
+                  </motion.div>
+
+                  {bloodResults && (
+                    <motion.div variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                      <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">Uploaded blood results</div>
+                      <p className="mt-3 text-sm leading-[1.6] text-[#4A5452]">
+                        {bloodResults.vitaminD !== null && `Vitamin D: ${bloodResults.vitaminD} nmol/L. `}
+                        {bloodResults.calcium !== null && `Calcium: ${bloodResults.calcium} mmol/L. `}
+                        {bloodResults.alkalinePhosphatase !== null && `ALP: ${bloodResults.alkalinePhosphatase} U/L. `}
+                        {bloodResults.redBloodCellCount !== null && `RBC: ${bloodResults.redBloodCellCount}. `}
+                        Vitamin D and calcium are included in the current estimate; ALP and RBC are contextual only.
+                      </p>
+                    </motion.div>
+                  )}
+
+                  {(reportedActivitySteps !== null || reportedActivityMinutes !== null) && (
+                    <motion.div variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                      <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">Activity input</div>
+                      <p className="mt-3 text-sm leading-[1.6] text-[#4A5452]">
+                        {reportedActivitySteps !== null && `~${reportedActivitySteps.toLocaleString()} steps/day. `}
+                        {reportedActivityMinutes !== null && `~${reportedActivityMinutes} active minutes/day. `}
+                        Used as an approximate proxy for the daily wrist-movement measure in the training data.
+                      </p>
+                    </motion.div>
+                  )}
+
+                  {result.category !== "lower" && (
+                    <motion.div
+                      variants={reveal}
+                      className="flex flex-col items-start justify-between gap-5 rounded-2xl px-7 py-6 sm:flex-row sm:items-center sm:px-8"
+                      style={{ backgroundColor: ACCENT }}
+                    >
+                      <div>
+                        <div className="font-[family-name:var(--font-heading)] text-[19px] font-bold text-white">
+                          Next step: talk to your GP about a DXA scan
+                        </div>
+                        <div className="mt-1 text-sm text-[#CBE6E0]">
+                          A DXA scan is the actual diagnostic test. This screening tells you whether it&apos;s worth
+                          asking for one.
+                        </div>
+                      </div>
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        transition={{ duration: 0.15 }}
+                        onClick={() => qaAsk("What's a DXA scan?")}
+                        className="whitespace-nowrap rounded-[9px] bg-white px-5 py-3 font-[family-name:var(--font-heading)] text-sm font-bold hover:bg-[#E4F0ED]"
+                        style={{ color: ACCENT }}
+                      >
+                        What&apos;s a DXA scan?
+                      </motion.button>
+                    </motion.div>
+                  )}
+
+                  {features && (
+                    <motion.div variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                      <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                        How your estimate changes with age
+                      </div>
+                      <p className="mt-1.5 text-[13px] leading-[1.5] text-[#5A6462]">
+                        Same profile, run through the model at each age bracket, with everything else held fixed. Your
+                        answer is highlighted.
+                      </p>
+                      <div className="mt-6 flex h-[150px] items-end gap-1.5 sm:gap-2.5">
+                        {AGE_BRACKETS.map((bracket, index) => {
+                          const projected = scoreBone({ ...features, age: AGE_MIDPOINT[bracket] });
+                          const isYours = AGE_MIDPOINT[bracket] === features.age;
+                          return (
+                            <motion.div
+                              key={bracket}
+                              initial={reduceMotion ? false : { opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.3, delay: index * 0.04 }}
+                              className="flex flex-1 flex-col items-center gap-1.5"
+                            >
+                              <div
+                                className="text-[11px] font-semibold"
+                                style={{ color: isYours ? ACCENT : "#5A6462" }}
+                              >
+                                {projected.estimatedTScore}
+                              </div>
+                              <div className="flex h-[100px] w-full items-end">
+                                <motion.div
+                                  initial={reduceMotion ? false : { height: 0 }}
+                                  animate={{ height: `${Math.max(6, barHeightPercent(projected.estimatedTScore))}%` }}
+                                  transition={{ duration: 0.5, ease: EASE_OUT, delay: index * 0.04 + 0.1 }}
+                                  className="w-full rounded-t-[4px]"
+                                  style={{
+                                    backgroundColor: isYours ? ACCENT : bandColor(projected.estimatedTScore) + "70",
+                                  }}
+                                  title={`${bracket}: estimated T-score ${projected.estimatedTScore}`}
+                                />
+                              </div>
+                              <div
+                                className="text-center text-[10px] leading-tight"
+                                style={{ color: isYours ? ACCENT : "#9AA5A2", fontWeight: isYours ? 700 : 400 }}
+                              >
+                                {bracket}
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  <motion.div variants={reveal} className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
+                    <div className="mb-4 text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
+                      Trusted resources
+                    </div>
+                    <TrustedResources />
+                  </motion.div>
+                </motion.div>
+
+                {/* Fixed height on mobile (stacks below the report); on large
+                    screens it pins alongside the long left column and grows to
+                    fill the viewport instead of leaving a short, dead panel. */}
+                <motion.div
+                  initial={reduceMotion ? false : { opacity: 0, x: 16 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.45, ease: EASE_OUT, delay: 0.15 }}
+                  className="flex h-[640px] flex-col rounded-2xl border border-[#E3E9E7] bg-white lg:sticky lg:top-8 lg:h-[calc(100vh-8.5rem)] lg:min-h-[420px]"
+                >
+                  <div className="border-b border-[#E3E9E7] px-6 py-[18px]">
+                    <div className="font-[family-name:var(--font-heading)] text-base font-bold">Ask about your result</div>
+                    <div className="mt-0.5 text-[13px] text-[#5A6462]">The AI explains; it never changes your score.</div>
+                  </div>
+                  <div ref={qaRef} className="flex flex-1 flex-col gap-3 overflow-y-auto px-6 py-5">
+                    <AnimatePresence initial={false}>
+                      {qaMessages.map((m, i) => (
+                        <motion.div
+                          key={i}
+                          initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.25, ease: EASE_OUT }}
+                        >
+                          {m.kind === "resources" ? (
+                            <ResourcesCard />
+                          ) : m.role === "bot" ? (
+                            <BotBubble text={m.text} small />
+                          ) : (
+                            <UserBubble text={m.text} small />
+                          )}
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                    {qaTyping && <TypingDots small />}
+                  </div>
+                  <div className="flex flex-col gap-2.5 border-t border-[#E3E9E7] px-5 py-3.5">
+                    <div className="flex flex-wrap gap-2">
+                      {[`Why is my risk ${cat}?`, "What is a DXA scan?", "What can I do now?"].map((s) => (
+                        <motion.button
+                          key={s}
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.96 }}
+                          transition={{ duration: 0.15 }}
+                          onClick={() => qaAsk(s)}
+                          className="rounded-full bg-[#EEF2F0] px-3.5 py-[7px] text-[13px] font-medium hover:bg-[#DCE7E3]"
+                          style={{ color: ACCENT }}
+                        >
+                          {s}
+                        </motion.button>
+                      ))}
+                      <motion.button
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.96 }}
+                        transition={{ duration: 0.15 }}
+                        onClick={showResources}
                         className="rounded-full bg-[#EEF2F0] px-3.5 py-[7px] text-[13px] font-medium hover:bg-[#DCE7E3]"
                         style={{ color: ACCENT }}
                       >
-                        {s}
-                      </button>
-                    ))}
-                    <button
-                      onClick={showResources}
-                      className="rounded-full bg-[#EEF2F0] px-3.5 py-[7px] text-[13px] font-medium hover:bg-[#DCE7E3]"
-                      style={{ color: ACCENT }}
-                    >
-                      Where can I learn more?
-                    </button>
+                        Where can I learn more?
+                      </motion.button>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        value={qaInput}
+                        onChange={(e) => setQaInput(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && qaInput.trim() && qaAsk(qaInput.trim())}
+                        placeholder="Type a question…"
+                        aria-label="Ask about your result"
+                        className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E]"
+                      />
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        transition={{ duration: 0.15 }}
+                        onClick={() => qaInput.trim() && qaAsk(qaInput.trim())}
+                        className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white"
+                        style={{ backgroundColor: ACCENT }}
+                      >
+                        Send
+                      </motion.button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      value={qaInput}
-                      onChange={(e) => setQaInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && qaInput.trim() && qaAsk(qaInput.trim())}
-                      placeholder="Type a question…"
-                      aria-label="Ask about your result"
-                      className="flex-1 rounded-[9px] border-[1.5px] border-[#D5DCDA] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#0E7C6E]"
-                    />
-                    <button
-                      onClick={() => qaInput.trim() && qaAsk(qaInput.trim())}
-                      className="rounded-[9px] px-4.5 py-2.5 font-[family-name:var(--font-heading)] text-sm font-bold text-white"
-                      style={{ backgroundColor: ACCENT }}
-                    >
-                      Send
-                    </button>
-                  </div>
-                </div>
+                </motion.div>
               </div>
             </div>
           </div>
-        </div>
+        </MotionConfig>
       )}
 
       <footer className="flex flex-col items-start justify-between gap-3 border-t border-[#E3E9E7] bg-white px-6 py-3.5 sm:flex-row sm:items-center sm:px-12">
