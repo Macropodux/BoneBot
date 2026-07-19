@@ -20,7 +20,7 @@ export type BoneFeatures = {
   highAlcohol: boolean;
   vitaminD: number;
   calcium: number;
-  // Thyroid / coeliac / CKD "secondary osteoporosis" flag. Only affects the
+  // Thyroid disease / CKD "secondary osteoporosis" flag. Only affects the
   // estimate once the model is retrained with it (SECONDARY_CONDITION_TRAINED).
   secondaryCondition: boolean;
 };
@@ -129,7 +129,7 @@ export function scoreBone(
     ["highAlcohol", "High alcohol intake", c.highAlcohol * binary(features.highAlcohol), "highAlcohol"],
     ["vitaminD", "Vitamin D", c.vitaminD * features.vitaminD, "vitaminD"],
     ["calcium", "Serum calcium", c.calcium * features.calcium, "calcium"],
-    ["secondaryCondition", "Thyroid / coeliac / kidney disease", c.secondaryCondition * binary(features.secondaryCondition), "secondaryCondition"],
+    ["secondaryCondition", "Thyroid or chronic kidney disease", c.secondaryCondition * binary(features.secondaryCondition), "secondaryCondition"],
   ];
 
   const estimate = tScoreModel.intercept + terms.reduce((sum, [, , value]) => sum + value, 0);

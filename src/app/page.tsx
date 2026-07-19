@@ -12,7 +12,7 @@
 //
 // The short conversational flow doesn't cover all BoneFeatures fields. Blood-test
 // values (vitaminD, calcium) and activity (weightBearingActivity) are
-// user-provided via photo upload / a quick chip when given; the remaining
+// user-provided via photo upload or numeric answers when given; the remaining
 // history fields this short flow never asks (hormone therapy, rheumatoid
 // arthritis, alcohol) still use the same illustrative-defaults pattern as
 // before; see mapAnswersToFeatures() below — flagged there for a clinical
@@ -59,18 +59,18 @@ type UploadedActivityResult = {
 
 const STEPS: Step[] = [
   { key: "assignedFemale", q: "Were you assigned female at birth?", options: ["Yes", "No"] },
-  { key: "age", q: "Let's start simple. How old are you?", options: [] },
+  { key: "age", q: "How old are you?", options: [] },
   { key: "menopauseStatus", q: "Have your periods stopped for good?", options: ["Yes", "No", "Not sure"] },
-  { key: "existingCare", q: "Have you already been diagnosed with osteoporosis, had a bone scan, or taken bone medication?", options: ["Yes", "No"] },
+  { key: "existingCare", q: "Have you been diagnosed with osteoporosis, had a DXA bone-density scan, or taken medicine for your bones?", options: ["Yes", "No"] },
   { key: "knowsDxa", q: "Do you know the T-score from your most recent DXA bone-density scan?", options: ["Yes", "No"] },
   { key: "dxaScore", q: "What was the T-score on that scan?", options: [] },
   { key: "dxaYear", q: "What year was that scan performed?", options: [] },
   { key: "menopause", q: "At what age did you reach menopause?", options: [] },
-  { key: "fracture", q: "Have you broken a bone since age 50, even from a minor fall or bump?", options: [] },
+  { key: "fracture", q: "Since age 50, have you broken a bone after a minor fall, bump, or similar low-impact injury?", options: [] },
   { key: "smoke", q: "Do you currently smoke?", options: [] },
-  { key: "steroids", q: "Have you ever taken corticosteroids (like prednisone) for 3 months or more?", options: [] },
-  { key: "bloodResults", q: "If you have blood-test results, upload an image now, or tap Skip to continue without one.", options: [] },
-  { key: "weight", q: "What's your weight and height? BoneBot uses these to calculate your BMI.", options: [] },
+  { key: "steroids", q: "Have you taken corticosteroid tablets, such as prednisolone or prednisone, for three months or longer?", options: [] },
+  { key: "bloodResults", q: "If you have recent blood-test results, upload clear images now. Otherwise, choose Skip.", options: [] },
+  { key: "weight", q: "What are your weight and height? BoneBot uses them to calculate your BMI.", options: [] },
   { key: "averageDailySteps", q: ACTIVITY_QUESTIONS.steps.question, options: [] },
   { key: "averageDailyActiveMinutes", q: ACTIVITY_QUESTIONS.minutes.question, options: [] },
   // Appended last and gated on SECONDARY_CONDITION_TRAINED so it is only asked
@@ -80,7 +80,7 @@ const STEPS: Step[] = [
     ? [
         {
           key: "secondaryCondition" as StepKey,
-          q: "Have you been diagnosed with thyroid disease, coeliac disease, or chronic kidney disease?",
+          q: "Have you been diagnosed with thyroid disease or chronic kidney disease?",
           options: ["Yes", "No", "Not sure"],
         },
       ]
@@ -172,7 +172,7 @@ const isActivityStep = (key: StepKey) =>
 const LOW_RISK_GUIDANCE = [
   "Keep active with weight-bearing and muscle-strengthening activity that feels safe and suitable for you.",
   "Avoid smoking. If you smoke, getting support to stop benefits your overall health as well as your bones.",
-  "Keep high alcohol intake low. If your health changes or you have a fracture after a minor fall, speak with a clinician.",
+  "Keep alcohol intake within recommended limits. If your health changes or you have a fracture after a minor fall, speak with a clinician.",
 ] as const;
 
 // Returns the feature vector plus the subset of feature keys the user actually
@@ -342,6 +342,8 @@ function factorDetail(factorLabel: string, f: BoneFeatures): { value: string; re
       return { value: `${f.vitaminD} nmol/L`, reference: "sufficient 50–125, deficient below 30" };
     case "Serum calcium":
       return { value: `${f.calcium} mmol/L`, reference: "normal range 2.2–2.6" };
+    case "Thyroid or chronic kidney disease":
+      return { value: f.secondaryCondition ? "Yes" : "No" };
     default:
       return { value: "" };
   }
@@ -630,7 +632,7 @@ export default function Home() {
     setBmiError("");
     const greetingName = name ? `, ${name}` : "";
     botSay(
-      `Nice to meet you${greetingName}. I'll ask four quick questions to get a sense of your bone-health risk — if they suggest a closer look could help, I'll ask a few more after that. Just so it's clear: the model does the maths, I only explain what it means. This is a screening check, not a diagnosis.`
+      `Nice to meet you${greetingName}. I'll begin with four short questions. If your answers are above BoneBot's threshold for a closer look, I'll ask some follow-up questions. The model calculates the screening estimate; AI only explains it. This is not a diagnosis.`
     );
     window.setTimeout(() => botSay(STEPS[0].q), 1400);
   }
@@ -680,7 +682,7 @@ export default function Home() {
   async function finishAtGate(message: string, triageResultValue?: TriageOutput) {
     setRouteMessage(
       triageResultValue
-        ? "This is a very low initial screening estimate. You do not need the longer questionnaire today."
+        ? "Your initial screening estimate is below BoneBot's threshold, so the longer questionnaire was not opened. This does not rule out osteoporosis or replace clinical advice."
         : message,
     );
     setTriageResult(triageResultValue ?? null);
@@ -707,11 +709,11 @@ export default function Home() {
             : MENOPAUSE_STATUS["Not sure"],
     });
     if (!triage.proceedToFullAssessment) {
-      void finishAtGate(`Your initial screening estimate is ${triage.probabilityPercent}%. That's a reassuringly low result, so BoneBot doesn't recommend the longer questionnaire today.`, triage);
+      void finishAtGate(`Your initial screening estimate is ${triage.probabilityPercent}%, which is below BoneBot's threshold for opening the longer questionnaire. This does not rule out osteoporosis or replace clinical advice.`, triage);
       return;
     }
     setStepIdx(FULL_QUESTION_START);
-    botSay("We’ll continue with the full questionnaire to get a more precise result.");
+    botSay("We’ll continue with the full questionnaire to produce a fuller screening estimate.");
     window.setTimeout(() => botSay(STEPS[FULL_QUESTION_START].q), 900);
   }
 
@@ -738,7 +740,7 @@ export default function Home() {
     if (stepIdx === 0) {
       if (opt !== "Yes") {
         void finishAtGate(
-          "BoneBot’s screening estimate is built and validated for people assigned female at birth around and after menopause, so it can’t give you a reliable result here. Please talk to a clinician about your bone health.",
+          "BoneBot's model was trained for adults assigned female at birth around and after menopause, so it cannot provide a reliable estimate here. Please speak with a clinician about your bone health.",
         );
         return;
       }
@@ -762,7 +764,7 @@ export default function Home() {
 
     if (stepIdx === 3) {
       if (nextAnswers.assignedFemale !== "Yes") {
-        void finishAtGate("BoneBot is currently calibrated for people assigned female at birth. A clinician can help you find the right bone-health assessment.");
+        void finishAtGate("BoneBot's model was trained for adults assigned female at birth around and after menopause. A clinician can help you find an appropriate bone-health assessment.");
       } else if (nextAnswers.existingCare === "Yes") {
         setStepIdx(4);
         botSay(STEPS[4].q);
@@ -897,7 +899,7 @@ export default function Home() {
         { role: "user", text: raw },
         {
           role: "bot",
-          text: "BoneBot's screening is designed for adults around and after menopause — could you enter your age in years?",
+          text: "Please enter an age from 18 to 110 years.",
         },
       ]);
       setFreeInput("");
@@ -933,7 +935,7 @@ export default function Home() {
       const nextUnresolvedCount = unresolvedAnswerCount + 1;
       setUnresolvedAnswerCount(nextUnresolvedCount);
       if (nextUnresolvedCount >= 3) {
-        void finishAtGate("BoneBot is not able to create a reliable screening score from the answers provided. For any further questions about your bone health, please reach out to your GP or another clinician.");
+        void finishAtGate("BoneBot cannot create a reliable screening estimate from the answers provided. Please contact your GP or another clinician with questions about your bone health.");
         return;
       }
       answer(resolution.storedValue, raw, false);
@@ -1432,25 +1434,25 @@ export default function Home() {
               Bone-health screening for postmenopausal women
             </div>
             <h1 className="max-w-[880px] text-balance font-[family-name:var(--font-heading)] text-[2.85rem] font-bold leading-[1.02] tracking-[-0.035em] text-[#12211E] sm:text-6xl lg:text-[4.6rem]">
-              Know your bone fracture risk
-              <br className="hidden sm:block" /> before it{" "}
+              Know when your bones may need a closer look
+              <br className="hidden sm:block" /> before a{" "}
               <span className="relative whitespace-nowrap" style={{ color: FRACTURE }}>
-                breaks
+                fracture
                 <span
                   aria-hidden
                   className="absolute inset-x-0 -bottom-1 h-[3px] rounded-full"
                   style={{ backgroundColor: FRACTURE, opacity: 0.35 }}
                 />
               </span>{" "}
-              something.
+              happens.
             </h1>
             <p className="mt-7 max-w-[600px] text-pretty text-lg leading-[1.6] text-[#41504C] sm:text-[19px]">
-              A 3-minute conversational screening. The risk model is trained on NHANES population data. The AI
-              explains your result; it never decides it.
+              A three-minute conversational screen estimates your T-score using an NHANES-trained model. AI
+              explains the result; it never sets or changes it.
             </p>
             <p className="mt-3 max-w-[600px] text-pretty text-[15px] leading-[1.6]" style={{ color: ACCENT }}>
-              Most bone-health research and tools were built around men&apos;s bodies. This one starts from yours —
-              tuned for what changes after menopause.
+              Designed around bone changes after menopause. This is a screening estimate—not a diagnosis or a
+              substitute for DXA.
             </p>
             <div className="mt-9 flex flex-wrap justify-center gap-3.5">
               <button
@@ -1466,14 +1468,14 @@ export default function Home() {
                 onClick={tryExample}
                 className="rounded-[10px] border-[1.5px] border-[#C6CFCC] px-8 py-4 font-[family-name:var(--font-heading)] text-[17px] font-bold text-[#15181A] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
               >
-                Try an example patient
+                Try an example
               </button>
             </div>
             <div className="mt-16 grid max-w-[920px] grid-cols-1 gap-4 sm:grid-cols-3">
               {[
-                { stat: "1 in 2", body: "women over 50 will fracture a bone due to osteoporosis." },
-                { stat: "NHANES", body: "The prediction comes from a model trained on national health survey data, not from a chatbot." },
-                { stat: "Adaptive", body: "Four quick screening questions, then more detail only when needed. No account or forms." },
+                { stat: "Often silent", body: "Bone loss may cause no symptoms until a fracture occurs." },
+                { stat: "Model-led", body: "A model trained on NHANES data produces the estimate. AI only explains it." },
+                { stat: "Adaptive", body: "Four initial questions, with follow-ups only when a closer look may help. No account needed." },
               ].map((c) => (
                 <div
                   key={c.stat}
@@ -1491,8 +1493,9 @@ export default function Home() {
       )}
 
       {screen === "chat" && (
-        <div className="flex min-h-0 flex-1 flex-col">
-          <header className="flex items-center gap-6 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-gradient-to-b from-[#F7F6F2] via-[#F5F7F5] to-[#F2F5F4]">
+          <FloatingBones />
+          <header className="relative z-10 flex items-center gap-6 border-b border-[#E3E9E7] bg-white/90 px-6 py-4 backdrop-blur-sm sm:px-12">
             <button
               type="button"
               onClick={goToLanding}
@@ -1508,7 +1511,7 @@ export default function Home() {
             </div>
             <div className="text-[13px] font-medium text-[#5A6462]">{progressLabel}</div>
             <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
-              Screening flag, not a diagnosis
+              Screening estimate, not a diagnosis
             </div>
             <button
               onClick={() => {
@@ -1519,7 +1522,7 @@ export default function Home() {
               Start over
             </button>
           </header>
-          <div ref={chatRef} className="flex-1 overflow-y-auto px-6 py-8">
+          <div ref={chatRef} className="relative z-10 flex-1 overflow-y-auto px-6 py-8">
             <div className="mx-auto flex max-w-[680px] flex-col gap-3.5">
               {messages.map((m, i) =>
                 m.role === "bot" ? <BotBubble key={i} text={m.text} /> : <UserBubble key={i} text={m.text} />
@@ -1549,7 +1552,7 @@ export default function Home() {
               )}
             </div>
           </div>
-          <div className="border-t border-[#E3E9E7] bg-white px-6 py-5">
+          <div className="relative z-10 border-t border-[#E3E9E7] bg-white/90 px-6 py-5 backdrop-blur-sm">
             <div className="mx-auto flex max-w-[680px] flex-col gap-3">
 
               {awaitingName && (
