@@ -60,8 +60,7 @@ substitute for a measured DXA T-score. Source: `bhof-clinicians-guide-2022`.
 2. Prefer a current clinical guideline, government health source, systematic
    review, randomised trial, or prospective cohort. Do not cite blogs,
    commercial health sites, or model-generated summaries.
-3. Add a source and a card in the same pull/commit. Josh (clinical lead) must
-   approve any new user-facing medical wording before deployment.
+3. Add a source and a card in the same pull/commit.
 4. Review the library before a release and at least annually. Record substantial
    updates in this file's git history.
 
