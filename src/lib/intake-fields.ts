@@ -97,14 +97,36 @@ function parseSkippableBoolean(raw: string): ParseResult {
   return parseBoolean(raw);
 }
 
+// Conservative yes/no synonym safety net (voice transcripts / casual replies
+// often say "yeah" or "nope" rather than "yes"/"no"). Deliberately excludes
+// ambiguous words like "right", "correct", or "ok", which can mean other
+// things or collide with correction flows. Only ever consulted by
+// parseChoice, and only for the "yes"/"no" values specifically — other
+// choice fields (e.g. a future non-boolean choice) are unaffected.
+const AFFIRMATIVE_SYNONYMS = ["yeah", "yep", "yup", "yah", "aye", "absolutely", "definitely", "for sure", "sure"];
+const NEGATIVE_SYNONYMS = ["nope", "nah", "not really", "no way"];
+
+// True if `t` (already trimmed+lowercased) is, or leads with, `word` as a
+// whole token — e.g. "yeah since 3 years" matches "yeah" but "yeahsure"
+// does not. Lets the LLM's raw extracted phrase still resolve deterministically.
+function matchesLeadingWord(t: string, word: string): boolean {
+  return t === word || t.startsWith(word + " ");
+}
+
 // values: canonical lowercase option values (e.g. ["yes", "no"]). A skip /
 // "not sure" reply resolves to the literal string "not-sure" — a genuine
 // answer for fields like menopauseStatus, not a null "no value" sentinel.
 function parseChoice(values: string[]) {
+  const hasYes = values.includes("yes");
+  const hasNo = values.includes("no");
   return (raw: string): ParseResult => {
     const t = raw.trim().toLowerCase();
     if (!t) return { ok: false };
+    // Checked before the negative synonyms below so "not sure" (and other
+    // SKIP_RE phrasings) never resolves to "no".
     if (SKIP_RE.test(t)) return { ok: true, value: "not-sure" };
+    if (hasNo && NEGATIVE_SYNONYMS.some((s) => matchesLeadingWord(t, s))) return { ok: true, value: "no" };
+    if (hasYes && AFFIRMATIVE_SYNONYMS.some((s) => matchesLeadingWord(t, s))) return { ok: true, value: "yes" };
     for (const v of values) {
       if (t === v || t.startsWith(v)) return { ok: true, value: v };
     }
