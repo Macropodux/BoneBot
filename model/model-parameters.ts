@@ -1,9 +1,7 @@
 // AUTO-GENERATED from model/train_bonebot.ipynb (NHANES 2013-2014). Do not edit by hand.
 // Regenerate whenever the model changes.
 //
-// Feature set matches what the app collects/imputes. Parental hip fracture is
-// intentionally ABSENT from training: NHANES 2013-2014 has no family-history
-// item, so it cannot be trained honestly (coefficient kept at 0 below).
+// Feature set matches what the app collects/imputes.
 // Activity is objective wrist-accelerometry (MIMS), averaged over valid wear
 // days only (>=10 h wake-wear, >=4 days) so low-wear days do not masquerade as
 // inactivity.
@@ -40,10 +38,6 @@ export const tScoreModel = {
     rheumatoidArthritis: 0.001246,
     onHormoneTherapy: 0.107144,
     secondaryCondition: -0.045588,
-    // NHANES 2013-2014 has no family-history-of-fracture item, so this cannot be
-    // trained. Kept at 0 (no effect on the estimate) only so the current intake
-    // UI keeps compiling; the intake question should be removed, then this key.
-    parentalHipFracture: 0,
   },
   imputationDefaults: {
     bmi: 28.1000,
@@ -58,7 +52,6 @@ export const tScoreModel = {
     rheumatoidArthritis: 0.0000,
     onHormoneTherapy: 0.0000,
     secondaryCondition: 0.0000,
-    parentalHipFracture: 0.0000,
   },
   // Complete-data 95% half-width (z * residualStd). Used as the fallback and
   // when no provided-features set is passed; the per-person band (below) widens

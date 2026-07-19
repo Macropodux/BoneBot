@@ -331,8 +331,6 @@ function factorDetail(factorLabel: string, f: BoneFeatures): { value: string; re
       return { value: `${activityLabel(f.weightBearingActivity)} activity`, reference: "higher is more protective" };
     case "Current smoker":
       return { value: f.currentSmoker ? "Yes" : "No" };
-    case "Parental hip fracture":
-      return { value: f.parentalHipFracture ? "Yes" : "No" };
     case "Glucocorticoid use":
       return { value: f.glucocorticoids ? "Yes, 3+ months" : "None reported" };
     case "Rheumatoid arthritis":

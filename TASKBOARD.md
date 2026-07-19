@@ -91,7 +91,7 @@ young-adult female reference. Cite Looker et al. 2010.
 
 **Features (none is the scan):** age, years since menopause, hormone therapy, prior
 fragility fracture, BMI, weight-bearing activity (wrist accelerometer), smoking,
-parental hip fracture, **glucocorticoids, rheumatoid arthritis, high alcohol** (FRAX
+**glucocorticoids, rheumatoid arthritis, high alcohol** (FRAX
 variables), and the objective labs **vitamin D + calcium** — the shape in
 `bone-model.ts`.
 
