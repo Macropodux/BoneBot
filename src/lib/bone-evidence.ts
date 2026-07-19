@@ -45,7 +45,7 @@ export type EvidenceCard = {
 export const EVIDENCE_SOURCES: EvidenceSource[] = [
   {
     id: "nhs-dxa",
-    title: "Bone density scan (DEXA scan): when it is used",
+    title: "Bone density scan (DXA scan): when it is used",
     publisher: "NHS",
     url: "https://www.nhs.uk/tests-and-treatments/dexa-scan/why-its-done/",
     type: "government",

@@ -18,7 +18,7 @@
 // before; see mapAnswersToFeatures() below — flagged there for a clinical
 // sanity-check, not a measurement.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { resolveAmbiguousAnswer } from "@/lib/ambiguity";
 import { scoreBone, type BoneFeatures, type ModelOutput } from "@/lib/bone-model";
 import { scoreTriage, type TriageOutput } from "@/lib/triage-model";
@@ -73,7 +73,7 @@ const STEPS: Step[] = [
     ? [
         {
           key: "secondaryCondition" as StepKey,
-          q: "Have you been diagnosed with thyroid disease, coeliac disease, or chronic kidney disease?",
+          q: "Have you been diagnosed with thyroid disease or chronic kidney disease?",
           options: ["Yes", "No", "Not sure"],
         },
       ]
@@ -248,14 +248,14 @@ const CAT_META = {
     chip: "Worth a conversation",
     color: "#A06D14",
     bg: "#FBF3DD",
-    desc: "Some of your answers match established risk factors for low bone density. This doesn't mean you have osteoporosis; it means a DEXA scan is worth discussing with your GP.",
+    desc: "Some of your answers match established risk factors for low bone density. This doesn't mean you have osteoporosis; it means a DXA scan is worth discussing with your GP.",
   },
   elevated: {
     label: "Elevated risk",
-    chip: "Ask your GP about a DEXA scan",
+    chip: "Ask your GP about a DXA scan",
     color: "#B0442F",
     bg: "#F9E7E2",
-    desc: "Several of your answers match strong clinical risk factors. A screening flag is not a diagnosis, but this profile is exactly what DEXA referral guidelines are designed to catch. Please raise it with your GP.",
+    desc: "Several of your answers match strong clinical risk factors. A screening flag is not a diagnosis, but this profile is exactly what DXA referral guidelines are designed to catch. Please raise it with your GP.",
   },
 } as const;
 
@@ -371,7 +371,7 @@ const RESOURCES = [
     name: "Bone Health & Osteoporosis Foundation",
     url: "https://www.bonehealthandosteoporosis.org/preventing-fractures/",
     brief:
-      "A US clinician-and-patient organization (formerly NOF). Their fracture-prevention guidance covers FRAX risk scoring, what a DEXA scan involves, and the range of treatments a doctor might discuss.",
+      "A US clinician-and-patient organization (formerly NOF). Their fracture-prevention guidance covers FRAX risk scoring, what a DXA scan involves, and the range of treatments a doctor might discuss.",
   },
   {
     name: "NHS: Osteoporosis",
@@ -438,15 +438,59 @@ function ResourcesCard() {
   );
 }
 
+// Minimal, dependency-free markdown for LLM-written text: **bold**, *italic*/
+// _italic_, and "- "/"1. " lists. Everything else is a plain paragraph. Every
+// LLM word still passes through as a React text node (never innerHTML), so
+// there's no way for the model's output to inject markup.
+function renderInline(text: string): ReactNode {
+  return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/g).map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) return <strong key={i}>{part.slice(2, -2)}</strong>;
+    if ((part.startsWith("*") && part.endsWith("*")) || (part.startsWith("_") && part.endsWith("_"))) {
+      return <em key={i}>{part.slice(1, -1)}</em>;
+    }
+    return part;
+  });
+}
+
+function Markdown({ text, className }: { text: string; className?: string }) {
+  const blocks = text.trim().split(/\n{2,}/);
+  return (
+    <div className={`flex flex-col gap-2.5 ${className ?? ""}`}>
+      {blocks.map((block, bi) => {
+        const lines = block.split("\n").map((l) => l.trim()).filter(Boolean);
+        if (lines.length > 0 && lines.every((l) => /^[-*]\s+/.test(l))) {
+          return (
+            <ul key={bi} className="list-disc space-y-1 pl-5">
+              {lines.map((l, li) => (
+                <li key={li}>{renderInline(l.replace(/^[-*]\s+/, ""))}</li>
+              ))}
+            </ul>
+          );
+        }
+        if (lines.length > 0 && lines.every((l) => /^\d+[.)]\s+/.test(l))) {
+          return (
+            <ol key={bi} className="list-decimal space-y-1 pl-5">
+              {lines.map((l, li) => (
+                <li key={li}>{renderInline(l.replace(/^\d+[.)]\s+/, ""))}</li>
+              ))}
+            </ol>
+          );
+        }
+        return <p key={bi}>{renderInline(lines.join(" "))}</p>;
+      })}
+    </div>
+  );
+}
+
 function BotBubble({ text, small }: { text: string; small?: boolean }) {
   return (
     <div className="flex justify-start">
       <div
-        className={`max-w-[78%] whitespace-pre-wrap ${small ? "text-sm" : "text-base"} leading-[1.55] ${
+        className={`max-w-[78%] ${small ? "text-sm" : "text-base"} leading-[1.55] ${
           small ? "rounded-[14px_14px_14px_4px] bg-[#F5F7F6] px-[15px] py-[11px]" : "rounded-[16px_16px_16px_4px] border border-[#E3E9E7] bg-white px-[18px] py-3"
         }`}
       >
-        {text}
+        <Markdown text={text} />
       </div>
     </div>
   );
@@ -500,6 +544,7 @@ export default function Home() {
   const [routeMessage, setRouteMessage] = useState("");
   const [scoreExplanation, setScoreExplanation] = useState("");
   const [implicationsExplanation, setImplicationsExplanation] = useState("");
+  const [summaryExplanation, setSummaryExplanation] = useState("");
   const [reportedDxa, setReportedDxa] = useState<{ score: number; year?: number } | null>(null);
   const [freeInput, setFreeInput] = useState("");
   const [userName, setUserName] = useState("");
@@ -511,6 +556,17 @@ export default function Home() {
   // Feature 1 — extracted-but-unconfirmed values from the blood-result image.
   // Nothing here reaches mapAnswersToFeatures()/scoreBone() until the user
   // hits "Use these" or edits + confirms; "Skip" discards it entirely.
+  // Set when a typed menopause age falls outside the typical 40–58 range —
+  // held for an explicit confirm/re-enter instead of silently accepted, since
+  // it's likely a typo (e.g. "28" meant to be "48").
+  const [pendingMenopauseAge, setPendingMenopauseAge] = useState<number | null>(null);
+  // True while BoneBot is waiting on the "continue the survey or head home?"
+  // choice shown after she says she already has existing bone-health care.
+  const [pendingExistingCareConfirm, setPendingExistingCareConfirm] = useState(false);
+  // Holds the in-progress answers while BoneBot is waiting on the "continue
+  // regardless, or see the explanation of that score?" choice, shown when a
+  // reported DXA score is from within the last 2 years.
+  const [pendingRecentDxaAnswers, setPendingRecentDxaAnswers] = useState<Partial<Record<StepKey, string>> | null>(null);
   const [pendingBloodResults, setPendingBloodResults] = useState<UploadedBloodResults | null>(null);
   const [bloodEditMode, setBloodEditMode] = useState(false);
   const [bloodEditVitaminD, setBloodEditVitaminD] = useState("");
@@ -541,7 +597,7 @@ export default function Home() {
 
   // Feature 7 — dedicated weight+height entry for the "weight" step; BMI is
   // computed deterministically (kg / m^2) and stored as the step's answer.
-  const [weightInput, setWeightInput] = useState("");
+  const [weightInput, setWeightInput] = useState("60");
   const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg");
   const [heightUnit, setHeightUnit] = useState<"cm" | "ftin">("cm");
   const [heightCmInput, setHeightCmInput] = useState("");
@@ -617,7 +673,7 @@ export default function Home() {
     setActivityImageFiles([]);
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
-    setWeightInput("");
+    setWeightInput("60");
     setWeightUnit("kg");
     setHeightUnit("cm");
     setHeightCmInput("");
@@ -642,7 +698,9 @@ export default function Home() {
       model.category === "lower"
         ? "This result is reassuring, but it cannot decide on its own whether a scan is appropriate. Keep supporting your bone health and discuss screening at a routine GP visit if that is relevant to you."
         : "This screening result is a reason to discuss a DXA scan and wider fracture-risk assessment with your GP. It is not a diagnosis.";
-    const getExplanation = async (explanationType: "score" | "implications", fallback: string) => {
+    // Falls back to the static per-band CAT_META.desc — see its render site.
+    const summaryFallback = CAT_META[CATEGORY_MAP[model.category]].desc;
+    const getExplanation = async (explanationType: "score" | "implications" | "summary", fallback: string) => {
       try {
         const response = await fetch("/api/assistant", {
           method: "POST",
@@ -652,6 +710,7 @@ export default function Home() {
             result: model,
             features: full,
             explanationType,
+            name: userName,
             // Feature 10a — full result context + profile, flattened, for the
             // explainer route on the other side of this call.
             ...resultContext(model),
@@ -663,12 +722,14 @@ export default function Home() {
         return fallback;
       }
     };
-    const [scoreText, implicationsText] = await Promise.all([
+    const [scoreText, implicationsText, summaryText] = await Promise.all([
       getExplanation("score", scoreFallback),
       getExplanation("implications", implicationsFallback),
+      getExplanation("summary", summaryFallback),
     ]);
     setScoreExplanation(scoreText);
     setImplicationsExplanation(implicationsText);
+    setSummaryExplanation(summaryText);
     setQaMessages([{ role: "bot", text: "Ask a question about your bone-health screening result." }]);
     setScreen("results");
   }
@@ -760,8 +821,11 @@ export default function Home() {
       if (nextAnswers.assignedFemale !== "Yes") {
         void finishAtGate("BoneBot is currently calibrated for people assigned female at birth. A clinician can help you find the right bone-health assessment.");
       } else if (nextAnswers.existingCare === "Yes") {
-        setStepIdx(4);
-        botSay(STEPS[4].q);
+        // Already-diagnosed / already-scanned / already-medicated — steer to
+        // her GP rather than walking straight into the DXA sub-questions, but
+        // let her choose to continue the survey anyway.
+        setPendingExistingCareConfirm(true);
+        botSay("In this case we recommend you consult your GP if you have any questions about your bone health. Do you want to continue the survey, or head back home?");
       } else {
         continueAfterTriage(nextAnswers);
       }
@@ -787,7 +851,19 @@ export default function Home() {
     }
 
     if (stepIdx === 6) {
-      showReportedDxa(nextAnswers);
+      // A DXA report is normally still valid for a couple of years — a very
+      // recent one (e.g. "-2.5 from last year") is worth double-checking
+      // rather than silently short-circuiting straight to the reported-score
+      // explanation and skipping the full questionnaire.
+      const yearNum = Number(opt);
+      const currentYear = new Date().getFullYear();
+      const isRecent = Number.isFinite(yearNum) && yearNum <= currentYear && currentYear - yearNum <= 2;
+      if (isRecent) {
+        setPendingRecentDxaAnswers(nextAnswers);
+        botSay("That's a fairly recent scan. Do you want to continue with the full questionnaire anyway, or see the explanation of your reported score?");
+      } else {
+        showReportedDxa(nextAnswers);
+      }
       return;
     }
 
@@ -874,6 +950,19 @@ export default function Home() {
     if (!raw || !step || flowQuestionBusy || extracting) return;
     const value = normaliseFreeAnswer(step.key, raw);
     if (value && value !== "Not sure" && value !== "Unknown") {
+      if (step.key === "menopause") {
+        const ageNum = Number(value);
+        if (ageNum < 40 || ageNum > 58) {
+          setMessages((items) => [
+            ...items,
+            { role: "user", text: raw },
+            { role: "bot", text: `Just to double check — menopause at around age ${ageNum} is outside the typical range. Is that right?` },
+          ]);
+          setPendingMenopauseAge(ageNum);
+          setFreeInput("");
+          return;
+        }
+      }
       answer(value, raw);
       return;
     }
@@ -935,7 +1024,7 @@ export default function Home() {
       const response = await fetch("/api/assistant", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ mode: "consumer", question: raw, stage: "questionnaire" }),
+        body: JSON.stringify({ mode: "consumer", question: raw, stage: "questionnaire", name: userName }),
       });
       if (response.ok) text = (await response.json()).text;
     } catch {
@@ -1032,6 +1121,43 @@ export default function Home() {
     } else if (message) {
       setMessages((items) => [...items, { role: "bot", text: message }]);
     }
+  }
+
+  function confirmMenopauseAge() {
+    if (pendingMenopauseAge === null) return;
+    const age = pendingMenopauseAge;
+    setPendingMenopauseAge(null);
+    answer(String(age), "Yes, that's right");
+  }
+
+  function rejectMenopauseAge() {
+    setPendingMenopauseAge(null);
+    setMessages((items) => [...items, { role: "user", text: "No, let me re-enter" }, { role: "bot", text: "No problem — what age was it?" }]);
+  }
+
+  function confirmExistingCareContinue() {
+    setPendingExistingCareConfirm(false);
+    setStepIdx(4);
+    botSay(STEPS[4].q);
+  }
+
+  function confirmExistingCareReturnHome() {
+    setPendingExistingCareConfirm(false);
+    restart();
+  }
+
+  function confirmRecentDxaContinue() {
+    if (!pendingRecentDxaAnswers) return;
+    const nextAnswers = pendingRecentDxaAnswers;
+    setPendingRecentDxaAnswers(null);
+    continueAfterTriage(nextAnswers);
+  }
+
+  function confirmRecentDxaSeeExplanation() {
+    if (!pendingRecentDxaAnswers) return;
+    const nextAnswers = pendingRecentDxaAnswers;
+    setPendingRecentDxaAnswers(null);
+    showReportedDxa(nextAnswers);
   }
 
   const VITAMIN_D_RANGE = { min: 10, max: 250 };
@@ -1272,6 +1398,10 @@ export default function Home() {
     setReportedDxa(null);
     setScoreExplanation("");
     setImplicationsExplanation("");
+    setSummaryExplanation("");
+    setPendingMenopauseAge(null);
+    setPendingExistingCareConfirm(false);
+    setPendingRecentDxaAnswers(null);
     setFreeInput("");
     setBloodResults(null);
     setPendingBloodResults(null);
@@ -1287,7 +1417,7 @@ export default function Home() {
     setUnresolvedAnswerCount(0);
     setClarificationCounts({});
     setUncertaintyNotes([]);
-    setWeightInput("");
+    setWeightInput("60");
     setWeightUnit("kg");
     setHeightUnit("cm");
     setHeightCmInput("");
@@ -1326,6 +1456,7 @@ export default function Home() {
           stage: "results",
           result: resultContext(result),
           profile: features,
+          name: userName,
         }),
       });
       if (r.ok) text = (await r.json()).text;
@@ -1347,7 +1478,19 @@ export default function Home() {
   }
 
   const step = STEPS[stepIdx];
-  const inFlow = screen === "chat" && step && !typing && messages.length > 1;
+  // Several flows chain two botSay() calls with a setTimeout between them
+  // (e.g. the name greeting, then the first question, a beat later) — typing
+  // is false in that gap, so also require the step's own question to have
+  // actually landed in the transcript before showing its chips/input. Without
+  // this, answer options could flash in right after the FIRST message, before
+  // the question they answer has appeared.
+  const lastMessage = messages[messages.length - 1];
+  const currentQuestionShown = Boolean(step) && lastMessage?.role === "bot" && lastMessage.text === step.q;
+  // Confirm/re-ask prompts (menopause-age outlier, existing-care GP steer,
+  // recent-DXA-score check) post their OWN bot message, not step.q — gate
+  // those on chatReady, not inFlow, or currentQuestionShown hides them.
+  const chatReady = screen === "chat" && !typing;
+  const inFlow = chatReady && step && messages.length > 1 && currentQuestionShown;
   const progressPct = awaitingName ? 0 : Math.round((stepIdx / STEPS.length) * 100);
   const progressLabel = awaitingName
     ? "Getting started"
@@ -1425,7 +1568,7 @@ export default function Home() {
               {[
                 { stat: "1 in 2", body: "women over 50 will fracture a bone due to osteoporosis." },
                 { stat: "NHANES", body: "The prediction comes from a model trained on national health survey data, not from a chatbot." },
-                { stat: "Adaptive", body: "Four quick screening questions, then more detail only when needed. No account or forms." },
+                { stat: "Adaptive", body: "Only 4 quick screening questions, then more detail only when needed. No account or forms." },
               ].map((c) => (
                 <div
                   key={c.stat}
@@ -1444,7 +1587,7 @@ export default function Home() {
 
       {screen === "chat" && (
         <div className="flex min-h-0 flex-1 flex-col">
-          <header className="flex items-center gap-6 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
+          <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
             <button
               type="button"
               onClick={goToLanding}
@@ -1459,17 +1602,22 @@ export default function Home() {
               />
             </div>
             <div className="text-[13px] font-medium text-[#5A6462]">{progressLabel}</div>
-            <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
-              Screening flag, not a diagnosis
+            {/* Wrapped as its own group so it drops to a second line as a
+                unit on narrow phones, instead of the badge or button
+                individually overflowing the viewport. */}
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <div className="rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
+                Screening flag, not a diagnosis
+              </div>
+              <button
+                onClick={() => {
+                  if (messages.length <= 1 || window.confirm("Start over? This clears your answers so far.")) restart();
+                }}
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+              >
+                Start over
+              </button>
             </div>
-            <button
-              onClick={() => {
-                if (messages.length <= 1 || window.confirm("Start over? This clears your answers so far.")) restart();
-              }}
-              className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
-            >
-              Start over
-            </button>
           </header>
           <div ref={chatRef} className="flex-1 overflow-y-auto px-6 py-8">
             <div className="mx-auto flex max-w-[680px] flex-col gap-3.5">
@@ -1839,7 +1987,61 @@ export default function Home() {
                 </div>
               )}
 
-              {inFlow && !pendingBloodResults && step.key !== "weight" && step.key !== "activity" && (
+              {chatReady && step?.key === "menopause" && pendingMenopauseAge !== null && (
+                <div className="flex flex-wrap gap-2.5">
+                  <button
+                    onClick={confirmMenopauseAge}
+                    className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
+                    style={{ backgroundColor: ACCENT }}
+                  >
+                    Yes, that&apos;s right
+                  </button>
+                  <button
+                    onClick={rejectMenopauseAge}
+                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                  >
+                    No, let me re-enter
+                  </button>
+                </div>
+              )}
+
+              {chatReady && step?.key === "existingCare" && pendingExistingCareConfirm && (
+                <div className="flex flex-wrap gap-2.5">
+                  <button
+                    onClick={confirmExistingCareContinue}
+                    className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
+                    style={{ backgroundColor: ACCENT }}
+                  >
+                    Continue the survey
+                  </button>
+                  <button
+                    onClick={confirmExistingCareReturnHome}
+                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                  >
+                    Return home
+                  </button>
+                </div>
+              )}
+
+              {chatReady && step?.key === "dxaYear" && pendingRecentDxaAnswers !== null && (
+                <div className="flex flex-wrap gap-2.5">
+                  <button
+                    onClick={confirmRecentDxaContinue}
+                    className="rounded-full px-5 py-2.5 text-[15px] font-medium text-white transition-colors"
+                    style={{ backgroundColor: ACCENT }}
+                  >
+                    Continue the questionnaire
+                  </button>
+                  <button
+                    onClick={confirmRecentDxaSeeExplanation}
+                    className="rounded-full border-[1.5px] border-[#C6CFCC] px-5 py-2.5 text-[15px] font-medium text-[#4A5452] transition-colors hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+                  >
+                    See my score explanation
+                  </button>
+                </div>
+              )}
+
+              {inFlow && !pendingBloodResults && pendingMenopauseAge === null && step.key !== "weight" && step.key !== "activity" && (
                 <div className="flex flex-col gap-2.5">
                   {/* Questions with chip options (Yes/No, etc.) are answered
                       by tapping a chip only — free typing is reserved for
@@ -1984,7 +2186,7 @@ export default function Home() {
 
       {screen === "results" && !result && (
         <div className="flex min-h-0 flex-1 flex-col">
-          <header className="flex items-center gap-6 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
+          <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
             <button
               type="button"
               onClick={goToLanding}
@@ -1993,15 +2195,17 @@ export default function Home() {
               Bone<span style={{ color: ACCENT }}>Bot</span>
             </button>
             <div className="text-[13px] font-medium text-[#5A6462]">Initial screening result</div>
-            <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
-              Screening flag, not a diagnosis
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <div className="rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
+                Screening flag, not a diagnosis
+              </div>
+              <button
+                onClick={restart}
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+              >
+                Start over
+              </button>
             </div>
-            <button
-              onClick={restart}
-              className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
-            >
-              Start over
-            </button>
           </header>
           <div className="flex flex-1 items-start justify-center overflow-y-auto px-6 py-10">
             <div className="flex w-full max-w-2xl flex-col gap-5">
@@ -2079,7 +2283,7 @@ export default function Home() {
 
       {screen === "results" && result && (
         <div className="flex min-h-0 flex-1 flex-col">
-          <header className="flex items-center gap-6 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
+          <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-[#E3E9E7] bg-white px-6 py-4 sm:px-12">
             <button
               type="button"
               onClick={goToLanding}
@@ -2088,25 +2292,27 @@ export default function Home() {
               Bone<span style={{ color: ACCENT }}>Bot</span>
             </button>
             <div className="hidden text-[13px] font-medium text-[#5A6462] sm:block">Screening complete</div>
-            <div className="ml-auto rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
-              Screening flag, not a diagnosis
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <div className="rounded-full bg-[#FBF3DD] px-3 py-[5px] text-xs font-semibold text-[#8A6A1F]">
+                Screening flag, not a diagnosis
+              </div>
+              <button
+                onClick={() => emailSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                className="flex items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+              >
+                <span aria-hidden>✉️</span> Email this result
+              </button>
+              <button
+                onClick={restart}
+                className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
+              >
+                Start over
+              </button>
             </div>
-            <button
-              onClick={() => emailSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })}
-              className="hidden items-center gap-1.5 rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E] sm:flex"
-            >
-              <span aria-hidden>✉️</span> Email this result
-            </button>
-            <button
-              onClick={restart}
-              className="rounded-lg border-[1.5px] border-[#C6CFCC] px-3.5 py-[7px] text-[13px] font-semibold text-[#4A5452] hover:border-[#0E7C6E] hover:text-[#0E7C6E]"
-            >
-              Start over
-            </button>
           </header>
 
           <div className="flex-1 overflow-y-auto px-6 py-8 sm:px-12">
-            <div className="mx-auto grid max-w-[1140px] grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_420px]">
+            <div className="mx-auto grid max-w-[1140px] grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_420px] 2xl:max-w-[1360px] 2xl:grid-cols-[1fr_460px]">
               <div className="flex flex-col gap-5">
                 {!result.validated && (
                   <p className="rounded-[14px] border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-xs text-amber-700">
@@ -2117,7 +2323,7 @@ export default function Home() {
                 <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
                   <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
                     <div className="text-[13px] font-semibold uppercase tracking-[0.1em] text-[#5A6462]">
-                      Your screening result
+                      {userName ? `${userName}'s screening result` : "Your screening result"}
                     </div>
                     <div className="flex gap-1 rounded-[9px] bg-[#EEF2F0] p-1">
                       {TABS.map((t) => (
@@ -2150,7 +2356,7 @@ export default function Home() {
                           {catMeta.chip}
                         </div>
                       </div>
-                      <p className="text-pretty text-base leading-[1.6] text-[#4A5452]">{catMeta.desc}</p>
+                      <Markdown text={summaryExplanation || catMeta.desc} className="text-pretty text-base leading-[1.6] text-[#4A5452]" />
                     </>
                   )}
 
@@ -2277,7 +2483,7 @@ export default function Home() {
                     </span>
                     <AIWrittenBadge />
                   </div>
-                  <p className="mt-4 whitespace-pre-wrap text-[15px] leading-[1.65] text-[#4A5452]">{scoreExplanation}</p>
+                  <Markdown text={scoreExplanation} className="mt-4 text-[15px] leading-[1.65] text-[#4A5452]" />
                 </div>
 
                 <div className="rounded-2xl border border-[#E3E9E7] bg-white px-7 py-7 sm:px-8">
@@ -2287,7 +2493,7 @@ export default function Home() {
                     </span>
                     <AIWrittenBadge />
                   </div>
-                  <p className="mt-4 whitespace-pre-wrap text-[15px] leading-[1.65] text-[#4A5452]">{implicationsExplanation}</p>
+                  <Markdown text={implicationsExplanation} className="mt-4 text-[15px] leading-[1.65] text-[#4A5452]" />
                 </div>
 
                 {bloodResults && (
@@ -2321,19 +2527,19 @@ export default function Home() {
                 >
                   <div>
                     <div className="font-[family-name:var(--font-heading)] text-[19px] font-bold text-white">
-                      Next step: talk to your GP about a DEXA scan
+                      Next step: talk to your GP about a DXA scan
                     </div>
                     <div className="mt-1 text-sm text-[#CBE6E0]">
-                      A DEXA scan is the actual diagnostic test. This screening tells you whether it&apos;s worth
+                      A DXA scan is the actual diagnostic test. This screening tells you whether it&apos;s worth
                       asking for one.
                     </div>
                   </div>
                   <button
-                    onClick={() => qaAsk("What's a DEXA scan?")}
+                    onClick={() => qaAsk("What's a DXA scan?")}
                     className="whitespace-nowrap rounded-[9px] bg-white px-5 py-3 font-[family-name:var(--font-heading)] text-sm font-bold hover:bg-[#E4F0ED]"
                     style={{ color: ACCENT }}
                   >
-                    What&apos;s a DEXA scan?
+                    What&apos;s a DXA scan?
                   </button>
                 </div>}
 
@@ -2437,7 +2643,10 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="flex h-[640px] flex-col rounded-2xl border border-[#E3E9E7] bg-white">
+              {/* Fixed height on mobile (stacks below the report); on large
+                  screens it pins alongside the long left column and grows to
+                  fill the viewport instead of leaving a short, dead panel. */}
+              <div className="flex h-[640px] flex-col rounded-2xl border border-[#E3E9E7] bg-white lg:sticky lg:top-8 lg:h-[calc(100vh-8.5rem)] lg:min-h-[420px]">
                 <div className="border-b border-[#E3E9E7] px-6 py-[18px]">
                   <div className="font-[family-name:var(--font-heading)] text-base font-bold">Ask about your result</div>
                   <div className="mt-0.5 text-[13px] text-[#5A6462]">The AI explains; it never changes your score.</div>
@@ -2455,7 +2664,7 @@ export default function Home() {
                 </div>
                 <div className="flex flex-col gap-2.5 border-t border-[#E3E9E7] px-5 py-3.5">
                   <div className="flex flex-wrap gap-2">
-                    {[`Why is my risk ${cat}?`, "What is a DEXA scan?", "What can I do now?"].map((s) => (
+                    {[`Why is my risk ${cat}?`, "What is a DXA scan?", "What can I do now?"].map((s) => (
                       <button
                         key={s}
                         onClick={() => qaAsk(s)}
