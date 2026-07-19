@@ -2958,8 +2958,11 @@ export default function Home() {
                           const isPositive = f.direction === "raises";
                           // A near-zero contribution isn't meaningfully raising or
                           // lowering the estimate — color it neutral grey instead of
-                          // implying a direction that barely matters.
-                          const isNegligible = Math.abs(f.contribution) < 0.1;
+                          // implying a direction that barely matters. Anything that
+                          // survived the 0.0-rounding filter above and still displays
+                          // as a real value (e.g. "+0.1") should get its real color,
+                          // so this threshold is well below the display precision.
+                          const isNegligible = Math.abs(f.contribution) < 0.01;
                           const factorColor = isNegligible ? "#9AA5A2" : isPositive ? ACCENT : "#B0442F";
                           const halfWidthPct = Math.max(3, Math.round((Math.abs(f.contribution) / maxAbs) * 50));
                           const detail = features ? factorDetail(f.factor, features) : { value: "" };
