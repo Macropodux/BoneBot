@@ -10,7 +10,7 @@ import { z } from "zod";
 
 export const maxDuration = 30;
 
-const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o";
 
 export async function POST(req: Request) {
   const { message, mode = "text" }: { message: string; mode?: "text" | "object" } = await req.json();

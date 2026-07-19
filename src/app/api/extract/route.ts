@@ -12,7 +12,7 @@ import { z } from "zod";
 
 export const maxDuration = 15;
 
-const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-4o";
 
 const ExtractSchema = z.object({
   value: z.string().nullable(),

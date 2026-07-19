@@ -14,7 +14,7 @@ import { activityLevelFromDailyAverages } from "@/lib/activity-input";
 
 export const maxDuration = 30;
 
-const VISION_MODEL = process.env.OPENAI_VISION_MODEL ?? "gpt-4o-mini";
+const VISION_MODEL = process.env.OPENAI_VISION_MODEL ?? "gpt-4o";
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 // Shared cap with blood-results/route.ts — enforced client-side (page.tsx
 // disables adding a 4th) and re-checked here.
