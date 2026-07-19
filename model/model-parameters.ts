@@ -4,7 +4,9 @@
 // Feature set matches what the app collects/imputes.
 // Activity is objective wrist-accelerometry (MIMS), averaged over valid wear
 // days only (>=10 h wake-wear, >=4 days) so low-wear days do not masquerade as
-// inactivity.
+// inactivity. The Ridge model was fitted after training-only median imputation,
+// robust Mahalanobis outlier filtering, and standardisation. The values below
+// are the exported raw-scale equivalents, so the app can score raw inputs.
 
 export const triage = {
   intercept: -4.638858,
@@ -23,31 +25,31 @@ export const triage = {
 export const SECONDARY_CONDITION_TRAINED = true;
 
 export const tScoreModel = {
-  intercept: -3.574560,
+  intercept: -4.024468,
   coefficients: {
-    age: -0.031843,
-    bmi: 0.066326,
-    yearsSinceMenopause: 0.002001,
-    activityLevel: 0.320833,
-    priorFragilityFracture: -0.377236,
-    glucocorticoids: -0.135299,
-    currentSmoker: 0.008751,
-    highAlcohol: -0.069274,
-    vitaminD: -0.001059,
-    calcium: 0.975935,
-    rheumatoidArthritis: 0.001246,
-    onHormoneTherapy: 0.107144,
-    secondaryCondition: -0.045588,
+    age: -0.031870,
+    bmi: 0.069652,
+    yearsSinceMenopause: 0.001773,
+    activityLevel: 0.279435,
+    priorFragilityFracture: -0.364870,
+    glucocorticoids: -0.103762,
+    currentSmoker: -0.000036,
+    highAlcohol: -0.033828,
+    vitaminD: -0.000731,
+    calcium: 1.124829,
+    rheumatoidArthritis: -0.001976,
+    onHormoneTherapy: 0.130588,
+    secondaryCondition: -0.031610,
   },
   imputationDefaults: {
-    bmi: 28.1000,
-    yearsSinceMenopause: 17.0000,
-    activityLevel: 0.6798,
+    bmi: 27.8000,
+    yearsSinceMenopause: 16.0000,
+    activityLevel: 0.6752,
     priorFragilityFracture: 0.0000,
     glucocorticoids: 0.0000,
     currentSmoker: 0.0000,
     highAlcohol: 0.0000,
-    vitaminD: 75.3000,
+    vitaminD: 76.0000,
     calcium: 2.3750,
     rheumatoidArthritis: 0.0000,
     onHormoneTherapy: 0.0000,
@@ -56,15 +58,15 @@ export const tScoreModel = {
   // Complete-data 95% half-width (z * residualStd). Used as the fallback and
   // when no provided-features set is passed; the per-person band (below) widens
   // it for imputed inputs.
-  intervalHalfWidth: 1.8532,
-  mae: 0.7250,
+  intervalHalfWidth: 1.8546,
+  mae: 0.7270,
   // Per-person prediction interval. residualStd is the complete-data residual
   // SD; z its multiplier. When a feature is imputed at inference its variance is
   // added back: extra variance = coefficient^2 * featureVariances[feature],
   // summed over imputed features (see scoreBone). Empirical coverage under ~50%
   // induced missingness: 0.946 (target 0.95).
   intervals: {
-    residualStd: 0.9455,
+    residualStd: 0.9462,
     z: 1.96,
     featureVariances: {
       age: 85.51958,
