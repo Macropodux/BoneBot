@@ -23,7 +23,7 @@ Extend the landing page's floating-bone visual identity through the conversation
   1. “Over the past 7 days, about how many steps did you average per day?”
   2. “Over the past 7 days, about how many active or exercise minutes did you average per day?”
 - Keep activity language explicit that steps and active minutes are practical proxies, not equivalent to the MIMS measure used in training.
-- Do not change results-page copy in this pass.
+- Do not broadly edit results-page copy. A narrow downstream label correction is allowed when required to keep a revised question faithful to the trained model.
 
 ## Accessibility and Interaction
 
@@ -35,7 +35,7 @@ Extend the landing page's floating-bone visual identity through the conversation
 ## Scope
 
 - Modify only the questionnaire screen composition and any component test needed to prove the reused motif contract.
-- Do not change answers, model features, scoring, APIs, or results-page copy.
+- Do not change answers, model features, scoring, or APIs.
 - Copy edits may change landing/questionnaire wording but must not change routing or data semantics.
 - Add no dependency and perform no broad redesign.
 
