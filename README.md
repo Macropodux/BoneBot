@@ -1,5 +1,7 @@
 # BoneBot
 
+🏆 **Winner, Hack-Nation's 6th Global AI Hackathon — London hub.**
+
 **BoneBot is a hormone-aware bone-health screening assistant for postmenopausal
 women.** It turns a woman's health profile — menopause history, risk factors, and
 simple labs — into an **estimated T-score with an uncertainty range**, the factors
